@@ -17,6 +17,9 @@ export default defineConfig({
         ),
         'monaco-editor/esm/vs/language/typescript/monaco.contribution.js': resolve(
           'node_modules/monaco-editor/esm/vs/language/typescript/monaco.contribution.js'
+        ),
+        'monaco-editor/esm/vs/languages/definitions/typescript/typescript.js': resolve(
+          'node_modules/monaco-editor/esm/vs/languages/definitions/typescript/typescript.js'
         )
       }
     },

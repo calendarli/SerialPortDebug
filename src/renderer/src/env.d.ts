@@ -5,3 +5,4 @@ declare module 'monaco-editor/esm/vs/editor/editor.api.js' {
 }
 
 declare module 'monaco-editor/esm/vs/language/typescript/monaco.contribution.js'
+declare module 'monaco-editor/esm/vs/languages/definitions/typescript/typescript.js'

@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api.js'
 import type * as Monaco from 'monaco-editor'
 import * as typescriptRuntime from 'monaco-editor/esm/vs/language/typescript/monaco.contribution.js'
+import * as typescriptSyntaxRuntime from 'monaco-editor/esm/vs/languages/definitions/typescript/typescript.js'
 import './monaco-setup'
 import scriptApiTypes from './script-api.d.ts?raw'
 import { hashScriptSource } from './script-pipeline'
@@ -27,6 +28,10 @@ let configured = false
 const models = new Map<string, monaco.editor.ITextModel>()
 const viewStates = new Map<string, monaco.editor.ICodeEditorViewState | null>()
 const typescript = typescriptRuntime as typeof Monaco.typescript
+const typescriptSyntax = typescriptSyntaxRuntime as {
+  conf: Monaco.languages.LanguageConfiguration
+  language: Monaco.languages.IMonarchLanguage
+}
 
 function configureTypeScript(): void {
   if (configured) return
@@ -49,6 +54,13 @@ function configureTypeScript(): void {
       aliases: ['JavaScript', 'js']
     })
   }
+  monaco.languages.setLanguageConfiguration('typescript', typescriptSyntax.conf)
+  monaco.languages.setMonarchTokensProvider('typescript', typescriptSyntax.language)
+  monaco.languages.setLanguageConfiguration('javascript', typescriptSyntax.conf)
+  monaco.languages.setMonarchTokensProvider('javascript', {
+    ...typescriptSyntax.language,
+    tokenPostfix: '.js'
+  })
   const options: Monaco.typescript.CompilerOptions = {
     target: typescript.ScriptTarget.ES2020,
     module: typescript.ModuleKind.None,
