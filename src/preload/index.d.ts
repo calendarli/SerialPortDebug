@@ -19,6 +19,7 @@ declare global {
   interface Window {
     electron: ElectronAPI
     api: {
+      getAppInfo(): Promise<{ version: string; platform: string; arch: string }>
       listPorts(): Promise<SerialPortInfo[]>
       openPort(options: SerialOptions): Promise<boolean>
       closePort(path: string): Promise<void>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
-type Tab = 'serial' | 'commands' | 'rules' | 'scripts'
+type Tab = 'serial' | 'commands' | 'rules' | 'scripts' | 'about'
 type Props = {
   activeTab: Tab
   commandCount: number
@@ -10,6 +10,7 @@ type Props = {
   serialContent: ReactNode
   commandsContent: ReactNode
   rulesContent: ReactNode
+  aboutContent: ReactNode
 }
 const storageKey = 'serialflow.sidebarWidth'
 const defaultWidth = 320
@@ -107,6 +108,14 @@ export function Sidebar(props: Props): React.JSX.Element {
           <span>脚本</span>
           {props.enabledScriptCount > 0 && <b>{props.enabledScriptCount}</b>}
         </button>
+        <button
+          title="关于"
+          className={`about-tab ${props.activeTab === 'about' ? 'active' : ''}`}
+          onClick={() => props.onTabChange('about')}
+        >
+          <span className="tab-icon">ⓘ</span>
+          <span>关于</span>
+        </button>
       </nav>
       {props.activeTab !== 'scripts' && (
         <>
@@ -115,7 +124,9 @@ export function Sidebar(props: Props): React.JSX.Element {
               ? props.serialContent
               : props.activeTab === 'commands'
                 ? props.commandsContent
-                : props.rulesContent}
+                : props.activeTab === 'rules'
+                  ? props.rulesContent
+                  : props.aboutContent}
           </div>
           <div
             className="sidebar-resizer"

@@ -843,6 +843,9 @@ footer > span:first-child {
   border-radius: 0 3px 3px 0;
   background: var(--primary);
 }
+.resizable-sidebar .side-tabs .about-tab {
+  margin-top: auto;
+}
 .resizable-sidebar .side-tabs .tab-icon {
   font-size: 22px;
   line-height: 18px;
@@ -883,6 +886,115 @@ footer > span:first-child {
 }
 .resizable-sidebar.resizing {
   user-select: none;
+}
+.about-panel {
+  min-height: 100%;
+  padding: 24px 20px;
+  color: var(--text);
+}
+.about-identity {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+.about-logo {
+  width: 48px;
+  height: 48px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  color: #fff;
+  font-size: 28px;
+  font-weight: 800;
+  background: linear-gradient(145deg, #38bdf8, #2563eb);
+  box-shadow: 0 8px 20px #2563eb35;
+}
+.about-identity h2 {
+  margin: 0 0 2px;
+  font-size: 22px;
+}
+.about-identity p,
+.about-description,
+.about-footer {
+  margin: 0;
+  color: var(--muted);
+}
+.about-identity p {
+  font-size: 15px;
+}
+.about-description {
+  margin: 18px 0;
+  line-height: 1.65;
+  font-size: 15px;
+}
+.about-details {
+  margin: 0;
+  padding: 5px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.about-details > div {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.about-details dt {
+  color: var(--muted);
+  font-size: 14px;
+}
+.about-details dd {
+  margin: 0;
+  text-align: right;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.about-repository {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 14px;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  background: var(--primary-soft);
+}
+.about-repository-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 700;
+  background: #fff;
+}
+.about-repository strong {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 15px;
+}
+.about-repository a {
+  display: block;
+  color: var(--primary);
+  font-size: 13px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+.about-repository a:hover {
+  text-decoration: underline;
+}
+.about-footer {
+  margin-top: 14px;
+  text-align: center;
+  font-size: 13px;
 }
 @media (max-width: 1050px) {
   .workspace {

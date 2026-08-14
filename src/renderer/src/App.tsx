@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ReceivePanel } from './components/ReceivePanel'
 import { AutoReplyPanel } from './components/AutoReplyPanel'
+import { AboutPanel } from './components/AboutPanel'
 import { CommandsPanel } from './components/CommandsPanel'
 import { SendPanel } from './components/SendPanel'
 import { SerialConfigPanel } from './components/SerialConfigPanel'
@@ -367,7 +368,9 @@ function App(): React.JSX.Element {
   const [commands, setCommands] = useState<SavedCommand[]>(loadCommands)
   const [commandGroups, setCommandGroups] = useState<CommandGroup[]>(loadCommandGroups)
   const [scripts, setScripts] = useState<UserScript[]>(() => ensureInitialScripts(loadScripts()))
-  const [sideTab, setSideTab] = useState<'serial' | 'commands' | 'rules' | 'scripts'>('serial')
+  const [sideTab, setSideTab] = useState<'serial' | 'commands' | 'rules' | 'scripts' | 'about'>(
+    'serial'
+  )
   const [rxCommunicationCount, setRxCommunicationCount] = useState(0)
   const [txCommunicationCount, setTxCommunicationCount] = useState(0)
   const [rxFrequency, setRxFrequency] = useState(0)
@@ -1143,6 +1146,7 @@ function App(): React.JSX.Element {
               onResetState={resetAutoReplyState}
             />
           }
+          aboutContent={<AboutPanel />}
         />
         {sideTab === 'scripts' ? (
           <section className="script-content">

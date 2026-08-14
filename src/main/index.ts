@@ -112,6 +112,11 @@ async function closeAllPorts(): Promise<void> {
 }
 
 function registerSerialHandlers(): void {
+  ipcMain.handle('app:info', () => ({
+    version: app.getVersion(),
+    platform: process.platform,
+    arch: process.arch
+  }))
   ipcMain.handle('serial:list', async () => {
     try {
       return await SerialPort.list()
