@@ -1149,6 +1149,7 @@ footer > span:first-child {
     monospace;
 }
 .parameter-editor {
+  container-type: inline-size;
   padding: 11px;
   overflow-x: auto;
   border: 1px solid var(--border);
@@ -1324,6 +1325,30 @@ footer > span:first-child {
   background: transparent;
   color: #94a3b8;
   font-size: 20px;
+}
+.command-parameter-edit-row {
+  grid-template-columns: minmax(150px, 1fr) 86px minmax(100px, max-content) 26px;
+  gap: 7px;
+}
+.command-parameter-edit-row > input {
+  width: 100%;
+  min-width: 0;
+}
+.command-parameter-edit-row .copy-placeholder {
+  max-width: 210px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@container (max-width: 460px) {
+  .command-parameter-edit-row {
+    grid-template-columns: minmax(0, 1fr) 100px 26px;
+  }
+  .command-parameter-edit-row > input:first-child {
+    grid-column: 1 / -1;
+  }
+  .command-parameter-edit-row .copy-placeholder {
+    max-width: 100px;
+  }
 }
 .parameter-byte-help {
   display: block;

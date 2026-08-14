@@ -1127,7 +1127,7 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
                   </button>
                 </div>
                 {draft.parameters.map((parameter, index) => (
-                  <div className="parameter-edit-row" key={index}>
+                  <div className="parameter-edit-row command-parameter-edit-row" key={index}>
                     <input
                       value={parameter.id}
                       placeholder="参数名字，例如 目标速度"

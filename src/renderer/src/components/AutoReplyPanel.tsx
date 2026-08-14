@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Rule } from '../types'
-import { defaultAutoReplyProgram } from '../scripts/auto-reply-program'
+import { defaultAutoReplyProgram, upgradeAutoReplyProgram } from '../scripts/auto-reply-program'
 
 type Props = {
   rules: Rule[]
@@ -45,6 +45,21 @@ function extractPlaceholderIds(template: string): string[] {
       [...template.matchAll(/\{\{([^{}]+)\}\}/g)].map((match) => match[1].trim()).filter(Boolean)
     )
   ]
+}
+
+function extractReturnedParameterIds(source: string): string[] {
+  const ids: string[] = []
+  const returnObjectPattern = /\breturn\s*\{([\s\S]*?)\}/g
+  for (const objectMatch of source.matchAll(returnObjectPattern)) {
+    const body = objectMatch[1]
+    const propertyPattern =
+      /(?:^|,)\s*(?:(['"])([^'"\r\n]+)\1|([\p{L}_$][\p{L}\p{N}_$]*))\s*(?=:|,|$)/gu
+    for (const propertyMatch of body.matchAll(propertyPattern)) {
+      const id = (propertyMatch[2] || propertyMatch[3] || '').trim()
+      if (id && !ids.includes(id)) ids.push(id)
+    }
+  }
+  return ids
 }
 
 export function AutoReplyPanel({
@@ -149,7 +164,7 @@ export function AutoReplyPanel({
           ? 'program'
           : 'parameters',
       parameters: rule.parameters.map((parameter) => ({ id: parameter.id })),
-      parameterProgram: rule.parameterProgram || defaultAutoReplyProgram
+      parameterProgram: upgradeAutoReplyProgram(rule.parameterProgram)
     })
     setError('')
     setCreating(true)
@@ -178,6 +193,16 @@ export function AutoReplyPanel({
       setError('复制失败，请检查剪贴板权限')
     }
   }
+  const insertProgramTab = (event: React.KeyboardEvent<HTMLTextAreaElement>): void => {
+    if (event.key !== 'Tab') return
+    event.preventDefault()
+    const target = event.currentTarget
+    const start = target.selectionStart
+    const end = target.selectionEnd
+    const next = `${draft.parameterProgram.slice(0, start)}\t${draft.parameterProgram.slice(end)}`
+    setDraft((current) => ({ ...current, parameterProgram: next }))
+    window.requestAnimationFrame(() => target.setSelectionRange(start + 1, start + 1))
+  }
   const saveRule = (): void => {
     if (!draft.name.trim()) return setError('请输入规则名称')
     if (!draft.pattern.trim()) return setError('请输入接收匹配表达式')
@@ -197,14 +222,23 @@ export function AutoReplyPanel({
       .map((parameter) => ({ ...parameter, id: parameter.id.trim() }))
       .filter((parameter) => Boolean(parameter.id))
     const placeholders = extractPlaceholderIds(draft.reply)
+    const returnedParameters = extractReturnedParameterIds(draft.parameterProgram)
     const parameters =
-      draft.parameterMode === 'program' ? placeholders.map((id) => ({ id })) : definedParameters
+      draft.parameterMode === 'program'
+        ? returnedParameters.map((id) => ({ id }))
+        : definedParameters
     const ids = parameters.map((parameter) => parameter.id)
     if (ids.some((id) => /[{}]/.test(id))) return setError('参数名字不能包含花括号')
     if (new Set(ids).size !== ids.length) return setError('参数名字不能重复')
+    if (draft.parameterMode === 'program' && placeholders.length && !returnedParameters.length)
+      return setError('未识别到程序返回参数，请使用 return { 参数名: 值 } 格式')
     const undefinedPlaceholder = placeholders.find((id) => !ids.includes(id))
-    if (draft.parameterMode === 'parameters' && undefinedPlaceholder)
-      return setError(`发送指令中的参数“${undefinedPlaceholder}”尚未定义`)
+    if (undefinedPlaceholder)
+      return setError(
+        draft.parameterMode === 'program'
+          ? `发送占位符“${undefinedPlaceholder}”与程序返回参数不一致`
+          : `发送指令中的参数“${undefinedPlaceholder}”尚未定义`
+      )
     if (draft.parameterMode === 'program') {
       if (!draft.parameterProgram.trim()) return setError('请输入编程模式代码')
       if (!/\bfunction\s+calculate\s*\(|\bcalculate\s*=/.test(draft.parameterProgram))
@@ -265,7 +299,7 @@ export function AutoReplyPanel({
     setEditingRuleId(null)
   }
 
-  const detectedProgramParameters = extractPlaceholderIds(draft.reply)
+  const detectedProgramParameters = extractReturnedParameterIds(draft.parameterProgram)
 
   return (
     <div className="auto-reply-panel" onContextMenu={(event) => openMenu(event, null)}>
@@ -403,7 +437,16 @@ export function AutoReplyPanel({
             if (event.target === event.currentTarget) setCreating(false)
           }}
         >
-          <div ref={modalRef} className="modal create-rule-modal">
+          <div
+            ref={modalRef}
+            className="modal create-rule-modal"
+            onKeyDown={(event) => {
+              if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+                event.preventDefault()
+                saveRule()
+              }
+            }}
+          >
             <div className="modal-head">
               <div>
                 <h2>{editingRuleId === null ? '新建自动回复规则' : '编辑自动回复规则'}</h2>
@@ -600,7 +643,7 @@ export function AutoReplyPanel({
               ) : (
                 <div className="program-placeholder-note">
                   <div className="program-placeholder-head">
-                    <span>程序返回参数从发送指令的占位符自动识别，无需手动添加</span>
+                    <span>实时识别程序返回对象，点击参数可复制到发送指令</span>
                     <strong className={detectedProgramParameters.length ? '' : 'empty'}>
                       实时监控 · {detectedProgramParameters.length} 个
                     </strong>
@@ -618,7 +661,7 @@ export function AutoReplyPanel({
                         </button>
                       ))
                     ) : (
-                      <small>尚未识别到占位符，例如：{'{{计数}}'}</small>
+                      <small>尚未识别到返回参数，例如：return {'{ 计数: i }'}</small>
                     )}
                   </div>
                 </div>
@@ -626,32 +669,14 @@ export function AutoReplyPanel({
               {draft.parameterMode === 'program' && (
                 <label className="auto-reply-program-editor">
                   编程参数程序（JavaScript）
-                  <span
-                    className="regex-help program-help"
-                    tabIndex={0}
-                    aria-label="自动回复编程参数使用说明"
-                    data-tooltip={
-                      '编程规则：\n' +
-                      '1. 必须定义 function calculate(input, match, context)。\n' +
-                      '2. 每次匹配自动回复规则时执行一次；顶层变量会在多次触发间保留，点击“重置状态”后清空。\n' +
-                      '3. input 是本次匹配的接收内容；match 是正则匹配数组；context.port 是串口；context.groups 是命名捕获组。\n' +
-                      '4. 发送指令中的 {{参数名}} 会自动成为返回参数；返回普通对象，键名必须与全部占位符完全一致，支持中文。值可使用字符串、数字或布尔值。\n\n' +
-                      '示例：\nlet i = 0\nfunction calculate(input, match, context) {\n  i++\n  return { 计数: i, PWM: 100 }\n}'
-                    }
-                  >
-                    ?
-                  </span>
                   <textarea
                     spellCheck={false}
                     value={draft.parameterProgram}
+                    onKeyDown={insertProgramTab}
                     onChange={(event) =>
                       setDraft({ ...draft, parameterProgram: event.target.value })
                     }
                   />
-                  <small>
-                    每次触发执行 <code>calculate(input, match, context)</code>
-                    。返回发送指令中全部占位符，例如 <code>{'{ 计数: i, PWM: 100 }'}</code>。
-                  </small>
                 </label>
               )}
               {error && <p className="form-error">{error}</p>}

@@ -748,26 +748,22 @@ function App(): React.JSX.Element {
                 const reply = fillRuleParameters(rule, values)
                   .replace(/\\r/g, '\r')
                   .replace(/\\n/g, '\n')
-                return send({
+                void send({
                   text: reply,
                   hex: rule.hex,
                   targetPort: rule.targetPort || sourcePort
-                })
+                }).catch((cause) => showError(cause, `自动回复“${rule.name}”发送失败`))
               })
               .catch((cause) => {
                 if (cause instanceof Error && cause.message === '规则状态已重置') return
                 const count = (autoReplyErrorCountsRef.current.get(rule.id) || 0) + 1
                 autoReplyErrorCountsRef.current.set(rule.id, count)
-                if (count === 1) showError(cause, `自动回复“${rule.name}”编程执行失败`)
-                if (count >= 3) {
-                  autoReplyProgramRuntime.reset(rule.id)
-                  setRules((current) =>
-                    current.map((item) =>
-                      item.id === rule.id ? { ...item, enabled: false } : item
-                    )
+                if (count === 1 || count % 10 === 0)
+                  showError(
+                    cause,
+                    `自动回复“${rule.name}”编程执行失败（第 ${count} 次，规则保持启用）`
                   )
-                  setMessage(`自动回复“${rule.name}”连续失败 3 次，已自动停用`)
-                }
+                else setMessage(`自动回复“${rule.name}”编程执行失败 ${count} 次，规则仍保持启用`)
               })
           } else {
             const reply = fillRuleParameters(rule).replace(/\\r/g, '\r').replace(/\\n/g, '\n')

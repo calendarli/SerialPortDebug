@@ -2,8 +2,20 @@ import type { Rule } from '../types'
 import { ScriptRuntime } from './script-runtime'
 import type { SavedScript, ScriptRunResult } from './script-types'
 
-export const defaultAutoReplyProgram = `// 顶层变量会在多次触发间保留，点击“重置状态”后清零
-let i = 0
+const legacyAutoReplyComment = '// 顶层变量会在多次触发间保留，点击“重置状态”后清零'
+const autoReplyProgramComment = `/**
+ * 自动回复编程规则
+ *
+ * 1. 每次收到匹配数据时执行 calculate(input, match, context)。
+ * 2. 返回对象的键是参数名，可在发送指令中用双花括号占位符引用。
+ *    返回对象示例：{ 计数: i, PWM: 100 }
+ * 3. input 是匹配内容，match 是正则结果，context 包含端口和命名捕获组等信息。
+ * 4. 顶层变量会在多次触发间保留；点击“重置状态”可清除累计数据。
+ * 5. 最终编码为 HEX 时，数字自动转换并补齐完整字节：1→01、10→0A、256→0100。
+ * 6. 编辑器快捷键：Tab 插入制表符，Ctrl+S 保存规则。
+ */`
+
+export const defaultAutoReplyProgram = `let i = 0
 
 function calculate(input, match, context) {
   i++
@@ -11,6 +23,15 @@ function calculate(input, match, context) {
     计数: i
   }
 }`
+
+export function upgradeAutoReplyProgram(source: string | undefined): string {
+  if (!source?.trim()) return defaultAutoReplyProgram
+  if (source.startsWith(autoReplyProgramComment))
+    return source.slice(autoReplyProgramComment.length).trimStart()
+  if (source.startsWith(legacyAutoReplyComment))
+    return source.slice(legacyAutoReplyComment.length).trimStart()
+  return source
+}
 
 export type AutoReplyProgramInput = {
   input: string
@@ -51,9 +72,21 @@ execute((value, _msgType, _index, context) => {
 })`
 }
 
-function printableValue(value: unknown): string {
+function unsignedIntegerHex(value: number | bigint): string {
+  if (typeof value === 'number' && (!Number.isSafeInteger(value) || value < 0))
+    throw new Error('HEX 编码的数字参数必须是非负安全整数')
+  if (typeof value === 'bigint' && value < 0n) throw new Error('HEX 编码的数字参数不能是负数')
+  const hex = value.toString(16).toUpperCase()
+  return hex.length % 2 ? `0${hex}` : hex
+}
+
+function printableValue(value: unknown, hex: boolean): string {
   if (value === null || value === undefined) return ''
   if (typeof value === 'string') return value
+  if (hex) {
+    if (typeof value === 'number' || typeof value === 'bigint') return unsignedIntegerHex(value)
+    if (typeof value === 'boolean') return value ? '01' : '00'
+  }
   if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint')
     return String(value)
   return JSON.stringify(value)
@@ -66,7 +99,7 @@ function normalizeOutput(rule: Rule, result: ScriptRunResult): Record<string, st
   const values: Record<string, string> = {}
   for (const parameter of rule.parameters) {
     if (!(parameter.id in output)) throw new Error(`程序没有输出参数“${parameter.id}”`)
-    values[parameter.id] = printableValue(output[parameter.id])
+    values[parameter.id] = printableValue(output[parameter.id], rule.hex)
   }
   return values
 }
