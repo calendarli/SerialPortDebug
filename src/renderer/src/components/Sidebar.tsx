@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
-type Tab = 'serial' | 'commands' | 'rules' | 'scripts' | 'about'
+type Tab = 'serial' | 'commands' | 'rules' | 'scripts' | 'tests' | 'modbus' | 'about'
 type Props = {
   activeTab: Tab
   commandCount: number
@@ -27,6 +27,7 @@ function initialWidth(): number {
 }
 
 export function Sidebar(props: Props): React.JSX.Element {
+  const fullPage = ['scripts', 'tests', 'modbus'].includes(props.activeTab)
   const [width, setWidth] = useState(initialWidth)
   const [resizing, setResizing] = useState(false)
   const dragStart = useRef({ x: 0, width: defaultWidth })
@@ -69,8 +70,8 @@ export function Sidebar(props: Props): React.JSX.Element {
 
   return (
     <aside
-      className={`config-panel resizable-sidebar ${props.activeTab === 'scripts' ? 'script-tab-only' : ''} ${resizing ? 'resizing' : ''}`}
-      style={{ width: props.activeTab === 'scripts' ? 52 : width }}
+      className={`config-panel resizable-sidebar ${fullPage ? 'script-tab-only' : ''} ${resizing ? 'resizing' : ''}`}
+      style={{ width: fullPage ? 52 : width }}
     >
       <nav className="side-tabs" aria-label="侧栏导航">
         <button
@@ -109,6 +110,22 @@ export function Sidebar(props: Props): React.JSX.Element {
           {props.enabledScriptCount > 0 && <b>{props.enabledScriptCount}</b>}
         </button>
         <button
+          title="自动化测试"
+          className={props.activeTab === 'tests' ? 'active' : ''}
+          onClick={() => props.onTabChange('tests')}
+        >
+          <span className="tab-icon">✓</span>
+          <span>测试</span>
+        </button>
+        <button
+          title="Modbus RTU"
+          className={props.activeTab === 'modbus' ? 'active' : ''}
+          onClick={() => props.onTabChange('modbus')}
+        >
+          <span className="tab-icon">M</span>
+          <span>Modbus</span>
+        </button>
+        <button
           title="关于"
           className={`about-tab ${props.activeTab === 'about' ? 'active' : ''}`}
           onClick={() => props.onTabChange('about')}
@@ -117,7 +134,7 @@ export function Sidebar(props: Props): React.JSX.Element {
           <span>关于</span>
         </button>
       </nav>
-      {props.activeTab !== 'scripts' && (
+      {!fullPage && (
         <>
           <div className="side-page">
             {props.activeTab === 'serial'

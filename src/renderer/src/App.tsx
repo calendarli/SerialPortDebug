@@ -1,11 +1,15 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ReceivePanel } from './components/ReceivePanel'
+import { PlotPanel } from './components/PlotPanel'
+import { ModbusPanel } from './components/ModbusPanel'
+import { TestPanel } from './components/TestPanel'
 import { AutoReplyPanel } from './components/AutoReplyPanel'
 import { AboutPanel } from './components/AboutPanel'
 import { CommandsPanel } from './components/CommandsPanel'
 import { SendPanel } from './components/SendPanel'
 import { SerialConfigPanel } from './components/SerialConfigPanel'
 import { Sidebar } from './components/Sidebar'
+import { defaultSerialFraming, SerialFramer } from './serial-framer'
 import { ScriptFramer } from './scripts/script-framer'
 import { autoReplyProgramRuntime } from './scripts/auto-reply-program'
 import {
@@ -16,14 +20,7 @@ import {
 } from './scripts/script-pipeline'
 import { ensureInitialScripts, loadScripts, saveScripts } from './scripts/script-storage'
 import type { SavedScript as UserScript } from './scripts/script-types'
-import {
-  appendCrc,
-  base64ToBytes,
-  bytesToBase64,
-  bytesToHex,
-  convertSerialText,
-  formatTime
-} from './serial-utils'
+import { appendCrc, bytesToBase64, bytesToHex, convertSerialText, formatTime } from './serial-utils'
 import type {
   CommandGroup,
   CrcMode,
@@ -34,6 +31,7 @@ import type {
   Rule,
   SavedCommand,
   SerialConfig,
+  SerialFraming,
   StopBits
 } from './types'
 
@@ -227,6 +225,20 @@ type PersistedSerialConfig = {
   dataBits: DataBits
   stopBits: StopBits
   parity: Parity
+  framing: SerialFraming
+  plotEnabled: boolean
+}
+function normalizeSerialFraming(value?: Partial<SerialFraming>): SerialFraming {
+  const mode = ['raw', 'delimiter', 'fixed', 'header-footer', 'idle'].includes(value?.mode || '')
+    ? (value!.mode as SerialFraming['mode'])
+    : defaultSerialFraming.mode
+  return {
+    ...defaultSerialFraming,
+    ...value,
+    mode,
+    fixedLength: Math.max(1, Math.floor(Number(value?.fixedLength) || 8)),
+    idleTimeout: Math.max(1, Math.floor(Number(value?.idleTimeout) || 20))
+  }
 }
 function loadSerialConfig(): PersistedSerialConfig {
   const fallback: PersistedSerialConfig = {
@@ -234,7 +246,9 @@ function loadSerialConfig(): PersistedSerialConfig {
     baudRate: 115200,
     dataBits: 8,
     stopBits: 1,
-    parity: 'none'
+    parity: 'none',
+    framing: defaultSerialFraming,
+    plotEnabled: true
   }
   try {
     const saved = JSON.parse(
@@ -260,7 +274,9 @@ function loadSerialConfig(): PersistedSerialConfig {
       baudRate,
       dataBits,
       stopBits,
-      parity
+      parity,
+      framing: normalizeSerialFraming(saved.framing),
+      plotEnabled: saved.plotEnabled !== false
     }
   } catch {
     return fallback
@@ -273,7 +289,9 @@ function loadSerialConfigs(): SerialConfig[] {
     if (Array.isArray(saved) && saved.length) {
       return saved.map((config, index) => ({
         ...config,
-        id: Number(config.id) || Date.now() + index
+        id: Number(config.id) || Date.now() + index,
+        framing: normalizeSerialFraming(config.framing),
+        plotEnabled: config.plotEnabled !== false
       }))
     }
   } catch {
@@ -334,11 +352,20 @@ function App(): React.JSX.Element {
     () => [...new Set(serialConfigs.map((config) => config.path).filter(Boolean))],
     [serialConfigs]
   )
+  const plotPorts = useMemo(
+    () =>
+      serialConfigs
+        .filter((config) => config.plotEnabled && config.path)
+        .map((config) => config.path),
+    [serialConfigs]
+  )
   const openedPortList = useMemo(() => [...openedPorts], [openedPorts])
   const [connectionBusy, setConnectionBusy] = useState(false)
   const [rxHex, setRxHex] = useState(() => loadBooleanSetting(receiveHexKey, false))
   const [timestamp, setTimestamp] = useState(() => loadBooleanSetting(timestampKey, true))
   const [paused, setPaused] = useState(false)
+  const [sessionRecording, setSessionRecording] = useState(false)
+  const [replayRunning, setReplayRunning] = useState(false)
   const [autoPauseEnabled, setAutoPauseEnabled] = useState(() =>
     loadBooleanSetting(autoPauseEnabledKey, false)
   )
@@ -368,13 +395,15 @@ function App(): React.JSX.Element {
   const [commands, setCommands] = useState<SavedCommand[]>(loadCommands)
   const [commandGroups, setCommandGroups] = useState<CommandGroup[]>(loadCommandGroups)
   const [scripts, setScripts] = useState<UserScript[]>(() => ensureInitialScripts(loadScripts()))
-  const [sideTab, setSideTab] = useState<'serial' | 'commands' | 'rules' | 'scripts' | 'about'>(
-    'serial'
-  )
+  const [sideTab, setSideTab] = useState<
+    'serial' | 'commands' | 'rules' | 'scripts' | 'tests' | 'modbus' | 'about'
+  >('serial')
   const [rxCommunicationCount, setRxCommunicationCount] = useState(0)
   const [txCommunicationCount, setTxCommunicationCount] = useState(0)
   const [rxFrequency, setRxFrequency] = useState(0)
   const [txFrequency, setTxFrequency] = useState(0)
+  const [ipcBatchFrequency, setIpcBatchFrequency] = useState(0)
+  const [ipcChunksPerBatch, setIpcChunksPerBatch] = useState(0)
   const [message, setMessage] = useState('就绪')
   const [errorDialog, setErrorDialog] = useState<string | null>(null)
   const [sendPanelHeight, setSendPanelHeight] = useState(loadSendPanelHeight)
@@ -405,6 +434,8 @@ function App(): React.JSX.Element {
   }>({ entries: [], rxEvents: 0, txEvents: 0 })
   const trafficEventsRef = useRef({ rx: 0, tx: 0 })
   const frequencySampleRef = useRef({ rx: 0, tx: 0, time: 0 })
+  const ipcTrafficRef = useRef({ batches: 0, chunks: 0 })
+  const ipcSampleRef = useRef({ batches: 0, chunks: 0 })
   const interactionSettingsRef = useRef({
     maxBytes: interactionCacheMb * 1024 * 1024,
     maxEntries: interactionCacheEntries,
@@ -413,6 +444,7 @@ function App(): React.JSX.Element {
   const autoSendCompletedRef = useRef(0)
   const scriptsRef = useRef(scripts)
   const scriptFramerRef = useRef(new ScriptFramer())
+  const serialFramerRef = useRef(new SerialFramer())
   const scriptReceiveQueuesRef = useRef(new Map<string, Promise<void>>())
   const scriptErrorCountsRef = useRef(new Map<string, number>())
   const autoReplyErrorCountsRef = useRef(new Map<number, number>())
@@ -473,7 +505,8 @@ function App(): React.JSX.Element {
       port: string,
       text: string,
       bytes: number,
-      visible = true
+      visible = true,
+      plotText?: string
     ): void => {
       const pending = pendingInteractionsRef.current
       if (direction === 'rx') {
@@ -489,6 +522,8 @@ function App(): React.JSX.Element {
           direction,
           port,
           text,
+          plotText,
+          timestampMs: Date.now(),
           bytes,
           time: interactionSettingsRef.current.timestamp ? formatTime() : undefined
         })
@@ -679,14 +714,21 @@ function App(): React.JSX.Element {
       const current = trafficEventsRef.current
       setRxFrequency((current.rx - previous.rx) / elapsedSeconds)
       setTxFrequency((current.tx - previous.tx) / elapsedSeconds)
+      const ipcCurrent = ipcTrafficRef.current
+      const ipcPrevious = ipcSampleRef.current
+      const batchDelta = ipcCurrent.batches - ipcPrevious.batches
+      setIpcBatchFrequency(batchDelta / elapsedSeconds)
+      setIpcChunksPerBatch(
+        batchDelta > 0 ? (ipcCurrent.chunks - ipcPrevious.chunks) / batchDelta : 0
+      )
+      ipcSampleRef.current = { ...ipcCurrent }
       frequencySampleRef.current = { rx: current.rx, tx: current.tx, time: now }
     }, 1000)
     return () => window.clearInterval(timer)
   }, [])
 
   useEffect(() => {
-    const offData = window.api.onData(({ path: sourcePort, base64 }) => {
-      const bytes = base64ToBytes(base64)
+    const processReceivedFrame = (sourcePort: string, bytes: Uint8Array, replay = false): void => {
       let decoder = textDecoders.current.get(sourcePort)
       if (!decoder) {
         decoder = new TextDecoder()
@@ -722,7 +764,7 @@ function App(): React.JSX.Element {
           return autoPauseExpression.test(candidate)
         })
       }
-      for (const { rule, expression } of compiledRules) {
+      for (const { rule, expression } of replay ? [] : compiledRules) {
         if (rule.targetPort && rule.targetPort !== sourcePort) continue
         const candidates = rule.receiveHex
           ? [hexBuffer, bytesToHex(bytes)]
@@ -784,7 +826,14 @@ function App(): React.JSX.Element {
           (script.direction === 'all' || script.direction === 'received') &&
           (!script.ports.length || script.ports.includes(sourcePort))
       )
-      queueInteraction('rx', sourcePort, rendered, bytes.length, !paused && !replaceRawDisplay)
+      queueInteraction(
+        'rx',
+        sourcePort,
+        rendered,
+        bytes.length,
+        !paused && !replaceRawDisplay,
+        text
+      )
       for (const script of scriptsRef.current) {
         if (
           !script.enabled ||
@@ -806,6 +855,21 @@ function App(): React.JSX.Element {
         pauseHexBuffers.current.set(sourcePort, '')
         setPaused(true)
         setMessage(`已按条件自动暂停：${autoPausePattern}`)
+      }
+    }
+    const offData = window.api.onData(({ path: sourcePort, chunks, replay }) => {
+      ipcTrafficRef.current.batches += 1
+      ipcTrafficRef.current.chunks += chunks.length
+      const framing =
+        serialConfigs.find((config) => config.path === sourcePort)?.framing || defaultSerialFraming
+      for (const chunk of chunks) {
+        try {
+          serialFramerRef.current.push(sourcePort, framing, chunk, (frame) =>
+            processReceivedFrame(sourcePort, frame, replay)
+          )
+        } catch (cause) {
+          showError(cause, `${sourcePort} 接收分帧失败`)
+        }
       }
     })
     const offStatus = window.api.onStatus((status) => {
@@ -839,6 +903,7 @@ function App(): React.JSX.Element {
     paused,
     queueInteraction,
     rxHex,
+    serialConfigs,
     send,
     sendPort,
     showError
@@ -984,7 +1049,9 @@ function App(): React.JSX.Element {
         baudRate: 115200,
         dataBits: 8,
         stopBits: 1,
-        parity: 'none'
+        parity: 'none',
+        framing: { ...defaultSerialFraming },
+        plotEnabled: true
       }
     ])
   }
@@ -1003,7 +1070,13 @@ function App(): React.JSX.Element {
       else {
         if (!config.path) return showProblem('请选择串口；如果列表为空，请先点击刷新并检查设备连接')
         if (openedPorts.has(config.path)) return showProblem(`${config.path} 已经打开`)
-        await window.api.openPort(config)
+        await window.api.openPort({
+          path: config.path,
+          baudRate: config.baudRate,
+          dataBits: config.dataBits,
+          stopBits: config.stopBits,
+          parity: config.parity
+        })
         setMessage(
           `已打开 ${config.path}（${config.baudRate} baud，${config.dataBits}${config.parity === 'none' ? 'N' : config.parity[0].toUpperCase()}${config.stopBits}）`
         )
@@ -1048,6 +1121,10 @@ function App(): React.JSX.Element {
     setTxCommunicationCount(0)
     setRxFrequency(0)
     setTxFrequency(0)
+    ipcTrafficRef.current = { batches: 0, chunks: 0 }
+    ipcSampleRef.current = { batches: 0, chunks: 0 }
+    setIpcBatchFrequency(0)
+    setIpcChunksPerBatch(0)
   }
   const resetAutoReplyState = useCallback((ruleId: number, notify = true): void => {
     autoReplyProgramRuntime.reset(ruleId)
@@ -1084,6 +1161,110 @@ function App(): React.JSX.Element {
     const next = Math.min(24, Math.max(8, Math.round(value)))
     setInteractionFontSize(next)
     localStorage.setItem(interactionFontSizeKey, String(next))
+  }
+  const toggleSessionRecording = async (): Promise<void> => {
+    try {
+      if (sessionRecording) {
+        const result = await window.api.stopSession()
+        setSessionRecording(false)
+        if (result)
+          setMessage(
+            `会话已保存：${result.events.toLocaleString()} 条，${formatCacheBytes(result.bytes)}`
+          )
+        return
+      }
+      const result = await window.api.startSession()
+      if (!result) return
+      setSessionRecording(true)
+      setMessage(`正在录制原始串口会话：${result.path}`)
+    } catch (error) {
+      setSessionRecording(false)
+      showError(error, '串口会话录制失败')
+    }
+  }
+  const toggleReplay = async (): Promise<void> => {
+    try {
+      if (replayRunning) {
+        await window.api.stopReplay()
+        setReplayRunning(false)
+        setMessage('会话回放已停止')
+        return
+      }
+      setReplayRunning(true)
+      const result = await window.api.replaySession()
+      setReplayRunning(false)
+      if (result)
+        setMessage(
+          result.stopped
+            ? '会话回放已停止'
+            : `会话回放完成：${result.events.toLocaleString()} 条 RX 数据`
+        )
+    } catch (error) {
+      setReplayRunning(false)
+      showError(error, '回放串口会话失败')
+    }
+  }
+  const exportProject = async (): Promise<void> => {
+    try {
+      const path = await window.api.saveProject({
+        format: 'serialflow-project',
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        serialConfigs,
+        rules,
+        commands,
+        commandGroups,
+        scripts,
+        settings: {
+          rxHex,
+          timestamp,
+          interactionCacheMb,
+          interactionCacheEntries,
+          interactionFontSize
+        }
+      })
+      if (path) setMessage(`工程已导出：${path}`)
+    } catch (error) {
+      showError(error, '导出工程失败')
+    }
+  }
+  const importProject = async (): Promise<void> => {
+    try {
+      const selected = await window.api.openProject()
+      if (!selected) return
+      const project = JSON.parse(selected.content) as Record<string, unknown>
+      if (project.format !== 'serialflow-project' || project.version !== 1)
+        throw new Error('不是受支持的 SerialFlow 工程文件')
+      if (Array.isArray(project.serialConfigs) && project.serialConfigs.length)
+        setSerialConfigs(
+          (project.serialConfigs as SerialConfig[]).map((config, index) => ({
+            ...config,
+            id: Number(config.id) || Date.now() + index,
+            framing: normalizeSerialFraming(config.framing),
+            plotEnabled: config.plotEnabled !== false
+          }))
+        )
+      if (Array.isArray(project.rules)) setRules(project.rules as Rule[])
+      if (Array.isArray(project.commands)) setCommands(project.commands as SavedCommand[])
+      if (Array.isArray(project.commandGroups))
+        setCommandGroups(project.commandGroups as CommandGroup[])
+      if (Array.isArray(project.scripts))
+        setScripts(ensureInitialScripts(project.scripts as UserScript[]))
+      const settings = project.settings as Record<string, unknown> | undefined
+      if (settings) {
+        if (typeof settings.rxHex === 'boolean') setRxHex(settings.rxHex)
+        if (typeof settings.timestamp === 'boolean') setTimestamp(settings.timestamp)
+        if (typeof settings.interactionCacheMb === 'number')
+          changeInteractionCacheMb(settings.interactionCacheMb)
+        if (typeof settings.interactionCacheEntries === 'number')
+          changeInteractionEntryLimit(settings.interactionCacheEntries)
+        if (typeof settings.interactionFontSize === 'number')
+          changeInteractionFontSize(settings.interactionFontSize)
+      }
+      setMessage(`工程已导入：${selected.path}`)
+    } catch (error) {
+      showError(error, '导入工程失败')
+    }
   }
 
   return (
@@ -1123,6 +1304,8 @@ function App(): React.JSX.Element {
               onDataBitsChange={changeDataBits}
               onRefresh={() => void refreshPorts()}
               onToggle={(config) => void toggleConnection(config)}
+              onImportProject={() => void importProject()}
+              onExportProject={() => void exportProject()}
             />
           }
           commandsContent={
@@ -1153,35 +1336,53 @@ function App(): React.JSX.Element {
               <ScriptPanel scripts={scripts} setScripts={setScripts} ports={configuredPorts} />
             </Suspense>
           </section>
+        ) : sideTab === 'tests' ? (
+          <TestPanel
+            entries={interactionCache.entries}
+            ports={openedPortList}
+            onSend={(text, hex, port) => sendCommandData(text, hex, null, port)}
+          />
+        ) : sideTab === 'modbus' ? (
+          <ModbusPanel
+            ports={openedPortList}
+            onSend={(text, hex, port) => sendCommandData(text, hex, null, port)}
+          />
         ) : (
           <section
             className="content"
             style={{ gridTemplateRows: `minmax(200px, 1fr) ${sendPanelHeight}px` }}
           >
-            <ReceivePanel
-              entries={interactionCache.entries}
-              rxHex={rxHex}
-              timestamp={timestamp}
-              paused={paused}
-              autoPauseEnabled={autoPauseEnabled}
-              autoPausePattern={autoPausePattern}
-              autoPauseRegex={autoPauseRegex}
-              autoPauseHex={autoPauseHex}
-              cacheSizeMb={interactionCacheMb}
-              cacheEntryLimit={interactionCacheEntries}
-              fontSize={interactionFontSize}
-              onClear={clearReceive}
-              onRxHexChange={setRxHex}
-              onTimestampChange={setTimestamp}
-              onPausedChange={setPaused}
-              onAutoPauseEnabledChange={setAutoPauseEnabled}
-              onAutoPausePatternChange={setAutoPausePattern}
-              onAutoPauseRegexChange={setAutoPauseRegex}
-              onAutoPauseHexChange={setAutoPauseHex}
-              onCacheSizeChange={changeInteractionCacheMb}
-              onCacheEntryLimitChange={changeInteractionEntryLimit}
-              onFontSizeChange={changeInteractionFontSize}
-            />
+            <div className="interaction-stack">
+              <PlotPanel entries={interactionCache.entries} enabledPorts={plotPorts} embedded />
+              <ReceivePanel
+                entries={interactionCache.entries}
+                rxHex={rxHex}
+                timestamp={timestamp}
+                paused={paused}
+                autoPauseEnabled={autoPauseEnabled}
+                autoPausePattern={autoPausePattern}
+                autoPauseRegex={autoPauseRegex}
+                autoPauseHex={autoPauseHex}
+                cacheSizeMb={interactionCacheMb}
+                cacheEntryLimit={interactionCacheEntries}
+                fontSize={interactionFontSize}
+                sessionRecording={sessionRecording}
+                replayRunning={replayRunning}
+                onClear={clearReceive}
+                onRxHexChange={setRxHex}
+                onTimestampChange={setTimestamp}
+                onPausedChange={setPaused}
+                onAutoPauseEnabledChange={setAutoPauseEnabled}
+                onAutoPausePatternChange={setAutoPausePattern}
+                onAutoPauseRegexChange={setAutoPauseRegex}
+                onAutoPauseHexChange={setAutoPauseHex}
+                onCacheSizeChange={changeInteractionCacheMb}
+                onCacheEntryLimitChange={changeInteractionEntryLimit}
+                onFontSizeChange={changeInteractionFontSize}
+                onToggleSessionRecording={() => void toggleSessionRecording()}
+                onToggleReplay={() => void toggleReplay()}
+              />
+            </div>
             <SendPanel
               text={sendText}
               hex={sendHex}
@@ -1255,6 +1456,8 @@ function App(): React.JSX.Element {
           {formatCacheBytes(interactionCache.bytes)} / {interactionCacheMb} MB · 频率{' '}
           <span className="rx">RX {formatFrequency(rxFrequency)} Hz</span> /{' '}
           <span className="tx">TX {formatFrequency(txFrequency)} Hz</span>
+          {' · '}IPC {formatFrequency(ipcBatchFrequency)} 批/s ·{' '}
+          {ipcChunksPerBatch ? ipcChunksPerBatch.toFixed(1) : '0'} 块/批
         </div>
       </footer>
     </main>

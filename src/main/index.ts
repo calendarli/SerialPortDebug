@@ -1,4 +1,6 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, dialog, ipcMain } from 'electron'
+import { createWriteStream, type WriteStream } from 'fs'
+import { readFile, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { SerialPort } from 'serialport'
@@ -76,7 +78,47 @@ function explainRuntimeError(
 const openPorts = new Map<string, SerialPort>()
 let mainWindow: BrowserWindow | null = null
 const writeQueues = new Map<string, Promise<void>>()
+const receiveBatches = new Map<
+  string,
+  { chunks: Uint8Array[]; bytes: number; timer?: NodeJS.Timeout }
+>()
 let portOperationQueue: Promise<void> = Promise.resolve()
+let sessionStream: WriteStream | null = null
+let sessionFile = ''
+let sessionEvents = 0
+let sessionBytes = 0
+let replayGeneration = 0
+
+function recordSession(direction: 'rx' | 'tx', path: string, data: Uint8Array): void {
+  if (!sessionStream) return
+  const entry = JSON.stringify({
+    type: 'data',
+    timestamp: Date.now(),
+    direction,
+    port: path,
+    bytes: data.length,
+    base64: Buffer.from(data).toString('base64')
+  })
+  sessionStream.write(`${entry}\n`)
+  sessionEvents += 1
+  sessionBytes += data.length
+}
+
+async function stopSession(): Promise<{
+  path: string
+  events: number
+  bytes: number
+} | null> {
+  if (!sessionStream) return null
+  const stream = sessionStream
+  const result = { path: sessionFile, events: sessionEvents, bytes: sessionBytes }
+  sessionStream = null
+  sessionFile = ''
+  await new Promise<void>((resolve, reject) =>
+    stream.end((error?: Error | null) => (error ? reject(error) : resolve()))
+  )
+  return result
+}
 
 function enqueuePortOperation<T>(operation: () => Promise<T>): Promise<T> {
   const task = portOperationQueue.catch(() => undefined).then(operation)
@@ -91,10 +133,29 @@ function emit(channel: string, value: unknown): void {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, value)
 }
 
+function flushReceiveBatch(path: string): void {
+  const batch = receiveBatches.get(path)
+  if (!batch) return
+  if (batch.timer) clearTimeout(batch.timer)
+  receiveBatches.delete(path)
+  if (batch.chunks.length) emit('serial:data', { path, chunks: batch.chunks })
+}
+
+function queueReceivedData(path: string, chunk: Buffer): void {
+  recordSession('rx', path, chunk)
+  const batch = receiveBatches.get(path) || { chunks: [], bytes: 0 }
+  batch.chunks.push(new Uint8Array(chunk))
+  batch.bytes += chunk.length
+  receiveBatches.set(path, batch)
+  if (batch.bytes >= 64 * 1024) flushReceiveBatch(path)
+  else if (!batch.timer) batch.timer = setTimeout(() => flushReceiveBatch(path), 4)
+}
+
 async function closePort(path: string): Promise<void> {
   const active = openPorts.get(path)
   openPorts.delete(path)
   writeQueues.delete(path)
+  flushReceiveBatch(path)
   if (active?.isOpen) {
     try {
       await new Promise<void>((resolve, reject) =>
@@ -124,6 +185,87 @@ function registerSerialHandlers(): void {
       throw explainRuntimeError(error, '读取端口列表')
     }
   })
+  ipcMain.handle('session:start', async () => {
+    if (!mainWindow) throw new Error('应用窗口尚未就绪')
+    if (sessionStream) return { path: sessionFile }
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: '保存串口会话',
+      defaultPath: `SerialFlow-${new Date().toISOString().replace(/[:.]/g, '-')}.serialflow-session`,
+      filters: [{ name: 'SerialFlow 会话', extensions: ['serialflow-session'] }]
+    })
+    if (result.canceled || !result.filePath) return null
+    sessionFile = result.filePath
+    sessionEvents = 0
+    sessionBytes = 0
+    sessionStream = createWriteStream(sessionFile, { encoding: 'utf8' })
+    sessionStream.write(
+      `${JSON.stringify({ type: 'header', version: 1, application: 'SerialFlow', createdAt: Date.now() })}\n`
+    )
+    return { path: sessionFile }
+  })
+  ipcMain.handle('session:stop', () => stopSession())
+  ipcMain.handle('session:replay', async () => {
+    if (!mainWindow) throw new Error('应用窗口尚未就绪')
+    const selected = await dialog.showOpenDialog(mainWindow, {
+      title: '回放串口会话',
+      properties: ['openFile'],
+      filters: [{ name: 'SerialFlow 会话', extensions: ['serialflow-session'] }]
+    })
+    if (selected.canceled || !selected.filePaths[0]) return null
+    const generation = ++replayGeneration
+    const lines = (await readFile(selected.filePaths[0], 'utf8')).split(/\r?\n/)
+    let previousTimestamp = 0
+    let events = 0
+    for (const line of lines) {
+      if (generation !== replayGeneration) break
+      if (!line.trim()) continue
+      const item = JSON.parse(line) as {
+        type?: string
+        timestamp?: number
+        direction?: string
+        port?: string
+        base64?: string
+      }
+      if (item.type !== 'data' || item.direction !== 'rx' || !item.base64) continue
+      const timestamp = Number(item.timestamp) || previousTimestamp
+      if (previousTimestamp && timestamp > previousTimestamp)
+        await new Promise((resolve) =>
+          setTimeout(resolve, Math.min(2000, timestamp - previousTimestamp))
+        )
+      previousTimestamp = timestamp
+      emit('serial:data', {
+        path: `[回放] ${item.port || '串口'}`,
+        chunks: [new Uint8Array(Buffer.from(item.base64, 'base64'))],
+        replay: true
+      })
+      events += 1
+    }
+    return { path: selected.filePaths[0], events, stopped: generation !== replayGeneration }
+  })
+  ipcMain.handle('session:stopReplay', () => {
+    replayGeneration += 1
+  })
+  ipcMain.handle('project:save', async (_event, project: unknown) => {
+    if (!mainWindow) throw new Error('应用窗口尚未就绪')
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: '导出 SerialFlow 工程',
+      defaultPath: 'SerialFlow-project.serialflow',
+      filters: [{ name: 'SerialFlow 工程', extensions: ['serialflow'] }]
+    })
+    if (result.canceled || !result.filePath) return null
+    await writeFile(result.filePath, JSON.stringify(project, null, 2), 'utf8')
+    return result.filePath
+  })
+  ipcMain.handle('project:open', async () => {
+    if (!mainWindow) throw new Error('应用窗口尚未就绪')
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: '导入 SerialFlow 工程',
+      properties: ['openFile'],
+      filters: [{ name: 'SerialFlow 工程', extensions: ['serialflow', 'json'] }]
+    })
+    if (result.canceled || !result.filePaths[0]) return null
+    return { path: result.filePaths[0], content: await readFile(result.filePaths[0], 'utf8') }
+  })
   ipcMain.handle('serial:open', async (_event, options: PortOptions) =>
     enqueuePortOperation(async () => {
       validatePortOptions(options)
@@ -139,7 +281,7 @@ function registerSerialHandlers(): void {
       }
       openPorts.set(options.path, next)
       next.on('data', (chunk: Buffer) => {
-        emit('serial:data', { path: options.path, base64: chunk.toString('base64') })
+        queueReceivedData(options.path, chunk)
       })
       next.on('error', (error) =>
         emit('serial:error', {
@@ -184,6 +326,7 @@ function registerSerialHandlers(): void {
               active.drain((drainError) => (drainError ? reject(drainError) : resolve()))
             })
           })
+          recordSession('tx', path, data)
         } catch (error) {
           throw explainRuntimeError(error, '发送数据', active.path)
         }
@@ -206,12 +349,17 @@ function createWindow(): void {
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
-    webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: false }
+    webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: true }
   })
   mainWindow.on('ready-to-show', () => mainWindow?.show())
   mainWindow.on('closed', () => (mainWindow = null))
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url)
+    try {
+      const target = new URL(url)
+      if (target.protocol === 'https:' || target.protocol === 'http:') void shell.openExternal(url)
+    } catch {
+      /* Ignore invalid or unsafe external URLs. */
+    }
     return { action: 'deny' }
   })
   if (is.dev && process.env['ELECTRON_RENDERER_URL'])
@@ -239,7 +387,10 @@ if (!app.requestSingleInstanceLock()) {
   })
 }
 
-app.on('before-quit', () => void closeAllPorts())
+app.on('before-quit', () => {
+  void stopSession()
+  void closeAllPorts()
+})
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })

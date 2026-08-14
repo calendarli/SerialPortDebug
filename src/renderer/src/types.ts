@@ -6,6 +6,18 @@ export type SerialConfig = {
   dataBits: DataBits
   stopBits: StopBits
   parity: Parity
+  framing: SerialFraming
+  plotEnabled: boolean
+}
+
+export type SerialFramingMode = 'raw' | 'delimiter' | 'fixed' | 'header-footer' | 'idle'
+export type SerialFraming = {
+  mode: SerialFramingMode
+  delimiter: string
+  fixedLength: number
+  header: string
+  footer: string
+  idleTimeout: number
 }
 
 export type Rule = {
@@ -60,6 +72,8 @@ export type InteractionEntry = {
   id: number
   direction: 'rx' | 'tx' | 'script'
   text: string
+  plotText?: string
+  timestampMs?: number
   bytes: number
   port: string
   time?: string

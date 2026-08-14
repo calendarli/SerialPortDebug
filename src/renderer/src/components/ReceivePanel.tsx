@@ -17,6 +17,8 @@ type Props = {
   cacheSizeMb: number
   cacheEntryLimit: number
   fontSize: number
+  sessionRecording: boolean
+  replayRunning: boolean
   onClear: () => void
   onRxHexChange: (value: boolean) => void
   onTimestampChange: (value: boolean) => void
@@ -28,6 +30,8 @@ type Props = {
   onCacheSizeChange: (value: number) => void
   onCacheEntryLimitChange: (value: number) => void
   onFontSizeChange: (value: number) => void
+  onToggleSessionRecording: () => void
+  onToggleReplay: () => void
 }
 
 function escapeRegExp(value: string): string {
@@ -193,6 +197,22 @@ export function ReceivePanel(props: Props): React.JSX.Element {
           <strong>数据交互</strong>
         </div>
         <div className="head-tools">
+          <button
+            className={`head-tool-button session-record ${props.sessionRecording ? 'recording' : ''}`}
+            title={
+              props.sessionRecording ? '停止并保存原始串口会话' : '将原始 RX/TX 数据录制到文件'
+            }
+            onClick={props.onToggleSessionRecording}
+          >
+            <i /> {props.sessionRecording ? '停止录制' : '录制会话'}
+          </button>
+          <button
+            className="head-tool-button"
+            title="按录制时序回放 RX 数据；不会写入真实串口"
+            onClick={props.onToggleReplay}
+          >
+            {props.replayRunning ? '停止回放' : '回放会话'}
+          </button>
           <span className="font-size-indicator" title="在数据视窗中按 Ctrl + 鼠标滚轮调整">
             字号 {props.fontSize}px
           </span>
