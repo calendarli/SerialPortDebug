@@ -1465,6 +1465,71 @@ footer div {
 .command-auto-settings > div.disabled {
   opacity: 0.5;
 }
+.command-auto-settings {
+  gap: 8px;
+}
+.auto-send-count-help,
+.group-loop-help {
+  display: block;
+  margin-top: -8px;
+  color: #8492a6;
+  font-size: 9px;
+}
+.group-loop-settings > div input {
+  width: 105px;
+  padding-right: 43px;
+}
+.group-loop-settings > div span {
+  margin-left: -40px;
+}
+.group-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.group-title-row .group-title {
+  min-width: 0;
+  flex: 1;
+}
+.root-group > .group-title-row .group-title {
+  background: #eaf2fc;
+}
+.nested-group > .group-title-row .group-title {
+  background: #f4f7fb;
+}
+.group-loop-button {
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid #bcd4fc;
+  border-radius: 7px;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 9px;
+  font-weight: 650;
+}
+.group-loop-button.stop {
+  border-color: #fecaca;
+  background: #fff1f2;
+  color: #dc2626;
+}
+.send-count {
+  display: flex;
+  align-items: center;
+}
+.send-count input {
+  width: 61px;
+  height: 29px;
+  padding: 0 20px 0 7px;
+}
+.send-count span {
+  margin-left: -19px;
+  color: #8090a6;
+  font-size: 9px;
+}
+.send-count input:disabled {
+  background: #f1f5f9;
+  opacity: 0.6;
+}
 .sender {
   position: relative;
 }

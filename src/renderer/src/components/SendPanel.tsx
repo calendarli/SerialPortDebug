@@ -8,6 +8,7 @@ type Props = {
   autoSend: boolean
   autoSendRunning: boolean
   interval: number
+  autoSendCount: number
   crcEnabled: boolean
   crcMode: CrcMode
   openedPorts: string[]
@@ -17,6 +18,7 @@ type Props = {
   onAppendCrlfChange: (value: boolean) => void
   onAutoSendChange: (value: boolean) => void
   onIntervalChange: (value: number) => void
+  onAutoSendCountChange: (value: number) => void
   onSend: () => void
   onCrcEnabledChange: (value: boolean) => void
   onCrcModeChange: (value: CrcMode) => void
@@ -130,6 +132,21 @@ export function SendPanel(props: Props): React.JSX.Element {
               onChange={(event) => props.onIntervalChange(Number(event.target.value))}
             />
             <span>ms</span>
+          </div>
+          <div className="send-count">
+            <input
+              aria-label="自动发送次数，0 表示无限"
+              type="number"
+              min="0"
+              disabled={!props.autoSend || props.autoSendRunning}
+              value={props.autoSendCount}
+              onChange={(event) =>
+                props.onAutoSendCountChange(
+                  Math.max(0, Math.floor(Number(event.target.value) || 0))
+                )
+              }
+            />
+            <span>次</span>
           </div>
         </div>
       </div>

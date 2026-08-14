@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import { bytesToHex, convertSerialText } from '../serial-utils'
 import type { CommandGroup, CrcMode, SavedCommand } from '../types'
 
@@ -22,6 +22,7 @@ type Draft = {
   hex: boolean
   autoSend: boolean
   autoSendInterval: number
+  autoSendCount: number
   crcEnabled: boolean
   crcMode: CrcMode
   targetPort: string
@@ -34,6 +35,7 @@ const emptyDraft = (): Draft => ({
   hex: false,
   autoSend: false,
   autoSendInterval: 1000,
+  autoSendCount: 0,
   crcEnabled: false,
   crcMode: 'modbus',
   targetPort: '',
@@ -134,12 +136,18 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
   const [editingGroupId, setEditingGroupId] = useState<number | null>(null)
   const [groupName, setGroupName] = useState('')
   const [groupTargetPort, setGroupTargetPort] = useState('')
+  const [groupAutoLoop, setGroupAutoLoop] = useState(false)
+  const [groupLoopDelay, setGroupLoopDelay] = useState(100)
+  const [groupLoopCount, setGroupLoopCount] = useState(0)
   const [draft, setDraft] = useState<Draft>(emptyDraft)
   const [error, setError] = useState('')
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
   const [menu, setMenu] = useState<Menu | null>(null)
   const [collapsed, setCollapsed] = useState<Set<number>>(new Set())
   const [activeAutoSendIds, setActiveAutoSendIds] = useState<Set<number>>(new Set())
+  const [activeGroupLoopIds, setActiveGroupLoopIds] = useState<Set<number>>(new Set())
+  const autoSendCountsRef = useRef(new Map<number, number>())
+  const groupLoopTokensRef = useRef(new Map<number, number>())
 
   useEffect(() => {
     if (!props.connected) return
@@ -159,6 +167,18 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
             command.targetPort
           )
           if (!success && !cancelled) {
+            autoSendCountsRef.current.delete(command.id)
+            setActiveAutoSendIds((current) => {
+              const next = new Set(current)
+              next.delete(command.id)
+              return next
+            })
+            return
+          }
+          const completed = (autoSendCountsRef.current.get(command.id) || 0) + 1
+          autoSendCountsRef.current.set(command.id, completed)
+          if (command.autoSendCount > 0 && completed >= command.autoSendCount) {
+            autoSendCountsRef.current.delete(command.id)
             setActiveAutoSendIds((current) => {
               const next = new Set(current)
               next.delete(command.id)
@@ -168,6 +188,12 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
           }
         } catch (cause) {
           setError(cause instanceof Error ? cause.message : String(cause))
+          autoSendCountsRef.current.delete(command.id)
+          setActiveAutoSendIds((current) => {
+            const next = new Set(current)
+            next.delete(command.id)
+            return next
+          })
           return
         }
         if (!cancelled) {
@@ -205,6 +231,15 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
       window.removeEventListener('blur', close)
     }
   }, [])
+
+  useEffect(
+    () => () => {
+      for (const [id, token] of groupLoopTokensRef.current) {
+        groupLoopTokensRef.current.set(id, token + 1)
+      }
+    },
+    []
+  )
 
   const update = (id: number, patch: Partial<SavedCommand>): void =>
     props.setCommands(
@@ -244,6 +279,7 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
   const sendCommand = async (command: SavedCommand): Promise<void> => {
     const isRunning = props.connected && activeAutoSendIds.has(command.id)
     if (command.autoSend && isRunning) {
+      autoSendCountsRef.current.delete(command.id)
       setActiveAutoSendIds((current) => {
         const next = new Set(current)
         next.delete(command.id)
@@ -260,8 +296,10 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
         command.crcMode,
         command.targetPort
       )
-      if (success && command.autoSend)
+      if (success && command.autoSend && command.autoSendCount !== 1) {
+        autoSendCountsRef.current.set(command.id, 1)
         setActiveAutoSendIds((current) => new Set(current).add(command.id))
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
     }
@@ -295,6 +333,7 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
       hex: command.hex,
       autoSend: command.autoSend,
       autoSendInterval: command.autoSendInterval,
+      autoSendCount: command.autoSendCount || 0,
       crcEnabled: Boolean(command.crcMode),
       crcMode: command.crcMode || 'modbus',
       targetPort: command.targetPort || props.targetPorts[0] || '',
@@ -312,6 +351,9 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
     setTargetParentId(parentId)
     setGroupName('')
     setGroupTargetPort('')
+    setGroupAutoLoop(false)
+    setGroupLoopDelay(100)
+    setGroupLoopCount(0)
     setError('')
     setCreatingGroup(true)
     setMenu(null)
@@ -323,21 +365,45 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
     setTargetParentId(group.parentId)
     setGroupName(group.name)
     setGroupTargetPort('')
+    setGroupAutoLoop(group.autoLoop)
+    setGroupLoopDelay(group.loopDelay)
+    setGroupLoopCount(group.loopCount)
     setError('')
     setCreatingGroup(true)
     setMenu(null)
   }
   const createGroup = (): void => {
     if (!groupName.trim()) return setError('请输入组名称')
+    if (!Number.isInteger(groupLoopDelay) || groupLoopDelay < 1)
+      return setError('组循环延迟不能小于 1ms')
+    if (!Number.isInteger(groupLoopCount) || groupLoopCount < 0)
+      return setError('组循环次数必须是大于或等于 0 的整数')
+    if (editingGroupId !== null && activeGroupLoopIds.has(editingGroupId))
+      stopGroupLoop(editingGroupId)
     if (editingGroupId === null)
       props.setGroups([
         ...props.groups,
-        { id: Date.now(), parentId: targetParentId, name: groupName.trim() }
+        {
+          id: Date.now(),
+          parentId: targetParentId,
+          name: groupName.trim(),
+          autoLoop: groupAutoLoop,
+          loopDelay: groupLoopDelay,
+          loopCount: groupLoopCount
+        }
       ])
     else
       props.setGroups(
         props.groups.map((group) =>
-          group.id === editingGroupId ? { ...group, name: groupName.trim() } : group
+          group.id === editingGroupId
+            ? {
+                ...group,
+                name: groupName.trim(),
+                autoLoop: groupAutoLoop,
+                loopDelay: groupLoopDelay,
+                loopCount: groupLoopCount
+              }
+            : group
         )
       )
     if (editingGroupId !== null && groupTargetPort) {
@@ -360,6 +426,8 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
     if (!draft.targetPort) return setError('请选择目标端口')
     if (!Number.isFinite(draft.autoSendInterval) || draft.autoSendInterval < 1)
       return setError('自动发送周期不能小于 1ms')
+    if (!Number.isInteger(draft.autoSendCount) || draft.autoSendCount < 0)
+      return setError('自动发送次数必须是大于或等于 0 的整数')
     const definitions = draft.parameters
       .map((parameter) => ({ ...parameter, id: parameter.id.trim() }))
       .filter((parameter) => parameter.id)
@@ -386,6 +454,7 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
           hex: draft.hex,
           autoSend: draft.autoSend,
           autoSendInterval: draft.autoSendInterval,
+          autoSendCount: draft.autoSendCount,
           crcMode: draft.crcEnabled ? draft.crcMode : null,
           targetPort: draft.targetPort,
           parameters: definitions.map(({ id, byteLength }) => ({
@@ -420,6 +489,7 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
                 hex: draft.hex,
                 autoSend: draft.autoSend,
                 autoSendInterval: draft.autoSendInterval,
+                autoSendCount: draft.autoSendCount,
                 crcMode: draft.crcEnabled ? draft.crcMode : null,
                 targetPort: draft.targetPort,
                 parameters
@@ -440,6 +510,10 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
   }
   const deleteGroup = (id: number): void => {
     const ids = new Set(descendantGroupIds(id))
+    ids.forEach((groupId) =>
+      groupLoopTokensRef.current.set(groupId, (groupLoopTokensRef.current.get(groupId) || 0) + 1)
+    )
+    setActiveGroupLoopIds((current) => new Set([...current].filter((groupId) => !ids.has(groupId))))
     props.setGroups(props.groups.filter((group) => !ids.has(group.id)))
     props.setCommands(
       props.commands.filter((command) => command.parentId === null || !ids.has(command.parentId))
@@ -470,6 +544,64 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
         .filter((group) => group.parentId === id)
         .reduce((total, group) => total + groupCommandCount(group.id), 0)
     )
+  }
+  const groupCommandsInOrder = (id: number): SavedCommand[] => [
+    ...props.groups
+      .filter((group) => group.parentId === id)
+      .flatMap((group) => groupCommandsInOrder(group.id)),
+    ...props.commands.filter((command) => command.parentId === id)
+  ]
+  const stopGroupLoop = (id: number): void => {
+    groupLoopTokensRef.current.set(id, (groupLoopTokensRef.current.get(id) || 0) + 1)
+    setActiveGroupLoopIds((current) => {
+      const next = new Set(current)
+      next.delete(id)
+      return next
+    })
+  }
+  const toggleGroupLoop = (group: CommandGroup): void => {
+    if (activeGroupLoopIds.has(group.id)) return stopGroupLoop(group.id)
+    if (!props.connected) return setError('请先打开串口')
+    const commands = groupCommandsInOrder(group.id)
+    if (!commands.length) return setError('当前组及子组内没有可发送的指令')
+    const token = (groupLoopTokensRef.current.get(group.id) || 0) + 1
+    groupLoopTokensRef.current.set(group.id, token)
+    setActiveGroupLoopIds((current) => new Set(current).add(group.id))
+    setError('')
+    const run = async (): Promise<void> => {
+      let completedLoops = 0
+      while (
+        groupLoopTokensRef.current.get(group.id) === token &&
+        (group.loopCount === 0 || completedLoops < group.loopCount)
+      ) {
+        for (let index = 0; index < commands.length; index += 1) {
+          if (groupLoopTokensRef.current.get(group.id) !== token) return
+          const command = commands[index]
+          try {
+            const success = await props.onSend(
+              buildCommand(command),
+              command.hex,
+              command.crcMode,
+              command.targetPort
+            )
+            if (!success) return stopGroupLoop(group.id)
+          } catch (cause) {
+            setError(cause instanceof Error ? cause.message : String(cause))
+            return stopGroupLoop(group.id)
+          }
+          const isLastSend =
+            group.loopCount > 0 &&
+            completedLoops + 1 >= group.loopCount &&
+            index === commands.length - 1
+          if (!isLastSend) {
+            await new Promise<void>((resolve) => window.setTimeout(resolve, group.loopDelay))
+          }
+        }
+        completedLoops += 1
+      }
+      if (groupLoopTokensRef.current.get(group.id) === token) stopGroupLoop(group.id)
+    }
+    void run()
   }
   const copyPlaceholder = async (id: string, index: number): Promise<void> => {
     if (!id.trim()) return
@@ -505,7 +637,7 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
             >
               {props.connected && activeAutoSendIds.has(command.id)
                 ? '发送中'
-                : `自动 ${command.autoSendInterval}ms`}
+                : `自动 ${command.autoSendInterval}ms / ${command.autoSendCount === 0 ? '∞' : `${command.autoSendCount}次`}`}
             </span>
           )}
         </div>
@@ -578,12 +710,22 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
           style={{ '--tree-depth': depth } as React.CSSProperties}
           onContextMenu={(event) => openMenu(event, 'group', group.id)}
         >
-          <button className="group-title" onClick={() => toggleGroup(group.id)}>
-            <span className="group-arrow">{isCollapsed ? '▸' : '▾'}</span>
-            <b className="folder-icon">▰</b>
-            <strong>{group.name}</strong>
-            <em>{groupCommandCount(group.id)} 条指令</em>
-          </button>
+          <div className="group-title-row">
+            <button className="group-title" onClick={() => toggleGroup(group.id)}>
+              <span className="group-arrow">{isCollapsed ? '▸' : '▾'}</span>
+              <b className="folder-icon">▰</b>
+              <strong>{group.name}</strong>
+              <em>{groupCommandCount(group.id)} 条指令</em>
+            </button>
+            {group.autoLoop && (
+              <button
+                className={`group-loop-button ${activeGroupLoopIds.has(group.id) ? 'stop' : ''}`}
+                onClick={() => toggleGroupLoop(group)}
+              >
+                {activeGroupLoopIds.has(group.id) ? '停止' : '循环'}
+              </button>
+            )}
+          </div>
           {!isCollapsed && <div className="group-children">{renderLevel(group.id, depth + 1)}</div>}
         </section>
       )
@@ -673,6 +815,41 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
                   }}
                 />
               </label>
+              <div className="command-auto-settings group-loop-settings">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={groupAutoLoop}
+                    onChange={(event) => setGroupAutoLoop(event.target.checked)}
+                  />
+                  启用组自动循环
+                </label>
+                <div className={groupAutoLoop ? '' : 'disabled'}>
+                  <input
+                    aria-label="组内指令发送延迟"
+                    type="number"
+                    min="1"
+                    disabled={!groupAutoLoop}
+                    value={groupLoopDelay}
+                    onChange={(event) => setGroupLoopDelay(Number(event.target.value))}
+                  />
+                  <span>ms 延迟</span>
+                </div>
+                <div className={groupAutoLoop ? '' : 'disabled'}>
+                  <input
+                    aria-label="组循环次数，0 表示无限"
+                    type="number"
+                    min="0"
+                    disabled={!groupAutoLoop}
+                    value={groupLoopCount}
+                    onChange={(event) => setGroupLoopCount(Number(event.target.value))}
+                  />
+                  <span>次</span>
+                </div>
+              </div>
+              <small className="group-loop-help">
+                循环次数为 0 时持续循环，延迟作用于每两条指令之间
+              </small>
               {editingGroupId !== null && (
                 <label>
                   批量修改组内指令目标端口
@@ -811,7 +988,21 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
                   />
                   <span>ms</span>
                 </div>
+                <div className={draft.autoSend ? '' : 'disabled'}>
+                  <input
+                    aria-label="自动发送次数，0 表示无限"
+                    type="number"
+                    min="0"
+                    disabled={!draft.autoSend}
+                    value={draft.autoSendCount}
+                    onChange={(event) =>
+                      setDraft({ ...draft, autoSendCount: Number(event.target.value) })
+                    }
+                  />
+                  <span>次</span>
+                </div>
               </div>
+              <small className="auto-send-count-help">发送次数为 0 时持续发送，直到手动停止</small>
               <div className="parameter-editor">
                 <div className="parameter-editor-head">
                   <span>参数名字与占用字节（支持中文，任意数量）</span>

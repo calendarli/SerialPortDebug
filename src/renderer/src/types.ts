@@ -38,12 +38,20 @@ export type SavedCommand = {
   hex: boolean
   autoSend: boolean
   autoSendInterval: number
+  autoSendCount: number
   crcMode?: CrcMode | null
   targetPort?: string
   parameters: CommandParameter[]
 }
 
-export type CommandGroup = { id: number; parentId: number | null; name: string }
+export type CommandGroup = {
+  id: number
+  parentId: number | null
+  name: string
+  autoLoop: boolean
+  loopDelay: number
+  loopCount: number
+}
 
 export type InteractionEntry = {
   id: number

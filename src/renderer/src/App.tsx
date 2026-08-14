@@ -97,6 +97,10 @@ function loadCommands(): SavedCommand[] {
           parentId: command.parentId ?? null,
           autoSend: Boolean(command.autoSend),
           autoSendInterval: Math.max(1, command.autoSendInterval || 1000),
+          autoSendCount:
+            Number.isInteger(command.autoSendCount) && command.autoSendCount >= 0
+              ? command.autoSendCount
+              : 0,
           crcMode: ['crc8', 'modbus', 'ccitt-false', 'xmodem', 'crc32'].includes(
             command.crcMode || ''
           )
@@ -122,7 +126,15 @@ function loadCommandGroups(): CommandGroup[] {
     const saved = JSON.parse(
       localStorage.getItem('serialflow.commandGroups') || '[]'
     ) as CommandGroup[]
-    return Array.isArray(saved) ? saved : []
+    return Array.isArray(saved)
+      ? saved.map((group) => ({
+          ...group,
+          parentId: group.parentId ?? null,
+          autoLoop: Boolean(group.autoLoop),
+          loopDelay: Math.max(1, group.loopDelay || 100),
+          loopCount: Number.isInteger(group.loopCount) && group.loopCount >= 0 ? group.loopCount : 0
+        }))
+      : []
   } catch {
     return []
   }
@@ -166,6 +178,8 @@ const receiveHexKey = 'serialflow.receiveHex'
 const timestampKey = 'serialflow.timestamp'
 const sendCrcEnabledKey = 'serialflow.sendCrcEnabled'
 const sendCrcModeKey = 'serialflow.sendCrcMode'
+const sendIntervalKey = 'serialflow.sendInterval'
+const sendCountKey = 'serialflow.sendCount'
 const autoPauseEnabledKey = 'serialflow.autoPauseEnabled'
 const autoPausePatternKey = 'serialflow.autoPausePattern'
 const autoPauseRegexKey = 'serialflow.autoPauseRegex'
@@ -235,6 +249,10 @@ function loadSerialConfigs(): SerialConfig[] {
 function loadPositiveSetting(key: string, fallback: number): number {
   const value = Number(localStorage.getItem(key))
   return Number.isFinite(value) && value > 0 ? value : fallback
+}
+function loadNonnegativeSetting(key: string, fallback: number): number {
+  const value = Number(localStorage.getItem(key))
+  return Number.isInteger(value) && value >= 0 ? value : fallback
 }
 function loadBooleanSetting(key: string, fallback: boolean): boolean {
   const value = localStorage.getItem(key)
@@ -309,7 +327,8 @@ function App(): React.JSX.Element {
   const [sendCrcMode, setSendCrcMode] = useState<CrcMode>(loadCrcMode)
   const [autoSend, setAutoSend] = useState(false)
   const [autoSendRunning, setAutoSendRunning] = useState(false)
-  const [interval, setIntervalValue] = useState(1000)
+  const [interval, setIntervalValue] = useState(() => loadPositiveSetting(sendIntervalKey, 1000))
+  const [autoSendCount, setAutoSendCount] = useState(() => loadNonnegativeSetting(sendCountKey, 0))
   const [rules, setRules] = useState<Rule[]>(loadRules)
   const [commands, setCommands] = useState<SavedCommand[]>(loadCommands)
   const [commandGroups, setCommandGroups] = useState<CommandGroup[]>(loadCommandGroups)
@@ -352,6 +371,7 @@ function App(): React.JSX.Element {
     maxEntries: interactionCacheEntries,
     timestamp
   })
+  const autoSendCompletedRef = useRef(0)
 
   useEffect(() => {
     interactionSettingsRef.current = {
@@ -676,6 +696,12 @@ function App(): React.JSX.Element {
         setAutoSendRunning(false)
         return
       }
+      autoSendCompletedRef.current += 1
+      if (autoSendCount > 0 && autoSendCompletedRef.current >= autoSendCount) {
+        setAutoSendRunning(false)
+        setMessage(`自动发送已完成，共发送 ${autoSendCompletedRef.current} 次`)
+        return
+      }
       if (!cancelled) {
         nextDeadline += period
         const now = performance.now()
@@ -688,7 +714,7 @@ function App(): React.JSX.Element {
       cancelled = true
       window.clearTimeout(timer)
     }
-  }, [autoSendRunning, connected, interval, send])
+  }, [autoSendCount, autoSendRunning, connected, interval, send])
 
   const triggerSend = useCallback(async (): Promise<void> => {
     if (autoSend && autoSendRunning) {
@@ -698,10 +724,17 @@ function App(): React.JSX.Element {
     }
     const success = await send()
     if (success && autoSend) {
+      autoSendCompletedRef.current = 1
+      if (autoSendCount === 1) {
+        setMessage('自动发送已完成，共发送 1 次')
+        return
+      }
       setAutoSendRunning(true)
-      setMessage(`自动发送已启动，周期 ${Math.max(1, interval)}ms`)
+      setMessage(
+        `自动发送已启动，周期 ${Math.max(1, interval)}ms，${autoSendCount === 0 ? '无限次数' : `共 ${autoSendCount} 次`}`
+      )
     }
-  }, [autoSend, autoSendRunning, interval, send])
+  }, [autoSend, autoSendCount, autoSendRunning, interval, send])
 
   const changeAutoSend = useCallback((enabled: boolean): void => {
     setAutoSend(enabled)
@@ -726,6 +759,14 @@ function App(): React.JSX.Element {
   useEffect(() => {
     localStorage.setItem('serialflow.commandGroups', JSON.stringify(commandGroups))
   }, [commandGroups])
+
+  useEffect(() => {
+    localStorage.setItem(sendIntervalKey, String(interval))
+  }, [interval])
+
+  useEffect(() => {
+    localStorage.setItem(sendCountKey, String(autoSendCount))
+  }, [autoSendCount])
 
   useEffect(() => {
     localStorage.setItem(receiveHexKey, String(rxHex))
@@ -972,6 +1013,7 @@ function App(): React.JSX.Element {
             autoSend={autoSend}
             autoSendRunning={autoSendRunning}
             interval={interval}
+            autoSendCount={autoSendCount}
             crcEnabled={sendCrcEnabled}
             crcMode={sendCrcMode}
             openedPorts={openedPortList}
@@ -981,6 +1023,7 @@ function App(): React.JSX.Element {
             onAppendCrlfChange={setAppendCrlf}
             onAutoSendChange={changeAutoSend}
             onIntervalChange={setIntervalValue}
+            onAutoSendCountChange={setAutoSendCount}
             onSend={() => void triggerSend()}
             onCrcEnabledChange={setSendCrcEnabled}
             onCrcModeChange={setSendCrcMode}
