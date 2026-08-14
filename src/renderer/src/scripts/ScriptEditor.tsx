@@ -24,6 +24,20 @@ type Props = {
 let configured = false
 const models = new Map<string, monaco.editor.ITextModel>()
 const viewStates = new Map<string, monaco.editor.ICodeEditorViewState | null>()
+const editorFontSizeKey = 'serialflow.scriptEditorFontSize'
+const defaultEditorFontSize = 17
+const minEditorFontSize = 12
+const maxEditorFontSize = 32
+
+function loadEditorFontSize(): number {
+  const saved = Number(localStorage.getItem(editorFontSizeKey))
+  if (!Number.isFinite(saved)) return defaultEditorFontSize
+  return Math.min(maxEditorFontSize, Math.max(minEditorFontSize, Math.round(saved)))
+}
+
+function editorLineHeight(fontSize: number): number {
+  return Math.round(fontSize * 1.5)
+}
 
 function configureTypeScript(): void {
   if (configured) return
@@ -91,14 +105,16 @@ export const ScriptEditor = forwardRef<ScriptEditorHandle, Props>(
         )
         models.set(props.scriptId, model)
       }
-      const editor = monaco.editor.create(containerRef.current, {
+      const editorContainer = containerRef.current
+      let editorFontSize = loadEditorFontSize()
+      const editor = monaco.editor.create(editorContainer, {
         model,
         theme: 'vs',
         automaticLayout: true,
         minimap: { enabled: true, scale: 0.75 },
         fontFamily: 'Consolas, "SFMono-Regular", monospace',
-        fontSize: 17,
-        lineHeight: 26,
+        fontSize: editorFontSize,
+        lineHeight: editorLineHeight(editorFontSize),
         tabSize: 2,
         insertSpaces: true,
         wordWrap: 'on',
@@ -117,8 +133,29 @@ export const ScriptEditor = forwardRef<ScriptEditorHandle, Props>(
       editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () =>
         propsRef.current.onTest()
       )
+      const handleFontZoom = (event: WheelEvent): void => {
+        if (!event.ctrlKey || event.deltaY === 0) return
+        event.preventDefault()
+        event.stopPropagation()
+        const next = Math.min(
+          maxEditorFontSize,
+          Math.max(minEditorFontSize, editorFontSize + (event.deltaY < 0 ? 1 : -1))
+        )
+        if (next === editorFontSize) return
+        editorFontSize = next
+        editor.updateOptions({
+          fontSize: next,
+          lineHeight: editorLineHeight(next)
+        })
+        localStorage.setItem(editorFontSizeKey, String(next))
+      }
+      editorContainer.addEventListener('wheel', handleFontZoom, {
+        capture: true,
+        passive: false
+      })
       return () => {
         viewStates.set(props.scriptId, editor.saveViewState())
+        editorContainer.removeEventListener('wheel', handleFontZoom, true)
         change.dispose()
         editor.dispose()
         editorRef.current = null

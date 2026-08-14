@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 
-import { getQuickJS } from 'quickjs-emscripten'
+import quickJsWasmUrl from '@jitl/quickjs-wasmfile-release-sync/wasm?url'
+import { newQuickJSWASMModule, newVariant, RELEASE_SYNC } from 'quickjs-emscripten'
 
 type RunMessage = {
   type: 'run'
@@ -20,15 +21,15 @@ type WorkerMessage = RunMessage | DisposeMessage
 
 type ScriptVm = {
   sourceHash: string
-  runtime: ReturnType<Awaited<ReturnType<typeof getQuickJS>>['newRuntime']>
+  runtime: ReturnType<Awaited<ReturnType<typeof newQuickJSWASMModule>>['newRuntime']>
   context: ReturnType<
-    ReturnType<Awaited<ReturnType<typeof getQuickJS>>['newRuntime']>['newContext']
+    ReturnType<Awaited<ReturnType<typeof newQuickJSWASMModule>>['newRuntime']>['newContext']
   >
   deadline: number
 }
 
 const scriptVms = new Map<string, ScriptVm>()
-let quickJsPromise: ReturnType<typeof getQuickJS> | null = null
+let quickJsPromise: ReturnType<typeof newQuickJSWASMModule> | null = null
 
 function serialize(value: unknown): string {
   const serialized = JSON.stringify(value, (_key, item) => {
@@ -50,7 +51,9 @@ async function getScriptVm(message: RunMessage): Promise<ScriptVm> {
   const current = scriptVms.get(message.scriptId)
   if (current?.sourceHash === message.sourceHash) return current
   if (current) disposeVm(message.scriptId)
-  quickJsPromise ||= getQuickJS()
+  quickJsPromise ||= newQuickJSWASMModule(
+    newVariant(RELEASE_SYNC, { wasmLocation: quickJsWasmUrl })
+  )
   const quickJs = await quickJsPromise
   const runtime = quickJs.newRuntime()
   runtime.setMemoryLimit(16 * 1024 * 1024)
