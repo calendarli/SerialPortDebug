@@ -6,7 +6,7 @@ type Pending = {
   timer: number
 }
 
-class ScriptRuntime {
+export class ScriptRuntime {
   private worker: Worker | null = null
   private requestId = 0
   private pending = new Map<number, Pending>()

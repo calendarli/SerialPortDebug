@@ -39,6 +39,9 @@ export type ScriptContext = {
   scriptName: string
   direction: ScriptMessageType
   index: number
+  match?: string[]
+  groups?: Record<string, string>
+  parameters?: Record<string, string>
 }
 
 export type ScriptResult = {

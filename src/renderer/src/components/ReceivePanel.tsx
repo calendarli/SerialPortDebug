@@ -8,10 +8,6 @@ type ContextMenu = { x: number; y: number; entry: InteractionEntry | null }
 type Props = {
   entries: InteractionEntry[]
   rxHex: boolean
-  rxCommunicationCount: number
-  txCommunicationCount: number
-  rxFrequency: number
-  txFrequency: number
   timestamp: boolean
   paused: boolean
   autoPauseEnabled: boolean
@@ -21,7 +17,6 @@ type Props = {
   cacheSizeMb: number
   cacheEntryLimit: number
   fontSize: number
-  cacheBytes: number
   onClear: () => void
   onRxHexChange: (value: boolean) => void
   onTimestampChange: (value: boolean) => void
@@ -180,14 +175,6 @@ export function ReceivePanel(props: Props): React.JSX.Element {
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>): void => {
     if (event.key === 'Escape' && searchOpen) closeSearch()
   }
-  const formatCacheBytes = (bytes: number): string =>
-    bytes >= 1024 * 1024
-      ? `${(bytes / 1024 / 1024).toFixed(2)} MB`
-      : bytes >= 1024
-        ? `${(bytes / 1024).toFixed(1)} KB`
-        : `${bytes} B`
-  const formatFrequency = (frequency: number): string =>
-    frequency < 10 && frequency > 0 ? frequency.toFixed(1) : Math.round(frequency).toLocaleString()
   let autoPausePatternValid = true
   if (props.autoPauseRegex && props.autoPausePattern) {
     try {
@@ -204,12 +191,6 @@ export function ReceivePanel(props: Props): React.JSX.Element {
       <div className="card-head interaction-head">
         <div>
           <strong>数据交互</strong>
-          <span>
-            通讯 RX {props.rxCommunicationCount.toLocaleString()} 次 / TX{' '}
-            {props.txCommunicationCount.toLocaleString()} 次 · 缓存{' '}
-            {formatCacheBytes(props.cacheBytes)} / {props.cacheSizeMb} MB · 频率 RX{' '}
-            {formatFrequency(props.rxFrequency)} Hz / TX {formatFrequency(props.txFrequency)} Hz
-          </span>
         </div>
         <div className="head-tools">
           <span className="font-size-indicator" title="在数据视窗中按 Ctrl + 鼠标滚轮调整">

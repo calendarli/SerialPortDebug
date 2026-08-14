@@ -18,7 +18,9 @@ export type Rule = {
   hex: boolean
   enabled: boolean
   targetPort?: string
-  parameters: Array<{ id: string; value: string }>
+  parameters: Array<{ id: string; value: string; mode?: 'manual' | 'program' }>
+  parameterMode?: 'parameters' | 'program'
+  parameterProgram?: string
 }
 
 export type CommandParameter = {

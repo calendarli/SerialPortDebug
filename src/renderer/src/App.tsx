@@ -6,6 +6,7 @@ import { SendPanel } from './components/SendPanel'
 import { SerialConfigPanel } from './components/SerialConfigPanel'
 import { Sidebar } from './components/Sidebar'
 import { ScriptFramer } from './scripts/script-framer'
+import { autoReplyProgramRuntime } from './scripts/auto-reply-program'
 import {
   bytesToPayload,
   payloadToBytes,
@@ -69,6 +70,11 @@ function loadRules(): Rule[] {
       hex: Boolean(rule.hex),
       enabled: rule.enabled !== false,
       targetPort: typeof rule.targetPort === 'string' ? rule.targetPort : '',
+      parameterMode:
+        rule.parameterMode === 'program' || rule.parameters?.some((item) => item.mode === 'program')
+          ? 'program'
+          : 'parameters',
+      parameterProgram: typeof rule.parameterProgram === 'string' ? rule.parameterProgram : '',
       parameters: Array.isArray(rule.parameters)
         ? rule.parameters
             .filter((item) => item?.id)
@@ -154,9 +160,10 @@ function loadCommandGroups(): CommandGroup[] {
   }
 }
 
-function fillRuleParameters(rule: Rule): string {
+function fillRuleParameters(rule: Rule, values?: Record<string, string>): string {
   return rule.parameters.reduce(
-    (template, parameter) => template.replaceAll(`{{${parameter.id}}}`, parameter.value),
+    (template, parameter) =>
+      template.replaceAll(`{{${parameter.id}}}`, values?.[parameter.id] ?? parameter.value),
     rule.reply
   )
 }
@@ -201,6 +208,18 @@ const autoPauseRegexKey = 'serialflow.autoPauseRegex'
 const autoPauseHexKey = 'serialflow.autoPauseHex'
 const serialConfigKey = 'serialflow.serialConfig'
 const serialConfigsKey = 'serialflow.serialConfigs'
+
+function formatCacheBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(2)} MB`
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${bytes} B`
+}
+
+function formatFrequency(frequency: number): string {
+  return frequency < 10 && frequency > 0
+    ? frequency.toFixed(1)
+    : Math.round(frequency).toLocaleString()
+}
 type PersistedSerialConfig = {
   path: string
   baudRate: number
@@ -349,8 +368,6 @@ function App(): React.JSX.Element {
   const [commandGroups, setCommandGroups] = useState<CommandGroup[]>(loadCommandGroups)
   const [scripts, setScripts] = useState<UserScript[]>(() => ensureInitialScripts(loadScripts()))
   const [sideTab, setSideTab] = useState<'serial' | 'commands' | 'rules' | 'scripts'>('serial')
-  const [rxCount, setRxCount] = useState(0)
-  const [txCount, setTxCount] = useState(0)
   const [rxCommunicationCount, setRxCommunicationCount] = useState(0)
   const [txCommunicationCount, setTxCommunicationCount] = useState(0)
   const [rxFrequency, setRxFrequency] = useState(0)
@@ -380,11 +397,9 @@ function App(): React.JSX.Element {
   const pendingFrameRef = useRef<number | null>(null)
   const pendingInteractionsRef = useRef<{
     entries: InteractionEntry[]
-    rxBytes: number
-    txBytes: number
     rxEvents: number
     txEvents: number
-  }>({ entries: [], rxBytes: 0, txBytes: 0, rxEvents: 0, txEvents: 0 })
+  }>({ entries: [], rxEvents: 0, txEvents: 0 })
   const trafficEventsRef = useRef({ rx: 0, tx: 0 })
   const frequencySampleRef = useRef({ rx: 0, tx: 0, time: 0 })
   const interactionSettingsRef = useRef({
@@ -397,6 +412,7 @@ function App(): React.JSX.Element {
   const scriptFramerRef = useRef(new ScriptFramer())
   const scriptReceiveQueuesRef = useRef(new Map<string, Promise<void>>())
   const scriptErrorCountsRef = useRef(new Map<string, number>())
+  const autoReplyErrorCountsRef = useRef(new Map<number, number>())
   const scriptSendIndexRef = useRef(0)
 
   useEffect(() => {
@@ -424,13 +440,9 @@ function App(): React.JSX.Element {
     const pending = pendingInteractionsRef.current
     pendingInteractionsRef.current = {
       entries: [],
-      rxBytes: 0,
-      txBytes: 0,
       rxEvents: 0,
       txEvents: 0
     }
-    if (pending.rxBytes) setRxCount((count) => count + pending.rxBytes)
-    if (pending.txBytes) setTxCount((count) => count + pending.txBytes)
     if (pending.rxEvents) setRxCommunicationCount((count) => count + pending.rxEvents)
     if (pending.txEvents) setTxCommunicationCount((count) => count + pending.txEvents)
     if (!pending.entries.length) return
@@ -462,11 +474,9 @@ function App(): React.JSX.Element {
     ): void => {
       const pending = pendingInteractionsRef.current
       if (direction === 'rx') {
-        pending.rxBytes += bytes
         pending.rxEvents += 1
         trafficEventsRef.current.rx += 1
       } else if (direction === 'tx') {
-        pending.txBytes += bytes
         pending.txEvents += 1
         trafficEventsRef.current.tx += 1
       }
@@ -714,15 +724,55 @@ function App(): React.JSX.Element {
         const candidates = rule.receiveHex
           ? [hexBuffer, bytesToHex(bytes)]
           : [lineBuffer, ...lineBuffer.split(/\r?\n/).map((line) => line.replace(/\r$/, ''))]
-        const matched = candidates.some((candidate) => {
+        let matchedCandidate = ''
+        let matchedResult: RegExpExecArray | null = null
+        for (const candidate of candidates) {
           expression.lastIndex = 0
-          return expression.test(candidate)
-        })
-        if (matched) {
+          const result = expression.exec(candidate)
+          if (result) {
+            matchedCandidate = candidate
+            matchedResult = result
+            break
+          }
+        }
+        if (matchedResult) {
           lineBuffers.current.set(sourcePort, '')
           hexBuffers.current.set(sourcePort, '')
-          const reply = fillRuleParameters(rule).replace(/\\r/g, '\r').replace(/\\n/g, '\n')
-          void send({ text: reply, hex: rule.hex, targetPort: rule.targetPort || sourcePort })
+          if (rule.parameterMode === 'program') {
+            const match = Array.from(matchedResult, (value) => value ?? '')
+            const groups = { ...(matchedResult.groups || {}) }
+            void autoReplyProgramRuntime
+              .run(rule, { input: matchedCandidate, match, groups, port: sourcePort })
+              .then((values) => {
+                autoReplyErrorCountsRef.current.delete(rule.id)
+                const reply = fillRuleParameters(rule, values)
+                  .replace(/\\r/g, '\r')
+                  .replace(/\\n/g, '\n')
+                return send({
+                  text: reply,
+                  hex: rule.hex,
+                  targetPort: rule.targetPort || sourcePort
+                })
+              })
+              .catch((cause) => {
+                if (cause instanceof Error && cause.message === '规则状态已重置') return
+                const count = (autoReplyErrorCountsRef.current.get(rule.id) || 0) + 1
+                autoReplyErrorCountsRef.current.set(rule.id, count)
+                if (count === 1) showError(cause, `自动回复“${rule.name}”编程执行失败`)
+                if (count >= 3) {
+                  autoReplyProgramRuntime.reset(rule.id)
+                  setRules((current) =>
+                    current.map((item) =>
+                      item.id === rule.id ? { ...item, enabled: false } : item
+                    )
+                  )
+                  setMessage(`自动回复“${rule.name}”连续失败 3 次，已自动停用`)
+                }
+              })
+          } else {
+            const reply = fillRuleParameters(rule).replace(/\\r/g, '\r').replace(/\\n/g, '\n')
+            void send({ text: reply, hex: rule.hex, targetPort: rule.targetPort || sourcePort })
+          }
           break
         }
       }
@@ -989,21 +1039,22 @@ function App(): React.JSX.Element {
   const clearReceive = (): void => {
     pendingInteractionsRef.current = {
       entries: [],
-      rxBytes: 0,
-      txBytes: 0,
       rxEvents: 0,
       txEvents: 0
     }
     trafficEventsRef.current = { rx: 0, tx: 0 }
     frequencySampleRef.current = { rx: 0, tx: 0, time: performance.now() }
     setInteractionCache({ entries: [], bytes: 0 })
-    setRxCount(0)
-    setTxCount(0)
     setRxCommunicationCount(0)
     setTxCommunicationCount(0)
     setRxFrequency(0)
     setTxFrequency(0)
   }
+  const resetAutoReplyState = useCallback((ruleId: number, notify = true): void => {
+    autoReplyProgramRuntime.reset(ruleId)
+    autoReplyErrorCountsRef.current.delete(ruleId)
+    if (notify) setMessage('自动回复编程状态已重置')
+  }, [])
   const changeInteractionCacheMb = (value: number): void => {
     const next = Math.min(1024, Math.max(1, Number.isFinite(value) ? Math.round(value) : 8))
     setInteractionCacheMb(next)
@@ -1089,7 +1140,12 @@ function App(): React.JSX.Element {
             />
           }
           rulesContent={
-            <AutoReplyPanel rules={rules} setRules={setRules} targetPorts={configuredPorts} />
+            <AutoReplyPanel
+              rules={rules}
+              setRules={setRules}
+              targetPorts={configuredPorts}
+              onResetState={resetAutoReplyState}
+            />
           }
         />
         {sideTab === 'scripts' ? (
@@ -1105,12 +1161,7 @@ function App(): React.JSX.Element {
           >
             <ReceivePanel
               entries={interactionCache.entries}
-              cacheBytes={interactionCache.bytes}
               rxHex={rxHex}
-              rxCommunicationCount={rxCommunicationCount}
-              txCommunicationCount={txCommunicationCount}
-              rxFrequency={rxFrequency}
-              txFrequency={txFrequency}
               timestamp={timestamp}
               paused={paused}
               autoPauseEnabled={autoPauseEnabled}
@@ -1199,9 +1250,12 @@ function App(): React.JSX.Element {
       )}
       <footer>
         <span>{message}</span>
-        <div>
-          <span className="rx">↓ RX {rxCount.toLocaleString()}</span>
-          <span className="tx">↑ TX {txCount.toLocaleString()}</span>
+        <div className="footer-traffic">
+          通讯 <span className="rx">RX {rxCommunicationCount.toLocaleString()} 次</span> /{' '}
+          <span className="tx">TX {txCommunicationCount.toLocaleString()} 次</span> · 缓存{' '}
+          {formatCacheBytes(interactionCache.bytes)} / {interactionCacheMb} MB · 频率{' '}
+          <span className="rx">RX {formatFrequency(rxFrequency)} Hz</span> /{' '}
+          <span className="tx">TX {formatFrequency(txFrequency)} Hz</span>
         </div>
       </footer>
     </main>
