@@ -1475,12 +1475,33 @@ footer div {
   color: #8492a6;
   font-size: 9px;
 }
+.group-loop-settings {
+  display: grid;
+  grid-template-columns: minmax(125px, 1fr) minmax(92px, 110px) minmax(62px, 76px);
+  width: 100%;
+}
+.group-loop-settings > label {
+  min-width: 0;
+  white-space: nowrap;
+}
+.group-loop-settings > div {
+  position: relative;
+  min-width: 0;
+}
 .group-loop-settings > div input {
-  width: 105px;
+  width: 100%;
+  min-width: 0;
   padding-right: 43px;
 }
-.group-loop-settings > div span {
-  margin-left: -40px;
+.group-loop-settings > div:last-child input {
+  padding-right: 23px;
+}
+.group-loop-settings > div span,
+.group-loop-settings > div:last-child span {
+  position: absolute;
+  right: 7px;
+  margin: 0;
+  pointer-events: none;
 }
 .group-title-row {
   display: flex;
