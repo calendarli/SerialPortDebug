@@ -35,6 +35,7 @@ export type SavedCommand = {
   parentId: number | null
   name: string
   template: string
+  releaseTemplate?: string
   hex: boolean
   autoSend: boolean
   autoSendInterval: number
@@ -55,7 +56,7 @@ export type CommandGroup = {
 
 export type InteractionEntry = {
   id: number
-  direction: 'rx' | 'tx'
+  direction: 'rx' | 'tx' | 'script'
   text: string
   bytes: number
   port: string

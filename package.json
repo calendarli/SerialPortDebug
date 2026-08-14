@@ -1,4 +1,4 @@
- {
+{
   "name": "serialportdebug",
   "version": "1.0.0",
   "description": "高速串口数据调试与自动化交互工具",
@@ -24,6 +24,8 @@
     "@electron-toolkit/utils": "^4.0.0",
     "@tanstack/react-virtual": "^3.14.9",
     "electron-updater": "^6.3.9",
+    "monaco-editor": "^0.56.0",
+    "quickjs-emscripten": "^0.32.0",
     "serialport": "^13.0.0"
   },
   "devDependencies": {

@@ -1,17 +1,25 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ReceivePanel } from './components/ReceivePanel'
 import { AutoReplyPanel } from './components/AutoReplyPanel'
 import { CommandsPanel } from './components/CommandsPanel'
 import { SendPanel } from './components/SendPanel'
 import { SerialConfigPanel } from './components/SerialConfigPanel'
 import { Sidebar } from './components/Sidebar'
+import { ScriptFramer } from './scripts/script-framer'
+import {
+  bytesToPayload,
+  payloadToBytes,
+  runScriptPipeline,
+  type ScriptDisplay
+} from './scripts/script-pipeline'
+import { ensureInitialScripts, loadScripts, saveScripts } from './scripts/script-storage'
+import type { SavedScript as UserScript } from './scripts/script-types'
 import {
   appendCrc,
   base64ToBytes,
   bytesToBase64,
   bytesToHex,
   convertSerialText,
-  encodeSerialData,
   formatTime
 } from './serial-utils'
 import type {
@@ -26,6 +34,10 @@ import type {
   SerialConfig,
   StopBits
 } from './types'
+
+const ScriptPanel = lazy(() =>
+  import('./scripts/ScriptPanel').then((module) => ({ default: module.ScriptPanel }))
+)
 
 const defaultRules: Rule[] = [
   {
@@ -95,6 +107,8 @@ function loadCommands(): SavedCommand[] {
       ? saved.map((command) => ({
           ...command,
           parentId: command.parentId ?? null,
+          releaseTemplate:
+            typeof command.releaseTemplate === 'string' ? command.releaseTemplate : '',
           autoSend: Boolean(command.autoSend),
           autoSendInterval: Math.max(1, command.autoSendInterval || 1000),
           autoSendCount:
@@ -332,7 +346,8 @@ function App(): React.JSX.Element {
   const [rules, setRules] = useState<Rule[]>(loadRules)
   const [commands, setCommands] = useState<SavedCommand[]>(loadCommands)
   const [commandGroups, setCommandGroups] = useState<CommandGroup[]>(loadCommandGroups)
-  const [sideTab, setSideTab] = useState<'serial' | 'commands' | 'rules'>('serial')
+  const [scripts, setScripts] = useState<UserScript[]>(() => ensureInitialScripts(loadScripts()))
+  const [sideTab, setSideTab] = useState<'serial' | 'commands' | 'rules' | 'scripts'>('serial')
   const [rxCount, setRxCount] = useState(0)
   const [txCount, setTxCount] = useState(0)
   const [rxCommunicationCount, setRxCommunicationCount] = useState(0)
@@ -372,6 +387,11 @@ function App(): React.JSX.Element {
     timestamp
   })
   const autoSendCompletedRef = useRef(0)
+  const scriptsRef = useRef(scripts)
+  const scriptFramerRef = useRef(new ScriptFramer())
+  const scriptReceiveQueuesRef = useRef(new Map<string, Promise<void>>())
+  const scriptErrorCountsRef = useRef(new Map<string, number>())
+  const scriptSendIndexRef = useRef(0)
 
   useEffect(() => {
     interactionSettingsRef.current = {
@@ -427,13 +447,19 @@ function App(): React.JSX.Element {
   }, [])
 
   const queueInteraction = useCallback(
-    (direction: 'rx' | 'tx', port: string, text: string, bytes: number, visible = true): void => {
+    (
+      direction: 'rx' | 'tx' | 'script',
+      port: string,
+      text: string,
+      bytes: number,
+      visible = true
+    ): void => {
       const pending = pendingInteractionsRef.current
       if (direction === 'rx') {
         pending.rxBytes += bytes
         pending.rxEvents += 1
         trafficEventsRef.current.rx += 1
-      } else {
+      } else if (direction === 'tx') {
         pending.txBytes += bytes
         pending.txEvents += 1
         trafficEventsRef.current.tx += 1
@@ -452,6 +478,16 @@ function App(): React.JSX.Element {
         pendingFrameRef.current = window.requestAnimationFrame(flushInteractions)
     },
     [flushInteractions]
+  )
+
+  const queueScriptDisplays = useCallback(
+    (port: string, displays: ScriptDisplay[]): void => {
+      for (const display of displays) {
+        const tags = display.tags.length ? ` [${display.tags.join(', ')}]` : ''
+        queueInteraction('script', port, `${display.scriptName}${tags} · ${display.text}`, 0)
+      }
+    },
+    [queueInteraction]
   )
 
   const compiledRules = useMemo(
@@ -516,7 +552,15 @@ function App(): React.JSX.Element {
       try {
         const source = override?.text ?? sendText
         const effectiveHex = override?.hex ?? sendHex
-        let bytes = encodeSerialData(source, effectiveHex)
+        const scripted = await runScriptPipeline(
+          scriptsRef.current,
+          'send',
+          targetPort,
+          { value: source, encoding: effectiveHex ? 'hex' : 'ascii' },
+          ++scriptSendIndexRef.current
+        )
+        let bytes = payloadToBytes(scripted.payload)
+        queueScriptDisplays(targetPort, scripted.displays)
         if (!override && appendCrlf) {
           const merged = new Uint8Array(bytes.length + 2)
           merged.set(bytes)
@@ -533,7 +577,9 @@ function App(): React.JSX.Element {
         queueInteraction(
           'tx',
           targetPort,
-          effectiveHex || crcMode ? bytesToHex(bytes) : new TextDecoder().decode(bytes),
+          scripted.payload.encoding !== 'ascii' || crcMode
+            ? bytesToHex(bytes)
+            : new TextDecoder().decode(bytes),
           bytes.length
         )
         setMessage(`已通过 ${targetPort} 发送 ${bytes.length} 字节`)
@@ -547,6 +593,7 @@ function App(): React.JSX.Element {
       appendCrlf,
       openedPorts,
       queueInteraction,
+      queueScriptDisplays,
       sendPort,
       sendCrcEnabled,
       sendCrcMode,
@@ -564,6 +611,39 @@ function App(): React.JSX.Element {
     (text: string, hex: boolean, crcMode?: CrcMode | null, targetPort?: string): Promise<boolean> =>
       sendRef.current({ text, hex, crcMode, targetPort }),
     []
+  )
+
+  const enqueueReceivedScript = useCallback(
+    (script: UserScript, port: string, frame: Uint8Array): void => {
+      const key = `${script.id}:${port}`
+      const previous = scriptReceiveQueuesRef.current.get(key) || Promise.resolve()
+      const task = previous
+        .catch(() => undefined)
+        .then(async () => {
+          const input = bytesToPayload(frame, script.encoding)
+          const result = await runScriptPipeline([script], 'received', port, input, 0)
+          queueScriptDisplays(port, result.displays)
+          scriptErrorCountsRef.current.delete(script.id)
+        })
+        .catch((cause) => {
+          const count = (scriptErrorCountsRef.current.get(script.id) || 0) + 1
+          scriptErrorCountsRef.current.set(script.id, count)
+          if (count === 1) showError(cause, `脚本“${script.name}”接收处理失败`)
+          if (count >= 3) {
+            setScripts((current) =>
+              current.map((item) => (item.id === script.id ? { ...item, enabled: false } : item))
+            )
+            scriptFramerRef.current.clear(script.id)
+            setMessage(`脚本“${script.name}”连续失败 3 次，已自动停止`)
+          }
+        })
+      scriptReceiveQueuesRef.current.set(key, task)
+      void task.finally(() => {
+        if (scriptReceiveQueuesRef.current.get(key) === task)
+          scriptReceiveQueuesRef.current.delete(key)
+      })
+    },
+    [queueScriptDisplays, showError]
   )
 
   useEffect(() => {
@@ -641,7 +721,31 @@ function App(): React.JSX.Element {
         }
       }
       const rendered = rxHex ? `${bytesToHex(bytes)} ` : text
-      queueInteraction('rx', sourcePort, rendered, bytes.length, !paused)
+      const replaceRawDisplay = scriptsRef.current.some(
+        (script) =>
+          script.enabled &&
+          script.compiledCode &&
+          script.displayMode === 'replace' &&
+          (script.direction === 'all' || script.direction === 'received') &&
+          (!script.ports.length || script.ports.includes(sourcePort))
+      )
+      queueInteraction('rx', sourcePort, rendered, bytes.length, !paused && !replaceRawDisplay)
+      for (const script of scriptsRef.current) {
+        if (
+          !script.enabled ||
+          !script.compiledCode ||
+          (script.direction !== 'all' && script.direction !== 'received') ||
+          (script.ports.length && !script.ports.includes(sourcePort))
+        )
+          continue
+        try {
+          scriptFramerRef.current.push(script, sourcePort, bytes, (frame) =>
+            enqueueReceivedScript(script, sourcePort, frame)
+          )
+        } catch (cause) {
+          showError(cause, `脚本“${script.name}”分帧失败`)
+        }
+      }
       if (shouldAutoPause) {
         pauseLineBuffers.current.set(sourcePort, '')
         pauseHexBuffers.current.set(sourcePort, '')
@@ -676,6 +780,7 @@ function App(): React.JSX.Element {
     autoPauseHex,
     autoPausePattern,
     compiledRules,
+    enqueueReceivedScript,
     paused,
     queueInteraction,
     rxHex,
@@ -759,6 +864,11 @@ function App(): React.JSX.Element {
   useEffect(() => {
     localStorage.setItem('serialflow.commandGroups', JSON.stringify(commandGroups))
   }, [commandGroups])
+
+  useEffect(() => {
+    scriptsRef.current = scripts
+    saveScripts(scripts)
+  }, [scripts])
 
   useEffect(() => {
     localStorage.setItem(sendIntervalKey, String(interval))
@@ -933,8 +1043,10 @@ function App(): React.JSX.Element {
         <div className={`status ${connected ? 'online' : ''}`}>
           <i />
           {connected
-            ? `已打开 ${openedPorts.size} 个串口：${[...openedPorts].join('、')}`
-            : '未连接'}
+            ? `已打开 ${openedPorts.size} 个串口：${[...openedPorts].join('、')}${scripts.some((script) => script.enabled) ? ` · 脚本 ${scripts.filter((script) => script.enabled).length}` : ''}`
+            : scripts.some((script) => script.enabled)
+              ? `未连接 · 脚本 ${scripts.filter((script) => script.enabled).length}`
+              : '未连接'}
         </div>
       </header>
       <section className="workspace">
@@ -943,6 +1055,7 @@ function App(): React.JSX.Element {
           onTabChange={setSideTab}
           commandCount={commands.length}
           enabledRuleCount={rules.filter((rule) => rule.enabled).length}
+          enabledScriptCount={scripts.filter((script) => script.enabled).length}
           serialContent={
             <SerialConfigPanel
               ports={ports}
@@ -972,71 +1085,87 @@ function App(): React.JSX.Element {
           rulesContent={
             <AutoReplyPanel rules={rules} setRules={setRules} targetPorts={configuredPorts} />
           }
+          scriptsContent={
+            <div className="script-side-intro">
+              <strong>脚本工作台</strong>
+              <p>使用 Monaco 编写 JavaScript / TypeScript，处理指定串口的发送与接收数据。</p>
+              <span>{scripts.length} 个脚本</span>
+              <span>{scripts.filter((script) => script.enabled).length} 个运行中</span>
+            </div>
+          }
         />
-        <section
-          className="content"
-          style={{ gridTemplateRows: `minmax(200px, 1fr) ${sendPanelHeight}px` }}
-        >
-          <ReceivePanel
-            entries={interactionCache.entries}
-            cacheBytes={interactionCache.bytes}
-            rxHex={rxHex}
-            rxCommunicationCount={rxCommunicationCount}
-            txCommunicationCount={txCommunicationCount}
-            rxFrequency={rxFrequency}
-            txFrequency={txFrequency}
-            timestamp={timestamp}
-            paused={paused}
-            autoPauseEnabled={autoPauseEnabled}
-            autoPausePattern={autoPausePattern}
-            autoPauseRegex={autoPauseRegex}
-            autoPauseHex={autoPauseHex}
-            cacheSizeMb={interactionCacheMb}
-            cacheEntryLimit={interactionCacheEntries}
-            fontSize={interactionFontSize}
-            onClear={clearReceive}
-            onRxHexChange={setRxHex}
-            onTimestampChange={setTimestamp}
-            onPausedChange={setPaused}
-            onAutoPauseEnabledChange={setAutoPauseEnabled}
-            onAutoPausePatternChange={setAutoPausePattern}
-            onAutoPauseRegexChange={setAutoPauseRegex}
-            onAutoPauseHexChange={setAutoPauseHex}
-            onCacheSizeChange={changeInteractionCacheMb}
-            onCacheEntryLimitChange={changeInteractionEntryLimit}
-            onFontSizeChange={changeInteractionFontSize}
-          />
-          <SendPanel
-            text={sendText}
-            hex={sendHex}
-            appendCrlf={appendCrlf}
-            autoSend={autoSend}
-            autoSendRunning={autoSendRunning}
-            interval={interval}
-            autoSendCount={autoSendCount}
-            crcEnabled={sendCrcEnabled}
-            crcMode={sendCrcMode}
-            openedPorts={openedPortList}
-            targetPort={sendPort}
-            onTextChange={setSendText}
-            onHexChange={changeSendMode}
-            onAppendCrlfChange={setAppendCrlf}
-            onAutoSendChange={changeAutoSend}
-            onIntervalChange={setIntervalValue}
-            onAutoSendCountChange={setAutoSendCount}
-            onSend={() => void triggerSend()}
-            onCrcEnabledChange={setSendCrcEnabled}
-            onCrcModeChange={setSendCrcMode}
-            onTargetPortChange={setSendPort}
-            height={sendPanelHeight}
-            onHeightChange={(value) => setSendPanelHeight(clampSendPanelHeight(value))}
-            onHeightCommit={(value) => {
-              const height = clampSendPanelHeight(value)
-              setSendPanelHeight(height)
-              localStorage.setItem(sendPanelHeightKey, String(height))
-            }}
-          />
-        </section>
+        {sideTab === 'scripts' ? (
+          <section className="script-content">
+            <Suspense fallback={<div className="script-loading">正在加载 Monaco 编辑器…</div>}>
+              <ScriptPanel scripts={scripts} setScripts={setScripts} ports={configuredPorts} />
+            </Suspense>
+          </section>
+        ) : (
+          <section
+            className="content"
+            style={{ gridTemplateRows: `minmax(200px, 1fr) ${sendPanelHeight}px` }}
+          >
+            <ReceivePanel
+              entries={interactionCache.entries}
+              cacheBytes={interactionCache.bytes}
+              rxHex={rxHex}
+              rxCommunicationCount={rxCommunicationCount}
+              txCommunicationCount={txCommunicationCount}
+              rxFrequency={rxFrequency}
+              txFrequency={txFrequency}
+              timestamp={timestamp}
+              paused={paused}
+              autoPauseEnabled={autoPauseEnabled}
+              autoPausePattern={autoPausePattern}
+              autoPauseRegex={autoPauseRegex}
+              autoPauseHex={autoPauseHex}
+              cacheSizeMb={interactionCacheMb}
+              cacheEntryLimit={interactionCacheEntries}
+              fontSize={interactionFontSize}
+              onClear={clearReceive}
+              onRxHexChange={setRxHex}
+              onTimestampChange={setTimestamp}
+              onPausedChange={setPaused}
+              onAutoPauseEnabledChange={setAutoPauseEnabled}
+              onAutoPausePatternChange={setAutoPausePattern}
+              onAutoPauseRegexChange={setAutoPauseRegex}
+              onAutoPauseHexChange={setAutoPauseHex}
+              onCacheSizeChange={changeInteractionCacheMb}
+              onCacheEntryLimitChange={changeInteractionEntryLimit}
+              onFontSizeChange={changeInteractionFontSize}
+            />
+            <SendPanel
+              text={sendText}
+              hex={sendHex}
+              appendCrlf={appendCrlf}
+              autoSend={autoSend}
+              autoSendRunning={autoSendRunning}
+              interval={interval}
+              autoSendCount={autoSendCount}
+              crcEnabled={sendCrcEnabled}
+              crcMode={sendCrcMode}
+              openedPorts={openedPortList}
+              targetPort={sendPort}
+              onTextChange={setSendText}
+              onHexChange={changeSendMode}
+              onAppendCrlfChange={setAppendCrlf}
+              onAutoSendChange={changeAutoSend}
+              onIntervalChange={setIntervalValue}
+              onAutoSendCountChange={setAutoSendCount}
+              onSend={() => void triggerSend()}
+              onCrcEnabledChange={setSendCrcEnabled}
+              onCrcModeChange={setSendCrcMode}
+              onTargetPortChange={setSendPort}
+              height={sendPanelHeight}
+              onHeightChange={(value) => setSendPanelHeight(clampSendPanelHeight(value))}
+              onHeightCommit={(value) => {
+                const height = clampSendPanelHeight(value)
+                setSendPanelHeight(height)
+                localStorage.setItem(sendPanelHeightKey, String(height))
+              }}
+            />
+          </section>
+        )}
       </section>
       {errorDialog && (
         <div

@@ -6,9 +6,18 @@ export default defineConfig({
   main: {},
   preload: {},
   renderer: {
+    worker: {
+      format: 'es'
+    },
     resolve: {
       alias: {
-        '@renderer': resolve('src/renderer/src')
+        '@renderer': resolve('src/renderer/src'),
+        'monaco-editor/esm/vs/editor/editor.api.js': resolve(
+          'node_modules/monaco-editor/esm/vs/editor/editor.api.js'
+        ),
+        'monaco-editor/esm/vs/language/typescript/monaco.contribution.js': resolve(
+          'node_modules/monaco-editor/esm/vs/language/typescript/monaco.contribution.js'
+        )
       }
     },
     plugins: [react()]

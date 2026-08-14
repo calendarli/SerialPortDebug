@@ -2132,6 +2132,315 @@ footer div {
   min-height: 42px;
   resize: vertical;
 }
+.create-rule-form > label textarea.command-release-input {
+  height: 52px;
+  min-height: 42px;
+  resize: vertical;
+}
+
+/* Monaco based external script workbench. */
+.script-content {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  padding: 12px;
+  overflow: hidden;
+}
+.script-loading,
+.script-empty {
+  display: grid;
+  height: 100%;
+  place-content: center;
+  gap: 10px;
+  color: #718096;
+  text-align: center;
+}
+.script-empty button {
+  height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #fff;
+}
+.script-side-intro {
+  padding: 18px 14px;
+}
+.script-side-intro strong {
+  color: #2d3b50;
+  font-size: 12px;
+}
+.script-side-intro p {
+  margin: 8px 0 12px;
+  color: #718096;
+  font-size: 9px;
+  line-height: 1.65;
+}
+.script-side-intro span {
+  display: block;
+  margin-top: 5px;
+  color: #2563eb;
+  font-size: 9px;
+}
+.script-panel {
+  display: grid;
+  grid-template-rows: 42px minmax(0, 1fr) auto;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+.script-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--border);
+}
+.script-panel-head strong {
+  color: #27364b;
+  font-size: 12px;
+}
+.script-panel-head span {
+  margin-right: auto;
+  color: #718096;
+  font-size: 9px;
+}
+.script-panel-head button,
+.script-toolbar button {
+  height: 27px;
+  padding: 0 9px;
+  border: 1px solid #d8e1ec;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #526176;
+  font-size: 9px;
+}
+.script-panel-head button:hover,
+.script-toolbar button:hover {
+  border-color: #b8cff6;
+  background: #eff6ff;
+  color: #2563eb;
+}
+.script-toolbar button.danger {
+  color: #dc2626;
+}
+.script-workspace {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
+}
+.script-list {
+  position: relative;
+  z-index: 0;
+  box-sizing: border-box;
+  contain: layout paint;
+  min-height: 0;
+  padding: 10px 7px 7px;
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+  background: #f7f9fc;
+}
+.script-list button {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 34px;
+  margin-bottom: 4px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: #526176;
+  text-align: left;
+}
+.script-list button.active {
+  border-color: #cbdcf7;
+  background: #eef5ff;
+  color: #2563eb;
+  box-shadow: none;
+}
+.script-list i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #cbd5e1;
+}
+.script-list i.running {
+  background: #10b981;
+  box-shadow: 0 0 0 3px #10b9811f;
+}
+.script-list span {
+  overflow: hidden;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.script-list em {
+  color: #8492a6;
+  font-size: 8px;
+  font-style: normal;
+}
+.script-editor-area {
+  display: grid;
+  position: relative;
+  z-index: 0;
+  contain: layout paint;
+  grid-template-rows: minmax(39px, 39px) minmax(180px, 1fr) 125px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.script-toolbar {
+  display: flex;
+  position: relative;
+  z-index: 1;
+  align-items: center;
+  min-height: 39px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  gap: 6px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.script-toolbar > input {
+  width: 145px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid #d8e1ec;
+  border-radius: 6px;
+  color: #344258;
+  font-size: 10px;
+}
+.script-toolbar > select {
+  width: 94px;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid #d8e1ec;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #526176;
+  font-size: 9px;
+}
+.script-toolbar .script-dirty {
+  margin-right: auto;
+  color: #d97706;
+  font-size: 8px;
+}
+.script-monaco {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border);
+}
+.script-test-area {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-width: 0;
+  min-height: 0;
+}
+.script-test-area label {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+  color: #718096;
+  font-size: 8px;
+}
+.script-test-area label + label {
+  border-left: 1px solid var(--border);
+}
+.script-test-area textarea,
+.script-test-area pre {
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  margin: 0;
+  padding: 7px;
+  overflow: auto;
+  border: 1px solid #dbe3ed;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #344258;
+  font:
+    9px/1.45 Consolas,
+    monospace;
+  resize: none;
+  white-space: pre-wrap;
+}
+.script-binding {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 58px;
+  padding: 7px 10px;
+  overflow-x: auto;
+  border-top: 1px solid var(--border);
+  background: #fbfcfe;
+}
+.script-binding > label {
+  color: #718096;
+  font-size: 8px;
+  white-space: nowrap;
+}
+.script-binding > label > select,
+.script-binding > label > input:not([type='checkbox']) {
+  display: block;
+  width: 105px;
+  height: 27px;
+  margin-top: 3px;
+  padding: 0 6px;
+  border: 1px solid #d8e1ec;
+  border-radius: 6px;
+  background: #fff;
+  color: #42526a;
+  font-size: 8px;
+}
+.script-binding input[type='checkbox'] {
+  margin-right: 4px;
+  accent-color: #2563eb;
+  vertical-align: -2px;
+}
+.script-binding fieldset {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 145px;
+  min-height: 39px;
+  margin: 0;
+  padding: 4px 8px;
+  border: 1px solid #dbe3ed;
+  border-radius: 7px;
+  color: #718096;
+  font-size: 8px;
+  white-space: nowrap;
+}
+.script-binding legend {
+  padding: 0 3px;
+}
+.interaction-entry.script {
+  border-color: #ddd6fe;
+  background: #faf8ff;
+}
+.script .interaction-meta {
+  border-color: #ddd6fe;
+  background: #f1edff;
+  color: #6d5c9e;
+}
+.script .interaction-meta b {
+  background: #7c3aed;
+}
+.interaction-entry.script pre {
+  color: #5b3f8c;
+}
 .crc-select {
   height: 28px;
   max-width: 145px;

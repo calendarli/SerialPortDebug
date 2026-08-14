@@ -1,7 +1,17 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
-type Tab = 'serial' | 'commands' | 'rules'
-type Props = { activeTab: Tab; commandCount: number; enabledRuleCount: number; onTabChange: (tab: Tab) => void; serialContent: ReactNode; commandsContent: ReactNode; rulesContent: ReactNode }
+type Tab = 'serial' | 'commands' | 'rules' | 'scripts'
+type Props = {
+  activeTab: Tab
+  commandCount: number
+  enabledRuleCount: number
+  enabledScriptCount: number
+  onTabChange: (tab: Tab) => void
+  serialContent: ReactNode
+  commandsContent: ReactNode
+  rulesContent: ReactNode
+  scriptsContent: ReactNode
+}
 const storageKey = 'serialflow.sidebarWidth'
 const defaultWidth = 320
 const minWidth = 270
@@ -23,11 +33,12 @@ export function Sidebar(props: Props): React.JSX.Element {
   const widthRef = useRef(width)
 
   useEffect(() => {
-    const handleResize = (): void => setWidth((current) => {
-      const nextWidth = clampWidth(current)
-      widthRef.current = nextWidth
-      return nextWidth
-    })
+    const handleResize = (): void =>
+      setWidth((current) => {
+        const nextWidth = clampWidth(current)
+        widthRef.current = nextWidth
+        return nextWidth
+      })
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])
@@ -56,13 +67,66 @@ export function Sidebar(props: Props): React.JSX.Element {
     localStorage.setItem(storageKey, String(defaultWidth))
   }
 
-  return <aside className={`config-panel resizable-sidebar ${resizing ? 'resizing' : ''}`} style={{ width }}>
-    <nav className="side-tabs" aria-label="侧栏导航">
-      <button title="串口" className={props.activeTab === 'serial' ? 'active' : ''} onClick={() => props.onTabChange('serial')}><span className="tab-icon">⌁</span><span>串口</span></button>
-      <button title="快捷指令" className={props.activeTab === 'commands' ? 'active' : ''} onClick={() => props.onTabChange('commands')}><span className="tab-icon">›_</span><span>指令</span>{props.commandCount > 0 && <b>{props.commandCount}</b>}</button>
-      <button title="自动回复" className={props.activeTab === 'rules' ? 'active' : ''} onClick={() => props.onTabChange('rules')}><span className="tab-icon">⌘</span><span>回复</span>{props.enabledRuleCount > 0 && <b>{props.enabledRuleCount}</b>}</button>
-    </nav>
-    <div className="side-page">{props.activeTab === 'serial' ? props.serialContent : props.activeTab === 'commands' ? props.commandsContent : props.rulesContent}</div>
-    <div className="sidebar-resizer" title="拖拽调整宽度，双击恢复默认" onPointerDown={beginResize} onPointerMove={resize} onPointerUp={finishResize} onPointerCancel={finishResize} onDoubleClick={resetWidth} />
-  </aside>
+  return (
+    <aside
+      className={`config-panel resizable-sidebar ${resizing ? 'resizing' : ''}`}
+      style={{ width }}
+    >
+      <nav className="side-tabs" aria-label="侧栏导航">
+        <button
+          title="串口"
+          className={props.activeTab === 'serial' ? 'active' : ''}
+          onClick={() => props.onTabChange('serial')}
+        >
+          <span className="tab-icon">⌁</span>
+          <span>串口</span>
+        </button>
+        <button
+          title="快捷指令"
+          className={props.activeTab === 'commands' ? 'active' : ''}
+          onClick={() => props.onTabChange('commands')}
+        >
+          <span className="tab-icon">›_</span>
+          <span>指令</span>
+          {props.commandCount > 0 && <b>{props.commandCount}</b>}
+        </button>
+        <button
+          title="自动回复"
+          className={props.activeTab === 'rules' ? 'active' : ''}
+          onClick={() => props.onTabChange('rules')}
+        >
+          <span className="tab-icon">⌘</span>
+          <span>回复</span>
+          {props.enabledRuleCount > 0 && <b>{props.enabledRuleCount}</b>}
+        </button>
+        <button
+          title="脚本"
+          className={props.activeTab === 'scripts' ? 'active' : ''}
+          onClick={() => props.onTabChange('scripts')}
+        >
+          <span className="tab-icon">{'{ }'}</span>
+          <span>脚本</span>
+          {props.enabledScriptCount > 0 && <b>{props.enabledScriptCount}</b>}
+        </button>
+      </nav>
+      <div className="side-page">
+        {props.activeTab === 'serial'
+          ? props.serialContent
+          : props.activeTab === 'commands'
+            ? props.commandsContent
+            : props.activeTab === 'rules'
+              ? props.rulesContent
+              : props.scriptsContent}
+      </div>
+      <div
+        className="sidebar-resizer"
+        title="拖拽调整宽度，双击恢复默认"
+        onPointerDown={beginResize}
+        onPointerMove={resize}
+        onPointerUp={finishResize}
+        onPointerCancel={finishResize}
+        onDoubleClick={resetWidth}
+      />
+    </aside>
+  )
 }

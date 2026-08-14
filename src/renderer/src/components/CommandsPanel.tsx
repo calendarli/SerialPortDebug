@@ -19,6 +19,7 @@ type Props = {
 type Draft = {
   name: string
   template: string
+  releaseTemplate: string
   hex: boolean
   autoSend: boolean
   autoSendInterval: number
@@ -32,6 +33,7 @@ type Menu = { x: number; y: number; type: 'root' | 'group' | 'command'; id: numb
 const emptyDraft = (): Draft => ({
   name: '',
   template: '',
+  releaseTemplate: '',
   hex: false,
   autoSend: false,
   autoSendInterval: 1000,
@@ -115,7 +117,7 @@ function numericParameterPlaceholder(mode: ParameterMode, byteLength: number): s
     : `HEX 最多 ${byteLength * 2} 位`
 }
 
-function buildCommand(command: SavedCommand): string {
+function buildCommand(command: SavedCommand, template = command.template): string {
   const result = command.parameters.reduce((current, parameter) => {
     const value = convertParameterForCommand(
       parameter.value,
@@ -124,7 +126,7 @@ function buildCommand(command: SavedCommand): string {
       parameter.byteLength
     )
     return current.replaceAll(`{{${parameter.id}}}`, value)
-  }, command.template)
+  }, template)
   return command.hex ? result : result.replace(/\\r/g, '\r').replace(/\\n/g, '\n')
 }
 
@@ -148,6 +150,7 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
   const [activeGroupLoopIds, setActiveGroupLoopIds] = useState<Set<number>>(new Set())
   const autoSendCountsRef = useRef(new Map<number, number>())
   const groupLoopTokensRef = useRef(new Map<number, number>())
+  const pressedCommandIdsRef = useRef(new Set<number>())
 
   useEffect(() => {
     if (!props.connected) return
@@ -178,6 +181,14 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
           const completed = (autoSendCountsRef.current.get(command.id) || 0) + 1
           autoSendCountsRef.current.set(command.id, completed)
           if (command.autoSendCount > 0 && completed >= command.autoSendCount) {
+            if (command.releaseTemplate) {
+              await props.onSend(
+                buildCommand(command, command.releaseTemplate),
+                command.hex,
+                command.crcMode,
+                command.targetPort
+              )
+            }
             autoSendCountsRef.current.delete(command.id)
             setActiveAutoSendIds((current) => {
               const next = new Set(current)
@@ -285,6 +296,18 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
         next.delete(command.id)
         return next
       })
+      if (command.releaseTemplate) {
+        try {
+          await props.onSend(
+            buildCommand(command, command.releaseTemplate),
+            command.hex,
+            command.crcMode,
+            command.targetPort
+          )
+        } catch (cause) {
+          setError(cause instanceof Error ? cause.message : String(cause))
+        }
+      }
       return
     }
     if (!props.connected) return setError('请先打开串口')
@@ -296,10 +319,52 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
         command.crcMode,
         command.targetPort
       )
-      if (success && command.autoSend && command.autoSendCount !== 1) {
-        autoSendCountsRef.current.set(command.id, 1)
-        setActiveAutoSendIds((current) => new Set(current).add(command.id))
+      if (success && command.autoSend) {
+        if (command.autoSendCount === 1) {
+          if (command.releaseTemplate)
+            await props.onSend(
+              buildCommand(command, command.releaseTemplate),
+              command.hex,
+              command.crcMode,
+              command.targetPort
+            )
+        } else {
+          autoSendCountsRef.current.set(command.id, 1)
+          setActiveAutoSendIds((current) => new Set(current).add(command.id))
+        }
       }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause))
+    }
+  }
+  const pressCommand = async (command: SavedCommand): Promise<void> => {
+    if (command.autoSend || pressedCommandIdsRef.current.has(command.id)) return
+    if (!props.connected) return setError('请先打开串口')
+    pressedCommandIdsRef.current.add(command.id)
+    try {
+      setError('')
+      const success = await props.onSend(
+        buildCommand(command),
+        command.hex,
+        command.crcMode,
+        command.targetPort
+      )
+      if (!success) pressedCommandIdsRef.current.delete(command.id)
+    } catch (cause) {
+      pressedCommandIdsRef.current.delete(command.id)
+      setError(cause instanceof Error ? cause.message : String(cause))
+    }
+  }
+  const releaseCommand = async (command: SavedCommand): Promise<void> => {
+    if (command.autoSend || !pressedCommandIdsRef.current.delete(command.id)) return
+    if (!command.releaseTemplate) return
+    try {
+      await props.onSend(
+        buildCommand(command, command.releaseTemplate),
+        command.hex,
+        command.crcMode,
+        command.targetPort
+      )
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
     }
@@ -330,6 +395,7 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
     setDraft({
       name: command.name,
       template: command.template,
+      releaseTemplate: command.releaseTemplate || '',
       hex: command.hex,
       autoSend: command.autoSend,
       autoSendInterval: command.autoSendInterval,
@@ -451,6 +517,7 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
           parentId: targetParentId,
           name: draft.name.trim(),
           template: draft.template,
+          releaseTemplate: draft.releaseTemplate,
           hex: draft.hex,
           autoSend: draft.autoSend,
           autoSendInterval: draft.autoSendInterval,
@@ -486,6 +553,7 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
                 ...command,
                 name: draft.name.trim(),
                 template: draft.template,
+                releaseTemplate: draft.releaseTemplate,
                 hex: draft.hex,
                 autoSend: draft.autoSend,
                 autoSendInterval: draft.autoSendInterval,
@@ -619,7 +687,14 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
       key={`command-${command.id}`}
       onContextMenu={(event) => openMenu(event, 'command', command.id)}
     >
-      <div className="command-head" title={command.template}>
+      <div
+        className="command-head"
+        title={
+          command.releaseTemplate
+            ? `按下：${command.template}\n抬起：${command.releaseTemplate}`
+            : command.template
+        }
+      >
         <div>
           <strong>{command.name}</strong>
           <span className={`format-badge ${command.hex ? 'hex' : ''}`}>
@@ -643,13 +718,37 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
         </div>
         <button
           className={`command-send ${props.connected && activeAutoSendIds.has(command.id) ? 'stop' : ''}`}
-          onClick={() => void sendCommand(command)}
+          onPointerDown={(event) => {
+            if (command.autoSend) return
+            event.currentTarget.setPointerCapture(event.pointerId)
+            void pressCommand(command)
+          }}
+          onPointerUp={(event) => {
+            if (command.autoSend) return
+            if (event.currentTarget.hasPointerCapture(event.pointerId))
+              event.currentTarget.releasePointerCapture(event.pointerId)
+            void releaseCommand(command)
+          }}
+          onPointerCancel={() => void releaseCommand(command)}
+          onKeyDown={(event) => {
+            if (!command.autoSend && !event.repeat && (event.key === 'Enter' || event.key === ' '))
+              void pressCommand(command)
+          }}
+          onKeyUp={(event) => {
+            if (!command.autoSend && (event.key === 'Enter' || event.key === ' '))
+              void releaseCommand(command)
+          }}
+          onClick={() => {
+            if (command.autoSend) void sendCommand(command)
+          }}
         >
           {command.autoSend
             ? props.connected && activeAutoSendIds.has(command.id)
               ? '停止'
               : '启动'
-            : '发送'}
+            : command.releaseTemplate
+              ? '按住发送'
+              : '发送'}
         </button>
       </div>
       {command.parameters.map((parameter) => (
@@ -900,7 +999,7 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
                 />
               </label>
               <label>
-                发送指令
+                按下发送指令
                 <textarea
                   value={draft.template}
                   placeholder={
@@ -913,6 +1012,16 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
                 <small>
                   使用完整参数名字定位，例如 <code>{'{{目标速度}}'}</code>
                 </small>
+              </label>
+              <label>
+                抬起发送指令（可选）
+                <textarea
+                  className="command-release-input"
+                  value={draft.releaseTemplate}
+                  placeholder={draft.hex ? '例如：01 06 00 00' : '例如：STOP {{目标速度}}\\r\\n'}
+                  onChange={(event) => setDraft({ ...draft, releaseTemplate: event.target.value })}
+                />
+                <small>普通指令按钮抬起时发送；自动发送停止或完成时发送一次</small>
               </label>
               <label>
                 目标端口

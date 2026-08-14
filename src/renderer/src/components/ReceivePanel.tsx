@@ -443,7 +443,12 @@ export function ReceivePanel(props: Props): React.JSX.Element {
         >
           {menu.entry && (
             <button onClick={() => void copyEntry(menu.entry!)}>
-              复制当前{menu.entry.direction === 'tx' ? '发送指令/数据' : '接收数据'}
+              复制当前
+              {menu.entry.direction === 'tx'
+                ? '发送指令/数据'
+                : menu.entry.direction === 'script'
+                  ? '脚本结果'
+                  : '接收数据'}
             </button>
           )}
           {menu.entry && <div className="menu-separator" />}
