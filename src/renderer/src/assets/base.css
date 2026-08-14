@@ -1,5 +1,25 @@
-:root { font-family: Inter, "Segoe UI", "Microsoft YaHei", sans-serif; color:#172033; background:#f4f7fb; font-synthesis:none; }
-* { box-sizing:border-box; }
-body { margin:0; min-width:980px; min-height:100vh; overflow:hidden; }
-button,input,select,textarea { font:inherit; }
-button { cursor:pointer; }
+:root {
+  font-family: Inter, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  font-size: 13px;
+  color: #172033;
+  background: #f4f7fb;
+  font-synthesis: none;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  min-width: 980px;
+  min-height: 100vh;
+  overflow: hidden;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+}

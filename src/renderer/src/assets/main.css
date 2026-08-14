@@ -1,4 +1,4 @@
-@import './base.css';
+﻿@import './base.css';
 :root {
   --page: #f4f7fb;
   --surface: #fff;
@@ -53,14 +53,14 @@ header {
 }
 .brand small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
 }
 .status {
   border: 1px solid var(--border);
   border-radius: 20px;
   padding: 7px 13px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 14px;
   background: #fff;
   box-shadow: 0 2px 8px #1e40700a;
 }
@@ -98,7 +98,7 @@ header {
   justify-content: space-between;
   align-items: center;
   margin: 0 0 15px;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
   color: #29354a;
 }
@@ -115,7 +115,7 @@ header {
 .config-panel > label {
   display: block;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
   margin-bottom: 12px;
 }
 select,
@@ -153,7 +153,7 @@ textarea:focus {
 }
 .grid-two label {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
   margin-bottom: 12px;
 }
 .connect {
@@ -186,7 +186,7 @@ textarea:focus {
   display: flex;
   align-items: center;
   position: relative;
-  font-size: 12px;
+  font-size: 14px;
   color: #43516a;
 }
 .toggle-row input {
@@ -266,19 +266,19 @@ textarea:focus {
   background: #fff;
 }
 .card-head strong {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
 }
 .card-head span {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
   margin-left: 12px;
 }
 .card-head > button {
   border: 0;
   background: var(--surface-soft);
   color: #64748b;
-  font-size: 11px;
+  font-size: 13px;
   padding: 6px 10px;
   border-radius: 6px;
 }
@@ -321,7 +321,7 @@ textarea:focus {
   border: 0;
   background: none;
   color: #718096;
-  font-size: 10px;
+  font-size: 12px;
   padding: 4px 11px;
   border-radius: 5px;
 }
@@ -356,7 +356,7 @@ textarea:focus {
 }
 .check {
   color: #64748b;
-  font-size: 11px;
+  font-size: 13px;
   white-space: nowrap;
 }
 .check input {
@@ -375,7 +375,7 @@ textarea:focus {
 .interval span {
   margin-left: -23px;
   align-self: center;
-  font-size: 10px;
+  font-size: 12px;
   color: #8090a6;
 }
 .send-button {
@@ -387,11 +387,11 @@ textarea:focus {
   box-shadow: 0 5px 12px #2563eb25;
   color: #fff;
   font-weight: 700;
-  font-size: 12px;
+  font-size: 14px;
 }
 .send-button kbd {
   margin-left: 12px;
-  font-size: 9px;
+  font-size: 11px;
   opacity: 0.75;
   font-family: inherit;
 }
@@ -405,7 +405,7 @@ footer {
   padding: 0 16px;
   background: rgba(255, 255, 255, 0.9);
   color: #8492a6;
-  font-size: 10px;
+  font-size: 12px;
 }
 footer div {
   display: flex;
@@ -448,7 +448,7 @@ footer div {
 .modal p {
   margin: 0;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
 }
 .modal-head button,
 .delete {
@@ -483,7 +483,7 @@ footer div {
 }
 .rule label {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
 }
 .rule label input {
   display: block;
@@ -542,7 +542,7 @@ footer div {
 }
 .head-check {
   color: #64748b;
-  font-size: 11px;
+  font-size: 13px;
   white-space: nowrap;
 }
 .head-check input {
@@ -555,7 +555,7 @@ footer div {
   border: 1px solid #cfe0fb;
   background: var(--primary-soft);
   color: #2563eb;
-  font-size: 10px;
+  font-size: 12px;
   padding: 0 9px;
   border-radius: 7px;
 }
@@ -587,7 +587,7 @@ footer div {
 .serial-config-content > label {
   display: block;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
   margin-bottom: 12px;
 }
 .side-tabs {
@@ -604,7 +604,7 @@ footer div {
   border-radius: 8px;
   background: transparent;
   color: #718096;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
 }
 .side-tabs button.active {
@@ -622,7 +622,7 @@ footer div {
   border-radius: 9px;
   background: #e0ecff;
   color: #2563eb;
-  font-size: 9px;
+  font-size: 11px;
 }
 .side-section-head {
   display: flex;
@@ -632,20 +632,20 @@ footer div {
 }
 .side-section-head strong {
   display: block;
-  font-size: 13px;
+  font-size: 15px;
 }
 .side-section-head small {
   display: block;
   margin-top: 2px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
 }
 .side-section-head > span {
   padding: 3px 7px;
   border-radius: 10px;
   background: #ecfdf5;
   color: #059669;
-  font-size: 9px;
+  font-size: 11px;
 }
 .side-rule-list {
   display: flex;
@@ -666,7 +666,7 @@ footer div {
   margin-bottom: 9px;
 }
 .side-rule-head label {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 650;
   color: #344258;
 }
@@ -685,7 +685,7 @@ footer div {
   display: block;
   margin-top: 8px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
 }
 .side-rule > label input,
 .side-rule > label textarea {
@@ -716,7 +716,7 @@ footer div {
   justify-content: space-between;
   margin-top: 9px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
 }
 .mini-segment {
   display: flex;
@@ -730,7 +730,7 @@ footer div {
   border-radius: 4px;
   background: transparent;
   color: #718096;
-  font-size: 9px;
+  font-size: 11px;
 }
 .mini-segment button.active {
   background: #fff;
@@ -745,13 +745,13 @@ footer div {
   border-radius: 8px;
   background: #f8fbff;
   color: var(--primary);
-  font-size: 11px;
+  font-size: 13px;
 }
 .empty-rules {
   padding: 24px 0;
   text-align: center;
   color: #94a3b8;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 /* Edge tab rail and persistent resizable sidebar. */
@@ -793,7 +793,7 @@ footer div {
   height: 52px;
   padding: 0;
   border-radius: 9px;
-  font-size: 9px;
+  font-size: 11px;
 }
 .resizable-sidebar .side-tabs button.active {
   background: #fff;
@@ -822,7 +822,7 @@ footer div {
   height: 15px;
   margin: 0;
   padding: 0 3px;
-  font-size: 8px;
+  font-size: 10px;
 }
 .sidebar-resizer {
   position: absolute;
@@ -897,7 +897,7 @@ footer div {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: #2c3a50;
-  font-size: 12px;
+  font-size: 14px;
 }
 .reply-item dl {
   margin: 0;
@@ -907,7 +907,7 @@ footer div {
   grid-template-columns: 34px minmax(0, 1fr);
   gap: 5px;
   margin-top: 5px;
-  font-size: 10px;
+  font-size: 12px;
 }
 .reply-item dt {
   color: #94a3b8;
@@ -927,7 +927,7 @@ footer div {
   border-radius: 5px;
   background: #eef2ff;
   color: #4f46e5;
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 700;
 }
 .format-badge.hex {
@@ -944,7 +944,7 @@ footer div {
 }
 .parameter-title {
   color: #8190a5;
-  font-size: 9px;
+  font-size: 11px;
 }
 .parameter-list label {
   display: grid;
@@ -955,7 +955,7 @@ footer div {
 .parameter-list code {
   overflow: hidden;
   color: #2563eb;
-  font-size: 9px;
+  font-size: 11px;
   text-overflow: ellipsis;
 }
 .parameter-list input {
@@ -967,7 +967,7 @@ footer div {
   background: #fbfdff;
   color: var(--text);
   outline: 0;
-  font-size: 10px;
+  font-size: 12px;
 }
 .rule-create-backdrop {
   z-index: 20;
@@ -985,7 +985,7 @@ footer div {
 }
 .create-rule-form > label {
   color: #64748b;
-  font-size: 11px;
+  font-size: 13px;
 }
 .create-rule-form > label input,
 .create-rule-form > label textarea {
@@ -1010,7 +1010,7 @@ footer div {
   display: block;
   margin-top: 5px;
   color: #94a3b8;
-  font-size: 9px;
+  font-size: 11px;
 }
 .create-rule-form > label code {
   color: #2563eb;
@@ -1020,7 +1020,7 @@ footer div {
   align-items: center;
   justify-content: space-between;
   color: #64748b;
-  font-size: 11px;
+  font-size: 13px;
 }
 .parameter-editor {
   padding: 11px;
@@ -1033,13 +1033,13 @@ footer div {
   align-items: center;
   justify-content: space-between;
   color: #64748b;
-  font-size: 10px;
+  font-size: 12px;
 }
 .parameter-editor-head button {
   border: 0;
   background: transparent;
   color: var(--primary);
-  font-size: 10px;
+  font-size: 12px;
 }
 .parameter-edit-row {
   display: grid;
@@ -1076,7 +1076,7 @@ footer div {
   border-radius: 7px;
   background: #fff1f2;
   color: #be123c;
-  font-size: 10px;
+  font-size: 12px;
 }
 .modal-foot {
   display: flex;
@@ -1142,7 +1142,7 @@ footer div {
   display: block;
   margin-top: 8px;
   color: #8492a6;
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1.55;
 }
 .commands-panel {
@@ -1174,7 +1174,7 @@ footer div {
 .command-head strong {
   overflow: hidden;
   color: #2c3a50;
-  font-size: 12px;
+  font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1195,7 +1195,7 @@ footer div {
   border-radius: 6px;
   background: #f6f8fb;
   color: #53647b;
-  font-size: 9px;
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1210,7 +1210,7 @@ footer div {
   display: block;
   margin-bottom: 4px;
   color: #718096;
-  font-size: 9px;
+  font-size: 11px;
 }
 .command-parameter input {
   width: 100%;
@@ -1236,7 +1236,7 @@ footer div {
   border-radius: 7px;
   background: #eff6ff;
   color: #2563eb;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 650;
 }
 .command-send:hover {
@@ -1248,7 +1248,7 @@ footer div {
   border-radius: 7px;
   background: #fff1f2;
   color: #be123c;
-  font-size: 9px;
+  font-size: 11px;
 }
 .commands-panel,
 .auto-reply-panel {
@@ -1277,7 +1277,7 @@ footer div {
 .group-title > span {
   width: 10px;
   color: #8ca0b8;
-  font-size: 10px;
+  font-size: 12px;
 }
 .group-title > b {
   color: #f59e0b;
@@ -1286,7 +1286,7 @@ footer div {
 }
 .group-title > strong {
   overflow: hidden;
-  font-size: 11px;
+  font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1308,7 +1308,7 @@ footer div {
   border-radius: 6px;
   background: #eff6ff;
   color: #2563eb;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 650;
 }
 .command-head > .command-send:hover {
@@ -1324,7 +1324,7 @@ footer div {
   overflow: hidden;
   margin: 0;
   color: #53647b;
-  font-size: 9px;
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1373,7 +1373,7 @@ footer div {
   place-items: center;
   width: 12px;
   color: #7390ad;
-  font-size: 10px;
+  font-size: 12px;
 }
 .group-title .folder-icon {
   width: auto;
@@ -1382,7 +1382,7 @@ footer div {
   line-height: 1;
 }
 .group-title > strong {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
 }
 .group-title > em {
@@ -1391,7 +1391,7 @@ footer div {
   border-radius: 9px;
   background: #fff;
   color: #8293a8;
-  font-size: 8px;
+  font-size: 10px;
   font-style: normal;
   font-weight: 500;
   box-shadow: 0 1px 3px #3341550d;
@@ -1421,7 +1421,7 @@ footer div {
   border-radius: 5px;
   background: #ecfdf5;
   color: #059669;
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 650;
   white-space: nowrap;
 }
@@ -1436,7 +1436,7 @@ footer div {
 }
 .command-auto-settings > label {
   color: #42526a;
-  font-size: 11px;
+  font-size: 13px;
 }
 .command-auto-settings > label input {
   margin: 0 6px 0 0;
@@ -1460,7 +1460,7 @@ footer div {
 .command-auto-settings > div span {
   margin-left: -23px;
   color: #8090a6;
-  font-size: 9px;
+  font-size: 11px;
 }
 .command-auto-settings > div.disabled {
   opacity: 0.5;
@@ -1473,7 +1473,7 @@ footer div {
   display: block;
   margin-top: -8px;
   color: #8492a6;
-  font-size: 9px;
+  font-size: 11px;
 }
 .group-loop-settings {
   display: grid;
@@ -1525,7 +1525,7 @@ footer div {
   border-radius: 7px;
   background: #eff6ff;
   color: #2563eb;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 650;
 }
 .group-loop-button.stop {
@@ -1545,7 +1545,7 @@ footer div {
 .send-count span {
   margin-left: -19px;
   color: #8090a6;
-  font-size: 9px;
+  font-size: 11px;
 }
 .send-count input:disabled {
   background: #f1f5f9;
@@ -1611,7 +1611,7 @@ footer div {
   gap: 6px;
   padding: 7px 8px;
   border-right: 1px solid;
-  font-size: 8px;
+  font-size: 10px;
   white-space: nowrap;
 }
 .rx .interaction-meta {
@@ -1631,7 +1631,7 @@ footer div {
   height: 18px;
   border-radius: 5px;
   color: #fff;
-  font-size: 8px;
+  font-size: 10px;
 }
 .rx .interaction-meta b {
   background: #2583c5;
@@ -1682,7 +1682,7 @@ footer div {
   background: transparent;
   color: #39475c;
   text-align: left;
-  font-size: 10px;
+  font-size: 12px;
 }
 .context-menu button:hover {
   background: #f1f5f9;
@@ -1720,7 +1720,7 @@ footer div {
   align-items: center;
   gap: 3px;
   color: #718096;
-  font-size: 9px;
+  font-size: 11px;
   white-space: nowrap;
 }
 .cache-controls input {
@@ -1732,7 +1732,7 @@ footer div {
   background: #f8fafc;
   color: #344258;
   outline: 0;
-  font-size: 9px;
+  font-size: 11px;
 }
 .cache-controls label:last-child input {
   width: 64px;
@@ -1799,17 +1799,17 @@ footer div {
 .interaction-meta {
   gap: 4px;
   padding: 3px 6px;
-  font-size: 7px;
+  font-size: 9px;
 }
 .interaction-meta b {
   width: 23px;
   height: 15px;
   border-radius: 4px;
-  font-size: 7px;
+  font-size: 9px;
 }
 .interaction-entry pre {
   padding: 3px 7px;
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.3;
 }
 .interaction-view .interaction-entry pre {
@@ -1823,7 +1823,7 @@ footer div {
   border-radius: 5px;
   background: #f1f5f9;
   color: #64748b;
-  font-size: 8px;
+  font-size: 10px;
   white-space: nowrap;
 }
 
@@ -1872,11 +1872,11 @@ footer div {
   background: #fff;
   color: #334155;
   outline: 0;
-  font-size: 10px;
+  font-size: 12px;
 }
 .interaction-search > label {
   color: #64748b;
-  font-size: 9px;
+  font-size: 11px;
   white-space: nowrap;
 }
 .interaction-search > label input {
@@ -1891,7 +1891,7 @@ footer div {
   border-radius: 6px;
   background: #fff;
   color: #64748b;
-  font-size: 10px;
+  font-size: 12px;
 }
 .interaction-search > button.active {
   border-color: #93b9fa;
@@ -1906,7 +1906,7 @@ footer div {
 .interaction-search > span {
   overflow: hidden;
   color: #718096;
-  font-size: 9px;
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2009,7 +2009,7 @@ footer div {
 .app-error-content p {
   margin: 0;
   color: #59697f;
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.7;
   white-space: pre-wrap;
   word-break: break-word;
@@ -2040,7 +2040,7 @@ footer div {
   border-radius: 8px;
   background: #2563eb;
   color: #fff;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   box-shadow: 0 5px 12px #2563eb28;
 }
@@ -2068,7 +2068,7 @@ footer div {
   border-radius: 8px;
   background: #f8fafc;
   color: #526176;
-  font-size: 10px;
+  font-size: 12px;
   white-space: nowrap;
 }
 .rule-pattern-input > label input {
@@ -2086,7 +2086,7 @@ footer div {
 }
 .receive-format-row > span {
   color: #64748b;
-  font-size: 10px;
+  font-size: 12px;
 }
 .auto-pause-bar {
   display: flex;
@@ -2125,7 +2125,7 @@ footer div {
 }
 .auto-pause-error {
   color: #dc2626;
-  font-size: 9px;
+  font-size: 11px;
 }
 .create-rule-form > label textarea.auto-reply-send-input {
   height: 52px;
@@ -2167,23 +2167,23 @@ footer div {
 }
 .script-side-intro strong {
   color: #2d3b50;
-  font-size: 12px;
+  font-size: 14px;
 }
 .script-side-intro p {
   margin: 8px 0 12px;
   color: #718096;
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1.65;
 }
 .script-side-intro span {
   display: block;
   margin-top: 5px;
   color: #2563eb;
-  font-size: 9px;
+  font-size: 11px;
 }
 .script-panel {
   display: grid;
-  grid-template-rows: 42px minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) auto;
   width: 100%;
   height: 100%;
   min-height: 0;
@@ -2193,23 +2193,6 @@ footer div {
   background: #fff;
   box-shadow: var(--shadow);
 }
-.script-panel-head {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 0 10px;
-  border-bottom: 1px solid var(--border);
-}
-.script-panel-head strong {
-  color: #27364b;
-  font-size: 12px;
-}
-.script-panel-head span {
-  margin-right: auto;
-  color: #718096;
-  font-size: 9px;
-}
-.script-panel-head button,
 .script-toolbar button {
   height: 27px;
   padding: 0 9px;
@@ -2217,9 +2200,8 @@ footer div {
   border-radius: 6px;
   background: #f8fafc;
   color: #526176;
-  font-size: 9px;
+  font-size: 11px;
 }
-.script-panel-head button:hover,
 .script-toolbar button:hover {
   border-color: #b8cff6;
   background: #eff6ff;
@@ -2234,16 +2216,38 @@ footer div {
   min-height: 0;
   overflow: hidden;
 }
+.script-list-pane {
+  display: grid;
+  grid-template-rows: 44px minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-right: 1px solid var(--border);
+  background: #f7f9fc;
+}
+.script-list-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--border);
+}
+.script-list-head strong {
+  color: #27364b;
+  font-size: 13px;
+}
+.script-list-head span {
+  color: #8492a6;
+  font-size: 10px;
+}
 .script-list {
   position: relative;
   z-index: 0;
   box-sizing: border-box;
   contain: layout paint;
   min-height: 0;
-  padding: 10px 7px 7px;
+  padding: 7px;
   overflow-y: auto;
-  border-right: 1px solid var(--border);
-  background: #f7f9fc;
 }
 .script-list button {
   display: grid;
@@ -2278,13 +2282,13 @@ footer div {
 }
 .script-list span {
   overflow: hidden;
-  font-size: 9px;
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .script-list em {
   color: #8492a6;
-  font-size: 8px;
+  font-size: 10px;
   font-style: normal;
 }
 .script-editor-area {
@@ -2292,7 +2296,7 @@ footer div {
   position: relative;
   z-index: 0;
   contain: layout paint;
-  grid-template-rows: minmax(39px, 39px) minmax(180px, 1fr) 125px;
+  grid-template-rows: minmax(44px, 44px) minmax(180px, 1fr) 125px;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -2302,7 +2306,7 @@ footer div {
   position: relative;
   z-index: 1;
   align-items: center;
-  min-height: 39px;
+  min-height: 44px;
   overflow-x: auto;
   overflow-y: hidden;
   gap: 6px;
@@ -2316,7 +2320,7 @@ footer div {
   border: 1px solid #d8e1ec;
   border-radius: 6px;
   color: #344258;
-  font-size: 10px;
+  font-size: 12px;
 }
 .script-toolbar > select {
   width: 94px;
@@ -2326,12 +2330,19 @@ footer div {
   border-radius: 6px;
   background: #f8fafc;
   color: #526176;
-  font-size: 9px;
+  font-size: 11px;
 }
 .script-toolbar .script-dirty {
+  min-width: 0;
   margin-right: auto;
   color: #d97706;
-  font-size: 8px;
+  font-size: 10px;
+}
+.script-toolbar-divider {
+  width: 1px;
+  height: 20px;
+  flex: 0 0 1px;
+  background: var(--border);
 }
 .script-monaco {
   min-width: 0;
@@ -2353,7 +2364,7 @@ footer div {
   gap: 4px;
   padding: 6px 8px;
   color: #718096;
-  font-size: 8px;
+  font-size: 10px;
 }
 .script-test-area label + label {
   border-left: 1px solid var(--border);
@@ -2388,7 +2399,7 @@ footer div {
 }
 .script-binding > label {
   color: #718096;
-  font-size: 8px;
+  font-size: 10px;
   white-space: nowrap;
 }
 .script-binding > label > select,
@@ -2402,7 +2413,7 @@ footer div {
   border-radius: 6px;
   background: #fff;
   color: #42526a;
-  font-size: 8px;
+  font-size: 10px;
 }
 .script-binding input[type='checkbox'] {
   margin-right: 4px;
@@ -2420,7 +2431,7 @@ footer div {
   border: 1px solid #dbe3ed;
   border-radius: 7px;
   color: #718096;
-  font-size: 8px;
+  font-size: 10px;
   white-space: nowrap;
 }
 .script-binding legend {
@@ -2449,7 +2460,7 @@ footer div {
   border-radius: 6px;
   background: #f8fafc;
   color: #46566d;
-  font-size: 9px;
+  font-size: 11px;
   outline: 0;
 }
 .crc-select:disabled {
@@ -2464,7 +2475,7 @@ footer div {
   border-radius: 9px;
   background: #f8fbff;
   color: #42526a;
-  font-size: 11px;
+  font-size: 13px;
 }
 .command-crc-settings input {
   margin: 0 6px 0 0;
@@ -2479,7 +2490,7 @@ footer div {
   border-radius: 7px;
   background: #fff;
   color: #42526a;
-  font-size: 10px;
+  font-size: 12px;
   outline: 0;
 }
 .command-crc-settings select:disabled {
@@ -2537,14 +2548,14 @@ footer div {
 }
 .serial-profile-head strong {
   color: #334155;
-  font-size: 11px;
+  font-size: 13px;
 }
 .serial-profile-head span {
   padding: 2px 6px;
   border-radius: 10px;
   background: #f1f5f9;
   color: #718096;
-  font-size: 8px;
+  font-size: 10px;
 }
 .serial-profile.open .serial-profile-head span {
   background: #e8f8f0;
@@ -2564,7 +2575,7 @@ footer div {
   display: block;
   margin-bottom: 8px;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
 }
 .serial-profile select {
   display: block;
@@ -2576,7 +2587,7 @@ footer div {
   border-radius: 7px;
   background: #fff;
   color: var(--text);
-  font-size: 10px;
+  font-size: 12px;
   outline: 0;
 }
 .serial-profile select:disabled {
@@ -2588,12 +2599,12 @@ footer div {
 }
 .serial-profile .grid-two label {
   margin-bottom: 8px;
-  font-size: 9px;
+  font-size: 11px;
 }
 .serial-profile .connect {
   height: 34px;
   margin-top: 1px;
-  font-size: 10px;
+  font-size: 12px;
 }
 .send-port-select {
   width: 112px;
@@ -2603,7 +2614,7 @@ footer div {
   border-radius: 7px;
   background: #f8fafc;
   color: #42526a;
-  font-size: 9px;
+  font-size: 11px;
   outline: 0;
 }
 .send-port-select:focus {
@@ -2617,7 +2628,7 @@ footer div {
   border-radius: 5px;
   background: #eaf2ff;
   color: #2563eb;
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2632,7 +2643,7 @@ footer div {
   border-radius: 8px;
   background: #fbfdff;
   color: var(--text);
-  font-size: 10px;
+  font-size: 12px;
   outline: 0;
 }
 .create-rule-form > label > select:focus {
@@ -2658,7 +2669,7 @@ footer div {
   border-radius: 5px;
   background: #fff7ed;
   color: #c2410c;
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 650;
   white-space: nowrap;
 }
@@ -2673,7 +2684,7 @@ footer div {
   border-radius: 50%;
   background: #fff;
   color: #64748b;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   line-height: 1;
   cursor: help;

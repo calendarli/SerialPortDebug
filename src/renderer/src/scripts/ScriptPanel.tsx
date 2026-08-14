@@ -161,41 +161,29 @@ export function ScriptPanel(props: Props): React.JSX.Element {
 
   return (
     <div className="script-panel">
-      <header className="script-panel-head">
-        <strong>脚本</strong>
-        <span>{props.scripts.filter((script) => script.enabled).length} 个运行中</span>
-        <button onClick={() => addScript('typescript')}>＋ TS</button>
-        <button onClick={() => addScript('javascript')}>＋ JS</button>
-        <button onClick={() => importRef.current?.click()}>导入</button>
-        <input
-          ref={importRef}
-          hidden
-          type="file"
-          accept=".js,.mjs,.ts,text/javascript,text/typescript"
-          onChange={(event) => {
-            const file = event.target.files?.[0]
-            if (file) void importScript(file)
-            event.target.value = ''
-          }}
-        />
-      </header>
       <div className="script-workspace">
-        <aside className="script-list">
-          {props.scripts.map((script) => (
-            <button
-              key={script.id}
-              className={script.id === selected.id ? 'active' : ''}
-              onClick={() => {
-                setSelectedId(script.id)
-                setSource(script.source)
-                setDirty(false)
-              }}
-            >
-              <i className={script.enabled ? 'running' : ''} />
-              <span>{script.name}</span>
-              <em>{script.language === 'typescript' ? 'TS' : 'JS'}</em>
-            </button>
-          ))}
+        <aside className="script-list-pane">
+          <header className="script-list-head">
+            <strong>脚本</strong>
+            <span>{props.scripts.filter((script) => script.enabled).length} 个运行中</span>
+          </header>
+          <div className="script-list">
+            {props.scripts.map((script) => (
+              <button
+                key={script.id}
+                className={script.id === selected.id ? 'active' : ''}
+                onClick={() => {
+                  setSelectedId(script.id)
+                  setSource(script.source)
+                  setDirty(false)
+                }}
+              >
+                <i className={script.enabled ? 'running' : ''} />
+                <span>{script.name}</span>
+                <em>{script.language === 'typescript' ? 'TS' : 'JS'}</em>
+              </button>
+            ))}
+          </div>
         </aside>
         <section className="script-editor-area">
           <div className="script-toolbar">
@@ -217,7 +205,7 @@ export function ScriptPanel(props: Props): React.JSX.Element {
               <option value="typescript">TypeScript</option>
               <option value="javascript">JavaScript</option>
             </select>
-            {dirty && <span className="script-dirty">未保存</span>}
+            <span className="script-dirty">{dirty ? '未保存' : ''}</span>
             <button onClick={() => void editorRef.current?.format()}>格式化</button>
             <button disabled={busy} onClick={() => void testCurrent()}>
               测试
@@ -241,6 +229,21 @@ export function ScriptPanel(props: Props): React.JSX.Element {
             >
               删除
             </button>
+            <span className="script-toolbar-divider" />
+            <button onClick={() => addScript('typescript')}>＋ TS</button>
+            <button onClick={() => addScript('javascript')}>＋ JS</button>
+            <button onClick={() => importRef.current?.click()}>导入</button>
+            <input
+              ref={importRef}
+              hidden
+              type="file"
+              accept=".js,.mjs,.ts,text/javascript,text/typescript"
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                if (file) void importScript(file)
+                event.target.value = ''
+              }}
+            />
           </div>
           <ScriptEditor
             ref={editorRef}
