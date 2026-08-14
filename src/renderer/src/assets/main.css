@@ -1121,6 +1121,21 @@ footer > span:first-child {
   color: #64748b;
   font-size: 17px;
 }
+.auto-reply-send-head,
+.auto-reply-send-encoding {
+  display: flex;
+  align-items: center;
+}
+.auto-reply-send-head {
+  justify-content: space-between;
+  gap: 12px;
+}
+.auto-reply-send-encoding {
+  flex: none;
+  gap: 7px;
+  color: #64748b;
+  font-size: 15px;
+}
 .create-rule-form > label.auto-reply-program-editor textarea {
   height: 220px;
   min-height: 140px;

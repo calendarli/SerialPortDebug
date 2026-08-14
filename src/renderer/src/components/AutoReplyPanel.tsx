@@ -466,8 +466,27 @@ export function AutoReplyPanel({
                     : `默认按完整${draft.receiveHex ? ' HEX 字节' : '指令文本'}匹配，特殊字符无需转义`}
                 </small>
               </label>
-              <label>
-                发送（发送指令）
+              <label className="auto-reply-send-field">
+                <div className="auto-reply-send-head">
+                  <span>发送（发送指令）</span>
+                  <div className="auto-reply-send-encoding">
+                    <span>最终发送编码</span>
+                    <div className="mini-segment">
+                      <button
+                        className={!draft.hex ? 'active' : ''}
+                        onClick={() => setDraft({ ...draft, hex: false })}
+                      >
+                        ASCII
+                      </button>
+                      <button
+                        className={draft.hex ? 'active' : ''}
+                        onClick={() => setDraft({ ...draft, hex: true })}
+                      >
+                        HEX
+                      </button>
+                    </div>
+                  </div>
+                </div>
                 <textarea
                   className="auto-reply-send-input"
                   value={draft.reply}
@@ -491,23 +510,6 @@ export function AutoReplyPanel({
                 </select>
                 <small>仅匹配该端口收到的数据，并从该端口发送回复</small>
               </label>
-              <div className="form-row">
-                <span>发送格式</span>
-                <div className="mini-segment">
-                  <button
-                    className={!draft.hex ? 'active' : ''}
-                    onClick={() => setDraft({ ...draft, hex: false })}
-                  >
-                    ASCII
-                  </button>
-                  <button
-                    className={draft.hex ? 'active' : ''}
-                    onClick={() => setDraft({ ...draft, hex: true })}
-                  >
-                    HEX
-                  </button>
-                </div>
-              </div>
               <div className="form-row">
                 <span>参数生成模式</span>
                 <div className="mini-segment">
