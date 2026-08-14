@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { bytesToHex, hexToBytes } from '../serial-utils'
 import { ScriptEditor, type ScriptEditorHandle } from './ScriptEditor'
 import { hashScriptSource } from './script-pipeline'
@@ -33,8 +33,19 @@ export function ScriptPanel(props: Props): React.JSX.Element {
   const [testInput, setTestInput] = useState('AA 01 BB')
   const [testOutput, setTestOutput] = useState('等待测试…')
   const [busy, setBusy] = useState(false)
+  const [menu, setMenu] = useState<{ x: number; y: number; scriptId: string | null } | null>(null)
   const editorRef = useRef<ScriptEditorHandle>(null)
   const importRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    const close = (): void => setMenu(null)
+    window.addEventListener('pointerdown', close)
+    window.addEventListener('blur', close)
+    return () => {
+      window.removeEventListener('pointerdown', close)
+      window.removeEventListener('blur', close)
+    }
+  }, [])
 
   const replaceScript = (id: string, patch: Partial<SavedScript>): SavedScript | null => {
     let nextScript: SavedScript | null = null
@@ -139,15 +150,51 @@ export function ScriptPanel(props: Props): React.JSX.Element {
     setDirty(false)
   }
 
-  const exportScript = (): void => {
-    if (!selected) return
-    const blob = new Blob([source], { type: 'text/plain;charset=utf-8' })
+  const exportScript = (scriptId: string): void => {
+    const script = props.scripts.find((item) => item.id === scriptId)
+    if (!script) return
+    const content = script.id === selected?.id ? source : script.source
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `${selected.name}.${selected.language === 'typescript' ? 'ts' : 'js'}`
+    link.download = `${script.name}.${script.language === 'typescript' ? 'ts' : 'js'}`
     link.click()
     URL.revokeObjectURL(url)
+    setMenu(null)
+  }
+
+  const deleteScript = (scriptId: string): void => {
+    const script = props.scripts.find((item) => item.id === scriptId)
+    if (!script || props.scripts.length === 1) return
+    if (!window.confirm(`确定删除脚本“${script.name}”吗？`)) return
+    scriptRuntime.disposeScript(script.id)
+    const remaining = props.scripts.filter((item) => item.id !== script.id)
+    props.setScripts(remaining)
+    if (selected?.id === script.id) {
+      setSelectedId(remaining[0]?.id || '')
+      setSource(remaining[0]?.source || '')
+      setDirty(false)
+    }
+    setMenu(null)
+  }
+
+  const openMenu = (event: React.MouseEvent, scriptId: string | null): void => {
+    event.preventDefault()
+    event.stopPropagation()
+    if (scriptId && scriptId !== selected?.id) {
+      const script = props.scripts.find((item) => item.id === scriptId)
+      if (script) {
+        setSelectedId(script.id)
+        setSource(script.source)
+        setDirty(false)
+      }
+    }
+    setMenu({
+      x: Math.min(event.clientX, window.innerWidth - 190),
+      y: Math.min(event.clientY, window.innerHeight - (scriptId ? 310 : 145)),
+      scriptId
+    })
   }
 
   if (!selected) {
@@ -162,7 +209,7 @@ export function ScriptPanel(props: Props): React.JSX.Element {
   return (
     <div className="script-panel">
       <div className="script-workspace">
-        <aside className="script-list-pane">
+        <aside className="script-list-pane" onContextMenu={(event) => openMenu(event, null)}>
           <header className="script-list-head">
             <strong>脚本</strong>
             <span>{props.scripts.filter((script) => script.enabled).length} 个运行中</span>
@@ -172,6 +219,7 @@ export function ScriptPanel(props: Props): React.JSX.Element {
               <button
                 key={script.id}
                 className={script.id === selected.id ? 'active' : ''}
+                onContextMenu={(event) => openMenu(event, script.id)}
                 onClick={() => {
                   setSelectedId(script.id)
                   setSource(script.source)
@@ -213,37 +261,6 @@ export function ScriptPanel(props: Props): React.JSX.Element {
             <button disabled={busy} onClick={() => void saveCurrent()}>
               保存
             </button>
-            <button onClick={exportScript}>导出</button>
-            <button
-              className="danger"
-              disabled={props.scripts.length === 1}
-              onClick={() => {
-                if (!window.confirm(`确定删除脚本“${selected.name}”吗？`)) return
-                scriptRuntime.disposeScript(selected.id)
-                const remaining = props.scripts.filter((script) => script.id !== selected.id)
-                props.setScripts(remaining)
-                setSelectedId(remaining[0]?.id || '')
-                setSource(remaining[0]?.source || '')
-                setDirty(false)
-              }}
-            >
-              删除
-            </button>
-            <span className="script-toolbar-divider" />
-            <button onClick={() => addScript('typescript')}>＋ TS</button>
-            <button onClick={() => addScript('javascript')}>＋ JS</button>
-            <button onClick={() => importRef.current?.click()}>导入</button>
-            <input
-              ref={importRef}
-              hidden
-              type="file"
-              accept=".js,.mjs,.ts,text/javascript,text/typescript"
-              onChange={(event) => {
-                const file = event.target.files?.[0]
-                if (file) void importScript(file)
-                event.target.value = ''
-              }}
-            />
           </div>
           <ScriptEditor
             ref={editorRef}
@@ -269,6 +286,91 @@ export function ScriptPanel(props: Props): React.JSX.Element {
           </div>
         </section>
       </div>
+      <input
+        ref={importRef}
+        hidden
+        type="file"
+        accept=".js,.mjs,.ts,text/javascript,text/typescript"
+        onChange={(event) => {
+          const file = event.target.files?.[0]
+          if (file) void importScript(file)
+          event.target.value = ''
+        }}
+      />
+      {menu && (
+        <div
+          className="context-menu script-context-menu"
+          style={{ left: menu.x, top: menu.y }}
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          {menu.scriptId ? (
+            <>
+              <button
+                onClick={() => {
+                  setMenu(null)
+                  editorRef.current?.focus()
+                }}
+              >
+                ✎ 编辑脚本
+              </button>
+              <button
+                disabled={busy}
+                onClick={() => {
+                  if (selected.enabled) {
+                    replaceScript(selected.id, { enabled: false })
+                    scriptRuntime.disposeScript(selected.id)
+                    setMenu(null)
+                  } else {
+                    setMenu(null)
+                    void saveCurrent(true)
+                  }
+                }}
+              >
+                {selected.enabled ? '暂停脚本' : '启用脚本'}
+              </button>
+              <button onClick={() => exportScript(menu.scriptId!)}>导出脚本</button>
+              <div className="menu-separator" />
+            </>
+          ) : null}
+          <button
+            onClick={() => {
+              setMenu(null)
+              addScript('typescript')
+            }}
+          >
+            ＋ 新建 TypeScript
+          </button>
+          <button
+            onClick={() => {
+              setMenu(null)
+              addScript('javascript')
+            }}
+          >
+            ＋ 新建 JavaScript
+          </button>
+          <button
+            onClick={() => {
+              setMenu(null)
+              importRef.current?.click()
+            }}
+          >
+            导入脚本文件
+          </button>
+          {menu.scriptId && (
+            <>
+              <div className="menu-separator" />
+              <button
+                className="danger"
+                disabled={props.scripts.length === 1}
+                title={props.scripts.length === 1 ? '至少保留一个脚本' : undefined}
+                onClick={() => deleteScript(menu.scriptId!)}
+              >
+                删除当前脚本
+              </button>
+            </>
+          )}
+        </div>
+      )}
       <section className="script-binding">
         <label>
           <input
