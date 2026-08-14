@@ -1155,6 +1155,55 @@ footer > span:first-child {
   border-radius: 9px;
   background: #f8fafc;
 }
+.program-placeholder-note {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #d8e1ec;
+  border-radius: 9px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 15px;
+}
+.program-placeholder-head,
+.program-placeholder-values {
+  display: flex;
+  align-items: center;
+}
+.program-placeholder-head {
+  justify-content: space-between;
+  gap: 10px;
+}
+.program-placeholder-head strong {
+  flex: none;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #047857;
+  font-size: 13px;
+  font-weight: 650;
+}
+.program-placeholder-head strong.empty {
+  background: #fff7ed;
+  color: #c2410c;
+}
+.program-placeholder-values {
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.program-placeholder-note code {
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: #f3e8ff;
+  color: #7e22ce;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.program-placeholder-note small {
+  color: #94a3b8;
+  font-size: 14px;
+}
 .parameter-editor-head {
   display: flex;
   align-items: center;

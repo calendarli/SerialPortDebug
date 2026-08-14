@@ -39,6 +39,14 @@ function isProgramRule(rule: Rule | undefined): boolean {
   return rule?.parameterMode === 'program'
 }
 
+function extractPlaceholderIds(template: string): string[] {
+  return [
+    ...new Set(
+      [...template.matchAll(/\{\{([^{}]+)\}\}/g)].map((match) => match[1].trim()).filter(Boolean)
+    )
+  ]
+}
+
 export function AutoReplyPanel({
   rules,
   setRules,
@@ -185,15 +193,18 @@ export function AutoReplyPanel({
     }
     if (!draft.reply) return setError('请输入发送指令')
     if (!draft.targetPort) return setError('请选择目标端口')
-    const parameters = draft.parameters
+    const definedParameters = draft.parameters
       .map((parameter) => ({ ...parameter, id: parameter.id.trim() }))
       .filter((parameter) => Boolean(parameter.id))
+    const placeholders = extractPlaceholderIds(draft.reply)
+    const parameters =
+      draft.parameterMode === 'program' ? placeholders.map((id) => ({ id })) : definedParameters
     const ids = parameters.map((parameter) => parameter.id)
     if (ids.some((id) => /[{}]/.test(id))) return setError('参数名字不能包含花括号')
     if (new Set(ids).size !== ids.length) return setError('参数名字不能重复')
-    const placeholders = [...draft.reply.matchAll(/\{\{([^{}]+)\}\}/g)].map((match) => match[1])
     const undefinedPlaceholder = placeholders.find((id) => !ids.includes(id))
-    if (undefinedPlaceholder) return setError(`发送指令中的参数“${undefinedPlaceholder}”尚未定义`)
+    if (draft.parameterMode === 'parameters' && undefinedPlaceholder)
+      return setError(`发送指令中的参数“${undefinedPlaceholder}”尚未定义`)
     if (draft.parameterMode === 'program') {
       if (!draft.parameterProgram.trim()) return setError('请输入编程模式代码')
       if (!/\bfunction\s+calculate\s*\(|\bcalculate\s*=/.test(draft.parameterProgram))
@@ -253,6 +264,8 @@ export function AutoReplyPanel({
     setCreating(false)
     setEditingRuleId(null)
   }
+
+  const detectedProgramParameters = extractPlaceholderIds(draft.reply)
 
   return (
     <div className="auto-reply-panel" onContextMenu={(event) => openMenu(event, null)}>
@@ -527,56 +540,80 @@ export function AutoReplyPanel({
                   </button>
                 </div>
               </div>
-              <div className="parameter-editor">
-                <div className="parameter-editor-head">
-                  <span>参数名字（支持中文，任意数量）</span>
-                  <button
-                    onClick={() =>
-                      setDraft({
-                        ...draft,
-                        parameters: [...draft.parameters, { id: '' }]
-                      })
-                    }
-                  >
-                    ＋ 添加参数
-                  </button>
-                </div>
-                {draft.parameters.map((parameter, index) => (
-                  <div className="parameter-edit-row" key={index}>
-                    <input
-                      value={parameter.id}
-                      placeholder="参数名字，例如 占空比"
-                      onChange={(event) => updateDraftParameter(index, { id: event.target.value })}
-                    />
+              {draft.parameterMode === 'parameters' ? (
+                <div className="parameter-editor">
+                  <div className="parameter-editor-head">
+                    <span>参数名字（支持中文，任意数量）</span>
                     <button
-                      className="copy-placeholder"
-                      disabled={!parameter.id.trim()}
-                      title={
-                        parameter.id.trim() ? `复制 {{${parameter.id.trim()}}}` : '请先输入参数名字'
-                      }
-                      onClick={() => void copyPlaceholder(parameter.id, index)}
-                    >
-                      {copiedIndex === index
-                        ? '已复制'
-                        : parameter.id.trim()
-                          ? `{{${parameter.id.trim()}}}`
-                          : '{{参数名字}}'}
-                    </button>
-                    <button
-                      className="remove-parameter"
-                      title="删除参数"
                       onClick={() =>
                         setDraft({
                           ...draft,
-                          parameters: draft.parameters.filter((_, itemIndex) => itemIndex !== index)
+                          parameters: [...draft.parameters, { id: '' }]
                         })
                       }
                     >
-                      ×
+                      ＋ 添加参数
                     </button>
                   </div>
-                ))}
-              </div>
+                  {draft.parameters.map((parameter, index) => (
+                    <div className="parameter-edit-row" key={index}>
+                      <input
+                        value={parameter.id}
+                        placeholder="参数名字，例如 占空比"
+                        onChange={(event) =>
+                          updateDraftParameter(index, { id: event.target.value })
+                        }
+                      />
+                      <button
+                        className="copy-placeholder"
+                        disabled={!parameter.id.trim()}
+                        title={
+                          parameter.id.trim()
+                            ? `复制 {{${parameter.id.trim()}}}`
+                            : '请先输入参数名字'
+                        }
+                        onClick={() => void copyPlaceholder(parameter.id, index)}
+                      >
+                        {copiedIndex === index
+                          ? '已复制'
+                          : parameter.id.trim()
+                            ? `{{${parameter.id.trim()}}}`
+                            : '{{参数名字}}'}
+                      </button>
+                      <button
+                        className="remove-parameter"
+                        title="删除参数"
+                        onClick={() =>
+                          setDraft({
+                            ...draft,
+                            parameters: draft.parameters.filter(
+                              (_, itemIndex) => itemIndex !== index
+                            )
+                          })
+                        }
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="program-placeholder-note">
+                  <div className="program-placeholder-head">
+                    <span>程序返回参数从发送指令的占位符自动识别，无需手动添加</span>
+                    <strong className={detectedProgramParameters.length ? '' : 'empty'}>
+                      实时监控 · {detectedProgramParameters.length} 个
+                    </strong>
+                  </div>
+                  <div className="program-placeholder-values" aria-live="polite">
+                    {detectedProgramParameters.length ? (
+                      detectedProgramParameters.map((id) => <code key={id}>{`{{${id}}}`}</code>)
+                    ) : (
+                      <small>尚未识别到占位符，例如：{'{{计数}}'}</small>
+                    )}
+                  </div>
+                </div>
+              )}
               {draft.parameterMode === 'program' && (
                 <label className="auto-reply-program-editor">
                   编程参数程序（JavaScript）
@@ -589,7 +626,7 @@ export function AutoReplyPanel({
                       '1. 必须定义 function calculate(input, match, context)。\n' +
                       '2. 每次匹配自动回复规则时执行一次；顶层变量会在多次触发间保留，点击“重置状态”后清空。\n' +
                       '3. input 是本次匹配的接收内容；match 是正则匹配数组；context.port 是串口；context.groups 是命名捕获组。\n' +
-                      '4. 返回普通对象，键名必须与规则中定义的全部参数名字完全一致，支持中文。值可使用字符串、数字或布尔值。\n\n' +
+                      '4. 发送指令中的 {{参数名}} 会自动成为返回参数；返回普通对象，键名必须与全部占位符完全一致，支持中文。值可使用字符串、数字或布尔值。\n\n' +
                       '示例：\nlet i = 0\nfunction calculate(input, match, context) {\n  i++\n  return { 计数: i, PWM: 100 }\n}'
                     }
                   >
@@ -604,7 +641,7 @@ export function AutoReplyPanel({
                   />
                   <small>
                     每次触发执行 <code>calculate(input, match, context)</code>
-                    。返回该规则全部参数，例如 <code>{'{ 计数: i, PWM: 100 }'}</code>。
+                    。返回发送指令中全部占位符，例如 <code>{'{ 计数: i, PWM: 100 }'}</code>。
                   </small>
                 </label>
               )}
