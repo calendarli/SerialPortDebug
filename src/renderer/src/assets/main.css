@@ -1192,13 +1192,21 @@ footer > span:first-child {
   flex-wrap: wrap;
   gap: 5px;
 }
-.program-placeholder-note code {
+.program-placeholder-copy {
   padding: 2px 6px;
+  border: 1px solid #e9d5ff;
   border-radius: 5px;
   background: #f3e8ff;
   color: #7e22ce;
-  font-size: 14px;
+  cursor: pointer;
+  font:
+    14px Consolas,
+    monospace;
   white-space: nowrap;
+}
+.program-placeholder-copy:hover {
+  border-color: #c084fc;
+  background: #eadcff;
 }
 .program-placeholder-note small {
   color: #94a3b8;

@@ -607,7 +607,16 @@ export function AutoReplyPanel({
                   </div>
                   <div className="program-placeholder-values" aria-live="polite">
                     {detectedProgramParameters.length ? (
-                      detectedProgramParameters.map((id) => <code key={id}>{`{{${id}}}`}</code>)
+                      detectedProgramParameters.map((id, index) => (
+                        <button
+                          className="program-placeholder-copy"
+                          key={id}
+                          title={`复制 {{${id}}}`}
+                          onClick={() => void copyPlaceholder(id, index)}
+                        >
+                          {copiedIndex === index ? '已复制' : `{{${id}}}`}
+                        </button>
+                      ))
                     ) : (
                       <small>尚未识别到占位符，例如：{'{{计数}}'}</small>
                     )}
