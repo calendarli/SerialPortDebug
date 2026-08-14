@@ -68,6 +68,26 @@ function loadRules(): Rule[] {
   }
 }
 
+function inferParameterByteLength(parameter: SavedCommand['parameters'][number]): number {
+  if (Number.isInteger(parameter.byteLength) && parameter.byteLength > 0)
+    return Math.min(64, parameter.byteLength)
+  const value = parameter.value?.trim()
+  if (!value) return 1
+  try {
+    const mode = parameter.inputMode || (parameter.inputHex ? 'hex' : 'dec')
+    if (mode === 'ascii') return 1
+    if (mode === 'hex' && /^[0-9a-f]+$/i.test(value))
+      return Math.min(64, Math.max(1, Math.ceil(value.length / 2)))
+    if (mode === 'dec' && /^\d+$/.test(value)) {
+      const numericValue = BigInt(value)
+      return Math.min(64, Math.max(1, Math.ceil(numericValue.toString(2).length / 8)))
+    }
+  } catch {
+    /* Keep the safe default for malformed legacy values. */
+  }
+  return 1
+}
+
 function loadCommands(): SavedCommand[] {
   try {
     const saved = JSON.parse(localStorage.getItem('serialflow.commands') || '[]') as SavedCommand[]
@@ -86,7 +106,8 @@ function loadCommands(): SavedCommand[] {
           parameters: Array.isArray(command.parameters)
             ? command.parameters.map((parameter) => ({
                 ...parameter,
-                inputMode: parameter.inputMode || (parameter.inputHex ? 'hex' : 'dec')
+                inputMode: parameter.inputMode || (parameter.inputHex ? 'hex' : 'dec'),
+                byteLength: inferParameterByteLength(parameter)
               }))
             : []
         }))
@@ -908,11 +929,7 @@ function App(): React.JSX.Element {
             />
           }
           rulesContent={
-            <AutoReplyPanel
-              rules={rules}
-              setRules={setRules}
-              targetPorts={configuredPorts}
-            />
+            <AutoReplyPanel rules={rules} setRules={setRules} targetPorts={configuredPorts} />
           }
         />
         <section

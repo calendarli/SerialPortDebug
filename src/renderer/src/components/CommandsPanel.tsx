@@ -25,7 +25,7 @@ type Draft = {
   crcEnabled: boolean
   crcMode: CrcMode
   targetPort: string
-  parameterIds: string[]
+  parameters: Array<{ id: string; byteLength: number }>
 }
 type Menu = { x: number; y: number; type: 'root' | 'group' | 'command'; id: number | null }
 const emptyDraft = (): Draft => ({
@@ -37,30 +37,51 @@ const emptyDraft = (): Draft => ({
   crcEnabled: false,
   crcMode: 'modbus',
   targetPort: '',
-  parameterIds: []
+  parameters: []
 })
 
 type ParameterMode = SavedCommand['parameters'][number]['inputMode']
 
-function convertNumericParameter(value: string, inputHex: boolean, outputHex: boolean): string {
+function convertNumericParameter(
+  value: string,
+  inputHex: boolean,
+  outputHex: boolean,
+  byteLength?: number
+): string {
   const clean = value.trim()
   if (!clean) return ''
   if (inputHex ? !/^[0-9a-f]+$/i.test(clean) : !/^\d+$/.test(clean)) {
     throw new Error(inputHex ? 'HEX 参数只能包含 0-9、A-F' : 'DEC 参数只能输入十进制数字 0-9')
   }
   const numericValue = BigInt(inputHex ? `0x${clean}` : clean)
+  if (byteLength) {
+    const maximum = (1n << BigInt(byteLength * 8)) - 1n
+    if (numericValue > maximum) {
+      throw new Error(
+        `${byteLength} 字节参数超出范围（HEX 最大 ${maximum
+          .toString(16)
+          .toUpperCase()
+          .padStart(byteLength * 2, '0')}，DEC 最大 ${maximum.toString(10)}）`
+      )
+    }
+  }
   const converted = numericValue.toString(outputHex ? 16 : 10).toUpperCase()
-  return outputHex && converted.length % 2 ? `0${converted}` : converted
+  if (!outputHex) return converted
+  return converted.padStart(
+    byteLength ? byteLength * 2 : converted.length + (converted.length % 2),
+    '0'
+  )
 }
 
 function convertParameterForCommand(
   value: string,
   mode: ParameterMode,
-  outputHex: boolean
+  outputHex: boolean,
+  byteLength: number
 ): string {
   if (!value) return ''
   if (mode === 'ascii') return outputHex ? bytesToHex(new TextEncoder().encode(value)) : value
-  return convertNumericParameter(value, mode === 'hex', outputHex)
+  return convertNumericParameter(value, mode === 'hex', outputHex, byteLength)
 }
 
 function convertParameterMode(value: string, from: ParameterMode, to: ParameterMode): string {
@@ -72,9 +93,34 @@ function convertParameterMode(value: string, from: ParameterMode, to: ParameterM
   return convertNumericParameter(value, from === 'hex', to === 'hex')
 }
 
+function numericParameterFits(value: string, mode: ParameterMode, byteLength: number): boolean {
+  if (!value || mode === 'ascii') return true
+  if (mode === 'hex' ? !/^[0-9a-f]+$/i.test(value) : !/^\d+$/.test(value)) return false
+  const numericValue = BigInt(mode === 'hex' ? `0x${value}` : value)
+  return numericValue <= (1n << BigInt(byteLength * 8)) - 1n
+}
+
+function numericParameterPlaceholder(mode: ParameterMode, byteLength: number): string {
+  if (mode === 'ascii') return 'ASCII 文本'
+  const maximum = (1n << BigInt(byteLength * 8)) - 1n
+  if (mode === 'dec') return `DEC 0-${maximum.toString(10)}`
+  const hexMaximum = maximum
+    .toString(16)
+    .toUpperCase()
+    .padStart(byteLength * 2, '0')
+  return byteLength <= 4
+    ? `HEX ${'0'.repeat(byteLength * 2)}-${hexMaximum}`
+    : `HEX 最多 ${byteLength * 2} 位`
+}
+
 function buildCommand(command: SavedCommand): string {
   const result = command.parameters.reduce((current, parameter) => {
-    const value = convertParameterForCommand(parameter.value, parameter.inputMode, command.hex)
+    const value = convertParameterForCommand(
+      parameter.value,
+      parameter.inputMode,
+      command.hex,
+      parameter.byteLength
+    )
     return current.replaceAll(`{{${parameter.id}}}`, value)
   }, command.template)
   return command.hex ? result : result.replace(/\\r/g, '\r').replace(/\\n/g, '\n')
@@ -182,9 +228,13 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
     const parameter = command.parameters.find((item) => item.id === parameterId)
     if (!parameter || parameter.inputMode === inputMode) return
     try {
+      const value = convertParameterMode(parameter.value, parameter.inputMode, inputMode)
+      if (!numericParameterFits(value, inputMode, parameter.byteLength)) {
+        throw new Error(`${parameter.byteLength} 字节不足以保存当前参数值`)
+      }
       updateParameter(command, parameterId, {
         inputMode,
-        value: convertParameterMode(parameter.value, parameter.inputMode, inputMode)
+        value
       })
       setError('')
     } catch (cause) {
@@ -248,7 +298,10 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
       crcEnabled: Boolean(command.crcMode),
       crcMode: command.crcMode || 'modbus',
       targetPort: command.targetPort || props.targetPorts[0] || '',
-      parameterIds: command.parameters.map((parameter) => parameter.id)
+      parameters: command.parameters.map((parameter) => ({
+        id: parameter.id,
+        byteLength: parameter.byteLength || 1
+      }))
     })
     setError('')
     setCreating(true)
@@ -307,9 +360,21 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
     if (!draft.targetPort) return setError('请选择目标端口')
     if (!Number.isFinite(draft.autoSendInterval) || draft.autoSendInterval < 1)
       return setError('自动发送周期不能小于 1ms')
-    const ids = draft.parameterIds.map((id) => id.trim()).filter(Boolean)
+    const definitions = draft.parameters
+      .map((parameter) => ({ ...parameter, id: parameter.id.trim() }))
+      .filter((parameter) => parameter.id)
+    const ids = definitions.map((parameter) => parameter.id)
     if (ids.some((id) => /[{}]/.test(id))) return setError('参数名字不能包含花括号')
     if (new Set(ids).size !== ids.length) return setError('参数名字不能重复')
+    if (
+      definitions.some(
+        (parameter) =>
+          !Number.isInteger(parameter.byteLength) ||
+          parameter.byteLength < 1 ||
+          parameter.byteLength > 64
+      )
+    )
+      return setError('参数字节数必须是 1-64 的整数')
     if (editingCommandId === null) {
       props.setCommands([
         ...props.commands,
@@ -323,20 +388,28 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
           autoSendInterval: draft.autoSendInterval,
           crcMode: draft.crcEnabled ? draft.crcMode : null,
           targetPort: draft.targetPort,
-          parameters: ids.map((id) => ({ id, value: '', inputMode: draft.hex ? 'hex' : 'ascii' }))
+          parameters: definitions.map(({ id, byteLength }) => ({
+            id,
+            byteLength,
+            value: '',
+            inputMode: draft.hex ? 'hex' : 'ascii'
+          }))
         }
       ])
     } else {
       const current = props.commands.find((command) => command.id === editingCommandId)
       if (!current) return setError('要编辑的指令不存在')
-      const parameters = ids.map(
-        (id) =>
-          current.parameters.find((parameter) => parameter.id === id) || {
-            id,
-            value: '',
-            inputMode: draft.hex ? ('hex' as const) : ('ascii' as const)
-          }
-      )
+      const parameters = definitions.map(({ id, byteLength }) => {
+        const existing = current.parameters.find((parameter) => parameter.id === id)
+        return existing
+          ? { ...existing, byteLength }
+          : {
+              id,
+              byteLength,
+              value: '',
+              inputMode: draft.hex ? ('hex' as const) : ('ascii' as const)
+            }
+      })
       props.setCommands(
         props.commands.map((command) =>
           command.id === editingCommandId
@@ -450,24 +523,17 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
       {command.parameters.map((parameter) => (
         <div className="command-parameter" key={parameter.id}>
           <label>
-            <span>{parameter.id}</span>
+            <span>
+              {parameter.id} · {parameter.byteLength} 字节
+            </span>
             <input
               inputMode={parameter.inputMode === 'dec' ? 'numeric' : 'text'}
+              maxLength={parameter.inputMode === 'hex' ? parameter.byteLength * 2 : undefined}
               value={parameter.value}
-              placeholder={
-                parameter.inputMode === 'ascii'
-                  ? 'ASCII 文本'
-                  : parameter.inputMode === 'dec'
-                    ? 'DEC 数值'
-                    : 'HEX 数值'
-              }
+              placeholder={numericParameterPlaceholder(parameter.inputMode, parameter.byteLength)}
               onChange={(event) => {
                 const value = event.target.value
-                if (
-                  parameter.inputMode === 'ascii' ||
-                  value === '' ||
-                  (parameter.inputMode === 'hex' ? /^[0-9a-f]+$/i.test(value) : /^\d+$/.test(value))
-                )
+                if (numericParameterFits(value, parameter.inputMode, parameter.byteLength))
                   updateParameter(command, parameter.id, {
                     value: parameter.inputMode === 'hex' ? value.toUpperCase() : value
                   })
@@ -748,38 +814,60 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
               </div>
               <div className="parameter-editor">
                 <div className="parameter-editor-head">
-                  <span>参数名字（支持中文，任意数量）</span>
+                  <span>参数名字与占用字节（支持中文，任意数量）</span>
                   <button
                     onClick={() =>
-                      setDraft({ ...draft, parameterIds: [...draft.parameterIds, ''] })
+                      setDraft({
+                        ...draft,
+                        parameters: [...draft.parameters, { id: '', byteLength: 1 }]
+                      })
                     }
                   >
                     ＋ 添加参数
                   </button>
                 </div>
-                {draft.parameterIds.map((id, index) => (
+                {draft.parameters.map((parameter, index) => (
                   <div className="parameter-edit-row" key={index}>
                     <input
-                      value={id}
+                      value={parameter.id}
                       placeholder="参数名字，例如 目标速度"
                       onChange={(event) =>
                         setDraft({
                           ...draft,
-                          parameterIds: draft.parameterIds.map((value, itemIndex) =>
-                            itemIndex === index ? event.target.value : value
+                          parameters: draft.parameters.map((value, itemIndex) =>
+                            itemIndex === index ? { ...value, id: event.target.value } : value
                           )
                         })
                       }
                     />
+                    <label className="parameter-byte-length">
+                      <input
+                        type="number"
+                        min="1"
+                        max="64"
+                        value={parameter.byteLength}
+                        onChange={(event) =>
+                          setDraft({
+                            ...draft,
+                            parameters: draft.parameters.map((value, itemIndex) =>
+                              itemIndex === index
+                                ? { ...value, byteLength: Number(event.target.value) }
+                                : value
+                            )
+                          })
+                        }
+                      />
+                      <span>字节</span>
+                    </label>
                     <button
                       className="copy-placeholder"
-                      disabled={!id.trim()}
-                      onClick={() => void copyPlaceholder(id, index)}
+                      disabled={!parameter.id.trim()}
+                      onClick={() => void copyPlaceholder(parameter.id, index)}
                     >
                       {copiedIndex === index
                         ? '已复制'
-                        : id.trim()
-                          ? `{{${id.trim()}}}`
+                        : parameter.id.trim()
+                          ? `{{${parameter.id.trim()}}}`
                           : '{{参数名字}}'}
                     </button>
                     <button
@@ -787,9 +875,7 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
                       onClick={() =>
                         setDraft({
                           ...draft,
-                          parameterIds: draft.parameterIds.filter(
-                            (_, itemIndex) => itemIndex !== index
-                          )
+                          parameters: draft.parameters.filter((_, itemIndex) => itemIndex !== index)
                         })
                       }
                     >
@@ -797,6 +883,12 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
                     </button>
                   </div>
                 ))}
+                {draft.parameters.length > 0 && (
+                  <small className="parameter-byte-help">
+                    DEC/HEX 参数按无符号数限制范围；发送 HEX 指令时按大端顺序左侧补零，例如 2 字节
+                    DEC 10 → 00 0A
+                  </small>
+                )}
               </div>
               {error && <p className="form-error">{error}</p>}
             </div>

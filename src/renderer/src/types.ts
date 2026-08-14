@@ -25,6 +25,7 @@ export type CommandParameter = {
   id: string
   value: string
   inputMode: 'ascii' | 'dec' | 'hex'
+  byteLength: number
   inputHex?: boolean
 }
 export type CrcMode = 'crc8' | 'modbus' | 'ccitt-false' | 'xmodem' | 'crc32'
