@@ -1091,14 +1091,6 @@ function App(): React.JSX.Element {
           rulesContent={
             <AutoReplyPanel rules={rules} setRules={setRules} targetPorts={configuredPorts} />
           }
-          scriptsContent={
-            <div className="script-side-intro">
-              <strong>脚本工作台</strong>
-              <p>使用 Monaco 编写 JavaScript / TypeScript，处理指定串口的发送与接收数据。</p>
-              <span>{scripts.length} 个脚本</span>
-              <span>{scripts.filter((script) => script.enabled).length} 个运行中</span>
-            </div>
-          }
         />
         {sideTab === 'scripts' ? (
           <section className="script-content">

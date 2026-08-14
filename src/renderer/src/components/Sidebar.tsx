@@ -10,7 +10,6 @@ type Props = {
   serialContent: ReactNode
   commandsContent: ReactNode
   rulesContent: ReactNode
-  scriptsContent: ReactNode
 }
 const storageKey = 'serialflow.sidebarWidth'
 const defaultWidth = 320
@@ -69,8 +68,8 @@ export function Sidebar(props: Props): React.JSX.Element {
 
   return (
     <aside
-      className={`config-panel resizable-sidebar ${resizing ? 'resizing' : ''}`}
-      style={{ width }}
+      className={`config-panel resizable-sidebar ${props.activeTab === 'scripts' ? 'script-tab-only' : ''} ${resizing ? 'resizing' : ''}`}
+      style={{ width: props.activeTab === 'scripts' ? 52 : width }}
     >
       <nav className="side-tabs" aria-label="侧栏导航">
         <button
@@ -109,24 +108,26 @@ export function Sidebar(props: Props): React.JSX.Element {
           {props.enabledScriptCount > 0 && <b>{props.enabledScriptCount}</b>}
         </button>
       </nav>
-      <div className="side-page">
-        {props.activeTab === 'serial'
-          ? props.serialContent
-          : props.activeTab === 'commands'
-            ? props.commandsContent
-            : props.activeTab === 'rules'
-              ? props.rulesContent
-              : props.scriptsContent}
-      </div>
-      <div
-        className="sidebar-resizer"
-        title="拖拽调整宽度，双击恢复默认"
-        onPointerDown={beginResize}
-        onPointerMove={resize}
-        onPointerUp={finishResize}
-        onPointerCancel={finishResize}
-        onDoubleClick={resetWidth}
-      />
+      {props.activeTab !== 'scripts' && (
+        <>
+          <div className="side-page">
+            {props.activeTab === 'serial'
+              ? props.serialContent
+              : props.activeTab === 'commands'
+                ? props.commandsContent
+                : props.rulesContent}
+          </div>
+          <div
+            className="sidebar-resizer"
+            title="拖拽调整宽度，双击恢复默认"
+            onPointerDown={beginResize}
+            onPointerMove={resize}
+            onPointerUp={finishResize}
+            onPointerCancel={finishResize}
+            onDoubleClick={resetWidth}
+          />
+        </>
+      )}
     </aside>
   )
 }

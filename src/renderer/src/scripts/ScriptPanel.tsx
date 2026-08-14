@@ -11,6 +11,17 @@ type Props = {
   ports: string[]
 }
 
+const testAreaHeightKey = 'serialflow.scriptTestAreaHeight'
+const defaultTestAreaHeight = 180
+const minTestAreaHeight = 110
+const maxTestAreaHeight = 420
+
+function loadTestAreaHeight(): number {
+  const saved = Number(localStorage.getItem(testAreaHeightKey))
+  if (!Number.isFinite(saved)) return defaultTestAreaHeight
+  return Math.min(maxTestAreaHeight, Math.max(minTestAreaHeight, Math.round(saved)))
+}
+
 function stringifyOutput(value: unknown): string {
   if (typeof value === 'string') return value
   return JSON.stringify(value, null, 2)
@@ -33,9 +44,14 @@ export function ScriptPanel(props: Props): React.JSX.Element {
   const [testInput, setTestInput] = useState('AA 01 BB')
   const [testOutput, setTestOutput] = useState('等待测试…')
   const [busy, setBusy] = useState(false)
+  const [testAreaHeight, setTestAreaHeight] = useState(loadTestAreaHeight)
+  const [resizingTestArea, setResizingTestArea] = useState(false)
   const [menu, setMenu] = useState<{ x: number; y: number; scriptId: string | null } | null>(null)
   const editorRef = useRef<ScriptEditorHandle>(null)
+  const editorAreaRef = useRef<HTMLElement>(null)
   const importRef = useRef<HTMLInputElement>(null)
+  const testResizeStart = useRef({ y: 0, height: testAreaHeight })
+  const latestTestAreaHeight = useRef(testAreaHeight)
 
   useEffect(() => {
     const close = (): void => setMenu(null)
@@ -197,6 +213,48 @@ export function ScriptPanel(props: Props): React.JSX.Element {
     })
   }
 
+  const clampTestAreaHeight = (height: number): number => {
+    const availableHeight = editorAreaRef.current?.clientHeight || 0
+    const availableMaximum = availableHeight
+      ? Math.max(minTestAreaHeight, availableHeight - 52 - 180 - 8)
+      : maxTestAreaHeight
+    return Math.round(
+      Math.min(maxTestAreaHeight, availableMaximum, Math.max(minTestAreaHeight, height))
+    )
+  }
+
+  const beginTestAreaResize = (event: React.PointerEvent<HTMLDivElement>): void => {
+    event.preventDefault()
+    testResizeStart.current = { y: event.clientY, height: testAreaHeight }
+    latestTestAreaHeight.current = testAreaHeight
+    event.currentTarget.setPointerCapture(event.pointerId)
+    setResizingTestArea(true)
+  }
+
+  const resizeTestArea = (event: React.PointerEvent<HTMLDivElement>): void => {
+    if (!resizingTestArea) return
+    const next = clampTestAreaHeight(
+      testResizeStart.current.height + testResizeStart.current.y - event.clientY
+    )
+    latestTestAreaHeight.current = next
+    setTestAreaHeight(next)
+  }
+
+  const finishTestAreaResize = (event: React.PointerEvent<HTMLDivElement>): void => {
+    if (!resizingTestArea) return
+    if (event.currentTarget.hasPointerCapture(event.pointerId))
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    localStorage.setItem(testAreaHeightKey, String(latestTestAreaHeight.current))
+    setResizingTestArea(false)
+  }
+
+  const resetTestAreaHeight = (): void => {
+    const next = clampTestAreaHeight(defaultTestAreaHeight)
+    latestTestAreaHeight.current = next
+    setTestAreaHeight(next)
+    localStorage.setItem(testAreaHeightKey, String(next))
+  }
+
   if (!selected) {
     return (
       <div className="script-empty">
@@ -233,7 +291,11 @@ export function ScriptPanel(props: Props): React.JSX.Element {
             ))}
           </div>
         </aside>
-        <section className="script-editor-area">
+        <section
+          ref={editorAreaRef}
+          className={`script-editor-area ${resizingTestArea ? 'resizing' : ''}`}
+          style={{ '--script-test-height': `${testAreaHeight}px` } as React.CSSProperties}
+        >
           <div className="script-toolbar">
             <input
               value={selected.name}
@@ -274,6 +336,20 @@ export function ScriptPanel(props: Props): React.JSX.Element {
             onSave={() => void saveCurrent()}
             onTest={() => void testCurrent()}
           />
+          <div
+            className={`script-test-resizer ${resizingTestArea ? 'resizing' : ''}`}
+            role="separator"
+            aria-label="调整测试输入和运行输出区域高度"
+            aria-orientation="horizontal"
+            title="拖拽调整测试区高度，双击恢复默认"
+            onPointerDown={beginTestAreaResize}
+            onPointerMove={resizeTestArea}
+            onPointerUp={finishTestAreaResize}
+            onPointerCancel={finishTestAreaResize}
+            onDoubleClick={resetTestAreaHeight}
+          >
+            <i />
+          </div>
           <div className="script-test-area">
             <label>
               测试输入
