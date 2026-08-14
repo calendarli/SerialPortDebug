@@ -1,8 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
-import * as monaco from 'monaco-editor/esm/vs/editor/editor.api.js'
-import type * as Monaco from 'monaco-editor'
-import * as typescriptRuntime from 'monaco-editor/esm/vs/language/typescript/monaco.contribution.js'
-import * as typescriptSyntaxRuntime from 'monaco-editor/esm/vs/languages/definitions/typescript/typescript.js'
+import * as monaco from 'monaco-editor'
 import './monaco-setup'
 import scriptApiTypes from './script-api.d.ts?raw'
 import { hashScriptSource } from './script-pipeline'
@@ -27,58 +24,34 @@ type Props = {
 let configured = false
 const models = new Map<string, monaco.editor.ITextModel>()
 const viewStates = new Map<string, monaco.editor.ICodeEditorViewState | null>()
-const typescript = typescriptRuntime as typeof Monaco.typescript
-const typescriptSyntax = typescriptSyntaxRuntime as {
-  conf: Monaco.languages.LanguageConfiguration
-  language: Monaco.languages.IMonarchLanguage
-}
 
 function configureTypeScript(): void {
   if (configured) return
   configured = true
-  // The slim Monaco editor API does not register language identifiers by itself.
-  // Register them before requesting a language worker so onLanguage hooks can set up
-  // both services without pulling every built-in Monaco language into the bundle.
-  const registeredLanguages = new Set(monaco.languages.getLanguages().map((item) => item.id))
-  if (!registeredLanguages.has('typescript')) {
-    monaco.languages.register({
-      id: 'typescript',
-      extensions: ['.ts', '.tsx'],
-      aliases: ['TypeScript', 'ts']
-    })
-  }
-  if (!registeredLanguages.has('javascript')) {
-    monaco.languages.register({
-      id: 'javascript',
-      extensions: ['.js', '.mjs'],
-      aliases: ['JavaScript', 'js']
-    })
-  }
-  monaco.languages.setLanguageConfiguration('typescript', typescriptSyntax.conf)
-  monaco.languages.setMonarchTokensProvider('typescript', typescriptSyntax.language)
-  monaco.languages.setLanguageConfiguration('javascript', typescriptSyntax.conf)
-  monaco.languages.setMonarchTokensProvider('javascript', {
-    ...typescriptSyntax.language,
-    tokenPostfix: '.js'
-  })
-  const options: Monaco.typescript.CompilerOptions = {
-    target: typescript.ScriptTarget.ES2020,
-    module: typescript.ModuleKind.None,
+  const options: monaco.typescript.CompilerOptions = {
+    target: monaco.typescript.ScriptTarget.ES2020,
+    module: monaco.typescript.ModuleKind.None,
     strict: true,
     noEmitOnError: false,
     sourceMap: true,
     allowNonTsExtensions: true,
     lib: ['es2020', 'dom']
   }
-  typescript.typescriptDefaults.setCompilerOptions(options)
-  typescript.javascriptDefaults.setCompilerOptions({ ...options, checkJs: true })
-  typescript.typescriptDefaults.addExtraLib(scriptApiTypes, 'serialflow://types/script-api.d.ts')
-  typescript.javascriptDefaults.addExtraLib(scriptApiTypes, 'serialflow://types/script-api.d.ts')
+  monaco.typescript.typescriptDefaults.setCompilerOptions(options)
+  monaco.typescript.javascriptDefaults.setCompilerOptions({ ...options, checkJs: true })
+  monaco.typescript.typescriptDefaults.addExtraLib(
+    scriptApiTypes,
+    'serialflow://types/script-api.d.ts'
+  )
+  monaco.typescript.javascriptDefaults.addExtraLib(
+    scriptApiTypes,
+    'serialflow://types/script-api.d.ts'
+  )
 }
 
 function diagnosticText(
   model: monaco.editor.ITextModel,
-  diagnostics: Monaco.typescript.Diagnostic[]
+  diagnostics: monaco.typescript.Diagnostic[]
 ): string | null {
   const errors = diagnostics.filter((diagnostic) => diagnostic.category === 1)
   if (!errors.length) return null
@@ -124,8 +97,8 @@ export const ScriptEditor = forwardRef<ScriptEditorHandle, Props>(
         automaticLayout: true,
         minimap: { enabled: true, scale: 0.75 },
         fontFamily: 'Consolas, "SFMono-Regular", monospace',
-        fontSize: 13,
-        lineHeight: 21,
+        fontSize: 17,
+        lineHeight: 26,
         tabSize: 2,
         insertSpaces: true,
         wordWrap: 'on',
@@ -165,8 +138,8 @@ export const ScriptEditor = forwardRef<ScriptEditorHandle, Props>(
           if (!model) throw new Error('脚本编辑器尚未加载')
           const languageApi =
             props.language === 'typescript'
-              ? typescript.getTypeScriptWorker
-              : typescript.getJavaScriptWorker
+              ? monaco.typescript.getTypeScriptWorker
+              : monaco.typescript.getJavaScriptWorker
           const workerFactory = await languageApi()
           const worker = await workerFactory(model.uri)
           const fileName = model.uri.toString()

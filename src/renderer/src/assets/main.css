@@ -41,26 +41,26 @@ header {
   place-items: center;
   color: #fff;
   font-weight: 800;
-  font-size: 21px;
+  font-size: 25px;
   background: linear-gradient(145deg, #38bdf8, #2563eb);
   box-shadow: 0 8px 18px #2563eb35;
 }
 .brand h1 {
-  font-size: 17px;
+  font-size: 21px;
   margin: 0;
   font-weight: 750;
   letter-spacing: 0.2px;
 }
 .brand small {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 17px;
 }
 .status {
   border: 1px solid var(--border);
   border-radius: 20px;
   padding: 7px 13px;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 18px;
   background: #fff;
   box-shadow: 0 2px 8px #1e40700a;
 }
@@ -98,7 +98,7 @@ header {
   justify-content: space-between;
   align-items: center;
   margin: 0 0 15px;
-  font-size: 15px;
+  font-size: 19px;
   font-weight: 700;
   color: #29354a;
 }
@@ -109,13 +109,13 @@ header {
   border-radius: 8px;
   background: #fff;
   color: var(--primary);
-  font-size: 17px;
+  font-size: 21px;
   line-height: 1;
 }
 .config-panel > label {
   display: block;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 17px;
   margin-bottom: 12px;
 }
 select,
@@ -153,7 +153,7 @@ textarea:focus {
 }
 .grid-two label {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 17px;
   margin-bottom: 12px;
 }
 .connect {
@@ -186,7 +186,7 @@ textarea:focus {
   display: flex;
   align-items: center;
   position: relative;
-  font-size: 14px;
+  font-size: 18px;
   color: #43516a;
 }
 .toggle-row input {
@@ -266,19 +266,19 @@ textarea:focus {
   background: #fff;
 }
 .card-head strong {
-  font-size: 15px;
+  font-size: 19px;
   font-weight: 700;
 }
 .card-head span {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 16px;
   margin-left: 12px;
 }
 .card-head > button {
   border: 0;
   background: var(--surface-soft);
   color: #64748b;
-  font-size: 13px;
+  font-size: 17px;
   padding: 6px 10px;
   border-radius: 6px;
 }
@@ -296,7 +296,7 @@ textarea:focus {
   color: #334155;
   background: #fbfdff;
   font:
-    12px/1.68 Consolas,
+    16px/1.68 Consolas,
     'SFMono-Regular',
     monospace;
   user-select: text;
@@ -321,7 +321,7 @@ textarea:focus {
   border: 0;
   background: none;
   color: #718096;
-  font-size: 12px;
+  font-size: 16px;
   padding: 4px 11px;
   border-radius: 5px;
 }
@@ -339,7 +339,7 @@ textarea:focus {
   background: #fff;
   color: #263348;
   font:
-    12px/1.5 Consolas,
+    16px/1.5 Consolas,
     monospace;
 }
 .sender textarea:focus {
@@ -356,7 +356,7 @@ textarea:focus {
 }
 .check {
   color: #64748b;
-  font-size: 13px;
+  font-size: 17px;
   white-space: nowrap;
 }
 .check input {
@@ -375,7 +375,7 @@ textarea:focus {
 .interval span {
   margin-left: -23px;
   align-self: center;
-  font-size: 12px;
+  font-size: 16px;
   color: #8090a6;
 }
 .send-button {
@@ -387,11 +387,11 @@ textarea:focus {
   box-shadow: 0 5px 12px #2563eb25;
   color: #fff;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 18px;
 }
 .send-button kbd {
   margin-left: 12px;
-  font-size: 11px;
+  font-size: 15px;
   opacity: 0.75;
   font-family: inherit;
 }
@@ -405,7 +405,7 @@ footer {
   padding: 0 16px;
   background: rgba(255, 255, 255, 0.9);
   color: #8492a6;
-  font-size: 12px;
+  font-size: 16px;
 }
 footer div {
   display: flex;
@@ -443,19 +443,19 @@ footer div {
 }
 .modal h2 {
   margin: 0 0 4px;
-  font-size: 16px;
+  font-size: 20px;
 }
 .modal p {
   margin: 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 17px;
 }
 .modal-head button,
 .delete {
   background: none;
   border: 0;
   color: #94a3b8;
-  font-size: 22px;
+  font-size: 26px;
 }
 .rule-list {
   padding: 13px 18px;
@@ -483,7 +483,7 @@ footer div {
 }
 .rule label {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 16px;
 }
 .rule label input {
   display: block;
@@ -542,7 +542,7 @@ footer div {
 }
 .head-check {
   color: #64748b;
-  font-size: 13px;
+  font-size: 17px;
   white-space: nowrap;
 }
 .head-check input {
@@ -551,11 +551,11 @@ footer div {
   margin: 0 4px 0 0;
 }
 .head-tool-button {
-  height: 28px;
+  height: 34px;
   border: 1px solid #cfe0fb;
   background: var(--primary-soft);
   color: #2563eb;
-  font-size: 12px;
+  font-size: 16px;
   padding: 0 9px;
   border-radius: 7px;
 }
@@ -571,7 +571,25 @@ footer div {
   margin-left: 0;
 }
 .card-head .interval input {
-  height: 29px;
+  height: 34px;
+}
+.sender .card-head {
+  height: auto;
+  min-height: 64px;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.sender .card-head > strong {
+  flex: 0 0 auto;
+}
+.sender .card-head .head-tools {
+  min-width: 0;
+  flex: 1 1 620px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  row-gap: 7px;
 }
 .send-actions {
   justify-content: flex-end;
@@ -587,7 +605,7 @@ footer div {
 .serial-config-content > label {
   display: block;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 17px;
   margin-bottom: 12px;
 }
 .side-tabs {
@@ -604,7 +622,7 @@ footer div {
   border-radius: 8px;
   background: transparent;
   color: #718096;
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 600;
 }
 .side-tabs button.active {
@@ -622,7 +640,7 @@ footer div {
   border-radius: 9px;
   background: #e0ecff;
   color: #2563eb;
-  font-size: 11px;
+  font-size: 15px;
 }
 .side-section-head {
   display: flex;
@@ -632,20 +650,20 @@ footer div {
 }
 .side-section-head strong {
   display: block;
-  font-size: 15px;
+  font-size: 19px;
 }
 .side-section-head small {
   display: block;
   margin-top: 2px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 16px;
 }
 .side-section-head > span {
   padding: 3px 7px;
   border-radius: 10px;
   background: #ecfdf5;
   color: #059669;
-  font-size: 11px;
+  font-size: 15px;
 }
 .side-rule-list {
   display: flex;
@@ -666,7 +684,7 @@ footer div {
   margin-bottom: 9px;
 }
 .side-rule-head label {
-  font-size: 13px;
+  font-size: 17px;
   font-weight: 650;
   color: #344258;
 }
@@ -679,13 +697,13 @@ footer div {
   border: 0;
   background: transparent;
   color: #94a3b8;
-  font-size: 18px;
+  font-size: 22px;
 }
 .side-rule > label {
   display: block;
   margin-top: 8px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 16px;
 }
 .side-rule > label input,
 .side-rule > label textarea {
@@ -699,7 +717,7 @@ footer div {
   color: var(--text);
   outline: 0;
   font:
-    11px/1.4 Consolas,
+    15px/1.4 Consolas,
     monospace;
 }
 .side-rule > label textarea {
@@ -716,7 +734,7 @@ footer div {
   justify-content: space-between;
   margin-top: 9px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 16px;
 }
 .mini-segment {
   display: flex;
@@ -730,7 +748,7 @@ footer div {
   border-radius: 4px;
   background: transparent;
   color: #718096;
-  font-size: 11px;
+  font-size: 15px;
 }
 .mini-segment button.active {
   background: #fff;
@@ -745,13 +763,13 @@ footer div {
   border-radius: 8px;
   background: #f8fbff;
   color: var(--primary);
-  font-size: 13px;
+  font-size: 17px;
 }
 .empty-rules {
   padding: 24px 0;
   text-align: center;
   color: #94a3b8;
-  font-size: 13px;
+  font-size: 17px;
 }
 
 /* Edge tab rail and persistent resizable sidebar. */
@@ -793,7 +811,7 @@ footer div {
   height: 52px;
   padding: 0;
   border-radius: 9px;
-  font-size: 11px;
+  font-size: 15px;
 }
 .resizable-sidebar .side-tabs button.active {
   background: #fff;
@@ -811,7 +829,7 @@ footer div {
   background: var(--primary);
 }
 .resizable-sidebar .side-tabs .tab-icon {
-  font-size: 18px;
+  font-size: 22px;
   line-height: 18px;
 }
 .resizable-sidebar .side-tabs b {
@@ -822,7 +840,7 @@ footer div {
   height: 15px;
   margin: 0;
   padding: 0 3px;
-  font-size: 10px;
+  font-size: 14px;
 }
 .sidebar-resizer {
   position: absolute;
@@ -881,7 +899,7 @@ footer div {
   border: 0;
   background: transparent;
   color: #94a3b8;
-  font-size: 18px;
+  font-size: 22px;
 }
 .rule-enable {
   display: flex;
@@ -897,7 +915,7 @@ footer div {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: #2c3a50;
-  font-size: 14px;
+  font-size: 18px;
 }
 .reply-item dl {
   margin: 0;
@@ -907,7 +925,7 @@ footer div {
   grid-template-columns: 34px minmax(0, 1fr);
   gap: 5px;
   margin-top: 5px;
-  font-size: 12px;
+  font-size: 16px;
 }
 .reply-item dt {
   color: #94a3b8;
@@ -927,7 +945,7 @@ footer div {
   border-radius: 5px;
   background: #eef2ff;
   color: #4f46e5;
-  font-size: 10px;
+  font-size: 14px;
   font-weight: 700;
 }
 .format-badge.hex {
@@ -944,7 +962,7 @@ footer div {
 }
 .parameter-title {
   color: #8190a5;
-  font-size: 11px;
+  font-size: 15px;
 }
 .parameter-list label {
   display: grid;
@@ -955,7 +973,7 @@ footer div {
 .parameter-list code {
   overflow: hidden;
   color: #2563eb;
-  font-size: 11px;
+  font-size: 15px;
   text-overflow: ellipsis;
 }
 .parameter-list input {
@@ -967,7 +985,7 @@ footer div {
   background: #fbfdff;
   color: var(--text);
   outline: 0;
-  font-size: 12px;
+  font-size: 16px;
 }
 .rule-create-backdrop {
   z-index: 20;
@@ -985,7 +1003,7 @@ footer div {
 }
 .create-rule-form > label {
   color: #64748b;
-  font-size: 13px;
+  font-size: 17px;
 }
 .create-rule-form > label input,
 .create-rule-form > label textarea {
@@ -1003,14 +1021,14 @@ footer div {
   height: 76px;
   resize: vertical;
   font:
-    11px/1.5 Consolas,
+    15px/1.5 Consolas,
     monospace;
 }
 .create-rule-form > label small {
   display: block;
   margin-top: 5px;
   color: #94a3b8;
-  font-size: 11px;
+  font-size: 15px;
 }
 .create-rule-form > label code {
   color: #2563eb;
@@ -1020,7 +1038,7 @@ footer div {
   align-items: center;
   justify-content: space-between;
   color: #64748b;
-  font-size: 13px;
+  font-size: 17px;
 }
 .parameter-editor {
   padding: 11px;
@@ -1033,13 +1051,13 @@ footer div {
   align-items: center;
   justify-content: space-between;
   color: #64748b;
-  font-size: 12px;
+  font-size: 16px;
 }
 .parameter-editor-head button {
   border: 0;
   background: transparent;
   color: var(--primary);
-  font-size: 12px;
+  font-size: 16px;
 }
 .parameter-edit-row {
   display: grid;
@@ -1049,7 +1067,7 @@ footer div {
   margin-top: 8px;
   color: #2563eb;
   font:
-    11px Consolas,
+    15px Consolas,
     monospace;
 }
 .parameter-edit-row input {
@@ -1061,14 +1079,14 @@ footer div {
   color: var(--text);
   outline: 0;
   font:
-    10px Consolas,
+    14px Consolas,
     monospace;
 }
 .parameter-edit-row button {
   border: 0;
   background: transparent;
   color: #94a3b8;
-  font-size: 16px;
+  font-size: 20px;
 }
 .form-error {
   margin: 0;
@@ -1076,7 +1094,7 @@ footer div {
   border-radius: 7px;
   background: #fff1f2;
   color: #be123c;
-  font-size: 12px;
+  font-size: 16px;
 }
 .modal-foot {
   display: flex;
@@ -1106,7 +1124,7 @@ footer div {
   top: 8px;
   color: #8492a6;
   font:
-    8px system-ui,
+    12px system-ui,
     sans-serif;
   pointer-events: none;
 }
@@ -1118,7 +1136,7 @@ footer div {
   background: #eff6ff;
   color: #2563eb;
   font:
-    9px Consolas,
+    13px Consolas,
     monospace;
   white-space: nowrap;
 }
@@ -1136,13 +1154,13 @@ footer div {
   border: 0;
   background: transparent;
   color: #94a3b8;
-  font-size: 16px;
+  font-size: 20px;
 }
 .parameter-byte-help {
   display: block;
   margin-top: 8px;
   color: #8492a6;
-  font-size: 11px;
+  font-size: 15px;
   line-height: 1.55;
 }
 .commands-panel {
@@ -1174,7 +1192,7 @@ footer div {
 .command-head strong {
   overflow: hidden;
   color: #2c3a50;
-  font-size: 14px;
+  font-size: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1185,7 +1203,7 @@ footer div {
   border: 0;
   background: transparent;
   color: #94a3b8;
-  font-size: 18px;
+  font-size: 22px;
 }
 .command-template {
   display: block;
@@ -1195,7 +1213,7 @@ footer div {
   border-radius: 6px;
   background: #f6f8fb;
   color: #53647b;
-  font-size: 11px;
+  font-size: 15px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1210,7 +1228,7 @@ footer div {
   display: block;
   margin-bottom: 4px;
   color: #718096;
-  font-size: 11px;
+  font-size: 15px;
 }
 .command-parameter input {
   width: 100%;
@@ -1222,7 +1240,7 @@ footer div {
   color: var(--text);
   outline: 0;
   font:
-    10px Consolas,
+    14px Consolas,
     monospace;
 }
 .command-parameter .mini-segment {
@@ -1236,7 +1254,7 @@ footer div {
   border-radius: 7px;
   background: #eff6ff;
   color: #2563eb;
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 650;
 }
 .command-send:hover {
@@ -1248,7 +1266,7 @@ footer div {
   border-radius: 7px;
   background: #fff1f2;
   color: #be123c;
-  font-size: 11px;
+  font-size: 15px;
 }
 .commands-panel,
 .auto-reply-panel {
@@ -1277,16 +1295,16 @@ footer div {
 .group-title > span {
   width: 10px;
   color: #8ca0b8;
-  font-size: 12px;
+  font-size: 16px;
 }
 .group-title > b {
   color: #f59e0b;
-  font-size: 15px;
+  font-size: 19px;
   font-weight: 400;
 }
 .group-title > strong {
   overflow: hidden;
-  font-size: 13px;
+  font-size: 17px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1308,7 +1326,7 @@ footer div {
   border-radius: 6px;
   background: #eff6ff;
   color: #2563eb;
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 650;
 }
 .command-head > .command-send:hover {
@@ -1324,7 +1342,7 @@ footer div {
   overflow: hidden;
   margin: 0;
   color: #53647b;
-  font-size: 11px;
+  font-size: 15px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1373,16 +1391,16 @@ footer div {
   place-items: center;
   width: 12px;
   color: #7390ad;
-  font-size: 12px;
+  font-size: 16px;
 }
 .group-title .folder-icon {
   width: auto;
   color: #f59e0b;
-  font-size: 15px;
+  font-size: 19px;
   line-height: 1;
 }
 .group-title > strong {
-  font-size: 13px;
+  font-size: 17px;
   font-weight: 700;
 }
 .group-title > em {
@@ -1391,7 +1409,7 @@ footer div {
   border-radius: 9px;
   background: #fff;
   color: #8293a8;
-  font-size: 10px;
+  font-size: 14px;
   font-style: normal;
   font-weight: 500;
   box-shadow: 0 1px 3px #3341550d;
@@ -1421,7 +1439,7 @@ footer div {
   border-radius: 5px;
   background: #ecfdf5;
   color: #059669;
-  font-size: 10px;
+  font-size: 14px;
   font-weight: 650;
   white-space: nowrap;
 }
@@ -1436,7 +1454,7 @@ footer div {
 }
 .command-auto-settings > label {
   color: #42526a;
-  font-size: 13px;
+  font-size: 17px;
 }
 .command-auto-settings > label input {
   margin: 0 6px 0 0;
@@ -1460,7 +1478,7 @@ footer div {
 .command-auto-settings > div span {
   margin-left: -23px;
   color: #8090a6;
-  font-size: 11px;
+  font-size: 15px;
 }
 .command-auto-settings > div.disabled {
   opacity: 0.5;
@@ -1473,7 +1491,7 @@ footer div {
   display: block;
   margin-top: -8px;
   color: #8492a6;
-  font-size: 11px;
+  font-size: 15px;
 }
 .group-loop-settings {
   display: grid;
@@ -1525,7 +1543,7 @@ footer div {
   border-radius: 7px;
   background: #eff6ff;
   color: #2563eb;
-  font-size: 11px;
+  font-size: 15px;
   font-weight: 650;
 }
 .group-loop-button.stop {
@@ -1539,13 +1557,13 @@ footer div {
 }
 .send-count input {
   width: 61px;
-  height: 29px;
+  height: 34px;
   padding: 0 20px 0 7px;
 }
 .send-count span {
   margin-left: -19px;
   color: #8090a6;
-  font-size: 11px;
+  font-size: 15px;
 }
 .send-count input:disabled {
   background: #f1f5f9;
@@ -1611,7 +1629,7 @@ footer div {
   gap: 6px;
   padding: 7px 8px;
   border-right: 1px solid;
-  font-size: 10px;
+  font-size: 14px;
   white-space: nowrap;
 }
 .rx .interaction-meta {
@@ -1631,7 +1649,7 @@ footer div {
   height: 18px;
   border-radius: 5px;
   color: #fff;
-  font-size: 10px;
+  font-size: 14px;
 }
 .rx .interaction-meta b {
   background: #2583c5;
@@ -1652,7 +1670,7 @@ footer div {
   padding: 7px 9px;
   color: #344258;
   font:
-    11px/1.55 Consolas,
+    15px/1.55 Consolas,
     'SFMono-Regular',
     monospace;
   white-space: pre-wrap;
@@ -1675,14 +1693,14 @@ footer div {
 .context-menu button {
   display: block;
   width: 100%;
-  height: 31px;
+  height: 38px;
   padding: 0 9px;
   border: 0;
   border-radius: 6px;
   background: transparent;
   color: #39475c;
   text-align: left;
-  font-size: 12px;
+  font-size: 16px;
 }
 .context-menu button:hover {
   background: #f1f5f9;
@@ -1702,10 +1720,23 @@ footer div {
   width: 410px;
 }
 .interaction-head {
-  min-height: 49px;
+  min-height: 64px;
   height: auto;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.interaction-head > div:first-child {
+  min-width: 0;
+  flex: 1 1 340px;
+  line-height: 1.45;
 }
 .interaction-head .head-tools {
+  min-width: 0;
+  flex: 1 1 520px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 9px;
 }
 .cache-controls {
@@ -1720,19 +1751,19 @@ footer div {
   align-items: center;
   gap: 3px;
   color: #718096;
-  font-size: 11px;
+  font-size: 15px;
   white-space: nowrap;
 }
 .cache-controls input {
   width: 54px;
-  height: 27px;
+  height: 34px;
   padding: 0 5px;
   border: 1px solid #d8e1ec;
   border-radius: 6px;
   background: #f8fafc;
   color: #344258;
   outline: 0;
-  font-size: 11px;
+  font-size: 15px;
 }
 .cache-controls label:last-child input {
   width: 64px;
@@ -1799,17 +1830,17 @@ footer div {
 .interaction-meta {
   gap: 4px;
   padding: 3px 6px;
-  font-size: 9px;
+  font-size: 13px;
 }
 .interaction-meta b {
   width: 23px;
   height: 15px;
   border-radius: 4px;
-  font-size: 9px;
+  font-size: 13px;
 }
 .interaction-entry pre {
   padding: 3px 7px;
-  font-size: 12px;
+  font-size: 16px;
   line-height: 1.3;
 }
 .interaction-view .interaction-entry pre {
@@ -1823,7 +1854,7 @@ footer div {
   border-radius: 5px;
   background: #f1f5f9;
   color: #64748b;
-  font-size: 10px;
+  font-size: 14px;
   white-space: nowrap;
 }
 
@@ -1872,11 +1903,11 @@ footer div {
   background: #fff;
   color: #334155;
   outline: 0;
-  font-size: 12px;
+  font-size: 16px;
 }
 .interaction-search > label {
   color: #64748b;
-  font-size: 11px;
+  font-size: 15px;
   white-space: nowrap;
 }
 .interaction-search > label input {
@@ -1891,7 +1922,7 @@ footer div {
   border-radius: 6px;
   background: #fff;
   color: #64748b;
-  font-size: 12px;
+  font-size: 16px;
 }
 .interaction-search > button.active {
   border-color: #93b9fa;
@@ -1906,7 +1937,7 @@ footer div {
 .interaction-search > span {
   overflow: hidden;
   color: #718096;
-  font-size: 11px;
+  font-size: 15px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1914,7 +1945,7 @@ footer div {
   margin-left: auto;
   border: 0;
   background: transparent;
-  font-size: 16px;
+  font-size: 20px;
 }
 .interaction-entry.search-match {
   border-color: #f59e0b !important;
@@ -1998,18 +2029,18 @@ footer div {
   border-radius: 50%;
   background: #fff1f2;
   color: #dc2626;
-  font-size: 22px;
+  font-size: 26px;
   font-weight: 800;
 }
 .app-error-content h2 {
   margin: 1px 0 7px;
   color: #27364b;
-  font-size: 15px;
+  font-size: 19px;
 }
 .app-error-content p {
   margin: 0;
   color: #59697f;
-  font-size: 14px;
+  font-size: 18px;
   line-height: 1.7;
   white-space: pre-wrap;
   word-break: break-word;
@@ -2021,7 +2052,7 @@ footer div {
   border-radius: 7px;
   background: transparent;
   color: #94a3b8;
-  font-size: 19px;
+  font-size: 23px;
 }
 .app-error-close:hover {
   background: #f1f5f9;
@@ -2040,7 +2071,7 @@ footer div {
   border-radius: 8px;
   background: #2563eb;
   color: #fff;
-  font-size: 13px;
+  font-size: 17px;
   font-weight: 700;
   box-shadow: 0 5px 12px #2563eb28;
 }
@@ -2068,7 +2099,7 @@ footer div {
   border-radius: 8px;
   background: #f8fafc;
   color: #526176;
-  font-size: 12px;
+  font-size: 16px;
   white-space: nowrap;
 }
 .rule-pattern-input > label input {
@@ -2086,7 +2117,7 @@ footer div {
 }
 .receive-format-row > span {
   color: #64748b;
-  font-size: 12px;
+  font-size: 16px;
 }
 .auto-pause-bar {
   display: flex;
@@ -2111,7 +2142,7 @@ footer div {
   background: #fff;
   color: #344258;
   font:
-    10px Consolas,
+    14px Consolas,
     monospace;
   outline: 0;
 }
@@ -2125,7 +2156,7 @@ footer div {
 }
 .auto-pause-error {
   color: #dc2626;
-  font-size: 11px;
+  font-size: 15px;
 }
 .create-rule-form > label textarea.auto-reply-send-input {
   height: 52px;
@@ -2167,19 +2198,19 @@ footer div {
 }
 .script-side-intro strong {
   color: #2d3b50;
-  font-size: 14px;
+  font-size: 18px;
 }
 .script-side-intro p {
   margin: 8px 0 12px;
   color: #718096;
-  font-size: 11px;
+  font-size: 15px;
   line-height: 1.65;
 }
 .script-side-intro span {
   display: block;
   margin-top: 5px;
   color: #2563eb;
-  font-size: 11px;
+  font-size: 15px;
 }
 .script-panel {
   display: grid;
@@ -2194,13 +2225,13 @@ footer div {
   box-shadow: var(--shadow);
 }
 .script-toolbar button {
-  height: 27px;
+  height: 34px;
   padding: 0 9px;
   border: 1px solid #d8e1ec;
   border-radius: 6px;
   background: #f8fafc;
   color: #526176;
-  font-size: 11px;
+  font-size: 15px;
 }
 .script-toolbar button:hover {
   border-color: #b8cff6;
@@ -2215,7 +2246,7 @@ footer div {
 }
 .script-list-pane {
   display: grid;
-  grid-template-rows: 44px minmax(0, 1fr);
+  grid-template-rows: 52px minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -2231,11 +2262,11 @@ footer div {
 }
 .script-list-head strong {
   color: #27364b;
-  font-size: 13px;
+  font-size: 17px;
 }
 .script-list-head span {
   color: #8492a6;
-  font-size: 10px;
+  font-size: 14px;
 }
 .script-list {
   position: relative;
@@ -2252,7 +2283,7 @@ footer div {
   align-items: center;
   gap: 6px;
   width: 100%;
-  height: 34px;
+  height: 40px;
   margin-bottom: 4px;
   padding: 0 8px;
   border: 1px solid transparent;
@@ -2279,13 +2310,13 @@ footer div {
 }
 .script-list span {
   overflow: hidden;
-  font-size: 11px;
+  font-size: 15px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .script-list em {
   color: #8492a6;
-  font-size: 10px;
+  font-size: 14px;
   font-style: normal;
 }
 .script-editor-area {
@@ -2293,7 +2324,7 @@ footer div {
   position: relative;
   z-index: 0;
   contain: layout paint;
-  grid-template-rows: minmax(44px, 44px) minmax(180px, 1fr) 125px;
+  grid-template-rows: minmax(52px, 52px) minmax(180px, 1fr) 125px;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -2303,7 +2334,7 @@ footer div {
   position: relative;
   z-index: 1;
   align-items: center;
-  min-height: 44px;
+  min-height: 52px;
   overflow-x: auto;
   overflow-y: hidden;
   gap: 6px;
@@ -2312,28 +2343,28 @@ footer div {
 }
 .script-toolbar > input {
   width: 145px;
-  height: 28px;
+  height: 34px;
   padding: 0 8px;
   border: 1px solid #d8e1ec;
   border-radius: 6px;
   color: #344258;
-  font-size: 12px;
+  font-size: 16px;
 }
 .script-toolbar > select {
   width: 94px;
-  height: 28px;
+  height: 34px;
   padding: 0 6px;
   border: 1px solid #d8e1ec;
   border-radius: 6px;
   background: #f8fafc;
   color: #526176;
-  font-size: 11px;
+  font-size: 15px;
 }
 .script-toolbar .script-dirty {
   min-width: 0;
   margin-right: auto;
   color: #d97706;
-  font-size: 10px;
+  font-size: 14px;
 }
 .script-context-menu {
   width: 180px;
@@ -2362,7 +2393,7 @@ footer div {
   gap: 6px;
   padding: 8px 10px;
   color: #718096;
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 600;
 }
 .script-test-area label + label {
@@ -2381,7 +2412,7 @@ footer div {
   background: #f8fafc;
   color: #344258;
   font:
-    13px/1.55 Consolas,
+    17px/1.55 Consolas,
     'Microsoft YaHei',
     monospace;
   font-weight: 400;
@@ -2400,21 +2431,21 @@ footer div {
 }
 .script-binding > label {
   color: #718096;
-  font-size: 10px;
+  font-size: 14px;
   white-space: nowrap;
 }
 .script-binding > label > select,
 .script-binding > label > input:not([type='checkbox']) {
   display: block;
   width: 105px;
-  height: 27px;
+  height: 34px;
   margin-top: 3px;
   padding: 0 6px;
   border: 1px solid #d8e1ec;
   border-radius: 6px;
   background: #fff;
   color: #42526a;
-  font-size: 10px;
+  font-size: 14px;
 }
 .script-binding input[type='checkbox'] {
   margin-right: 4px;
@@ -2432,7 +2463,7 @@ footer div {
   border: 1px solid #dbe3ed;
   border-radius: 7px;
   color: #718096;
-  font-size: 10px;
+  font-size: 14px;
   white-space: nowrap;
 }
 .script-binding legend {
@@ -2461,7 +2492,7 @@ footer div {
   border-radius: 6px;
   background: #f8fafc;
   color: #46566d;
-  font-size: 11px;
+  font-size: 15px;
   outline: 0;
 }
 .crc-select:disabled {
@@ -2476,7 +2507,7 @@ footer div {
   border-radius: 9px;
   background: #f8fbff;
   color: #42526a;
-  font-size: 13px;
+  font-size: 17px;
 }
 .command-crc-settings input {
   margin: 0 6px 0 0;
@@ -2491,7 +2522,7 @@ footer div {
   border-radius: 7px;
   background: #fff;
   color: #42526a;
-  font-size: 12px;
+  font-size: 16px;
   outline: 0;
 }
 .command-crc-settings select:disabled {
@@ -2515,7 +2546,7 @@ footer div {
   gap: 6px;
 }
 .multi-serial-config .add-port {
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 700;
 }
 .serial-profile-list {
@@ -2549,14 +2580,14 @@ footer div {
 }
 .serial-profile-head strong {
   color: #334155;
-  font-size: 13px;
+  font-size: 17px;
 }
 .serial-profile-head span {
   padding: 2px 6px;
   border-radius: 10px;
   background: #f1f5f9;
   color: #718096;
-  font-size: 10px;
+  font-size: 14px;
 }
 .serial-profile.open .serial-profile-head span {
   background: #e8f8f0;
@@ -2567,7 +2598,7 @@ footer div {
   border: 0;
   background: transparent;
   color: #a0aec0;
-  font-size: 15px;
+  font-size: 19px;
 }
 .serial-profile-head button:not(:disabled):hover {
   color: #e11d48;
@@ -2576,7 +2607,7 @@ footer div {
   display: block;
   margin-bottom: 8px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 15px;
 }
 .serial-profile select {
   display: block;
@@ -2588,7 +2619,7 @@ footer div {
   border-radius: 7px;
   background: #fff;
   color: var(--text);
-  font-size: 12px;
+  font-size: 16px;
   outline: 0;
 }
 .serial-profile select:disabled {
@@ -2600,12 +2631,12 @@ footer div {
 }
 .serial-profile .grid-two label {
   margin-bottom: 8px;
-  font-size: 11px;
+  font-size: 15px;
 }
 .serial-profile .connect {
   height: 34px;
   margin-top: 1px;
-  font-size: 12px;
+  font-size: 16px;
 }
 .send-port-select {
   width: 112px;
@@ -2615,7 +2646,7 @@ footer div {
   border-radius: 7px;
   background: #f8fafc;
   color: #42526a;
-  font-size: 11px;
+  font-size: 15px;
   outline: 0;
 }
 .send-port-select:focus {
@@ -2629,7 +2660,7 @@ footer div {
   border-radius: 5px;
   background: #eaf2ff;
   color: #2563eb;
-  font-size: 10px;
+  font-size: 14px;
   font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2644,7 +2675,7 @@ footer div {
   border-radius: 8px;
   background: #fbfdff;
   color: var(--text);
-  font-size: 12px;
+  font-size: 16px;
   outline: 0;
 }
 .create-rule-form > label > select:focus {
@@ -2670,7 +2701,7 @@ footer div {
   border-radius: 5px;
   background: #fff7ed;
   color: #c2410c;
-  font-size: 10px;
+  font-size: 14px;
   font-weight: 650;
   white-space: nowrap;
 }
@@ -2685,7 +2716,7 @@ footer div {
   border-radius: 50%;
   background: #fff;
   color: #64748b;
-  font-size: 11px;
+  font-size: 15px;
   font-weight: 700;
   line-height: 1;
   cursor: help;
@@ -2712,7 +2743,7 @@ footer div {
   color: #f8fafc;
   box-shadow: 0 10px 28px #0f172a35;
   font:
-    10px/1.65 system-ui,
+    14px/1.65 system-ui,
     sans-serif;
   text-align: left;
   white-space: pre-line;

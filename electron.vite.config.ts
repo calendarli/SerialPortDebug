@@ -11,16 +11,7 @@ export default defineConfig({
     },
     resolve: {
       alias: {
-        '@renderer': resolve('src/renderer/src'),
-        'monaco-editor/esm/vs/editor/editor.api.js': resolve(
-          'node_modules/monaco-editor/esm/vs/editor/editor.api.js'
-        ),
-        'monaco-editor/esm/vs/language/typescript/monaco.contribution.js': resolve(
-          'node_modules/monaco-editor/esm/vs/language/typescript/monaco.contribution.js'
-        ),
-        'monaco-editor/esm/vs/languages/definitions/typescript/typescript.js': resolve(
-          'node_modules/monaco-editor/esm/vs/languages/definitions/typescript/typescript.js'
-        )
+        '@renderer': resolve('src/renderer/src')
       }
     },
     plugins: [react()]

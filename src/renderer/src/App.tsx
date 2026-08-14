@@ -188,6 +188,7 @@ function loadSendPanelHeight(): number {
 const cacheSizeKey = 'serialflow.interactionCacheMb'
 const cacheEntryKey = 'serialflow.interactionCacheEntries'
 const interactionFontSizeKey = 'serialflow.interactionFontSize'
+const globalFontUpgradeKey = 'serialflow.globalFontUpgrade20260814V2'
 const receiveHexKey = 'serialflow.receiveHex'
 const timestampKey = 'serialflow.timestamp'
 const sendCrcEnabledKey = 'serialflow.sendCrcEnabled'
@@ -361,9 +362,14 @@ function App(): React.JSX.Element {
     loadPositiveSetting(cacheSizeKey, 8)
   )
   const [interactionCacheEntries, setInteractionCacheEntries] = useState(loadEntryLimit)
-  const [interactionFontSize, setInteractionFontSize] = useState(() =>
-    Math.min(24, Math.max(8, loadPositiveSetting(interactionFontSizeKey, 10)))
-  )
+  const [interactionFontSize, setInteractionFontSize] = useState(() => {
+    const current = Math.min(24, Math.max(8, loadPositiveSetting(interactionFontSizeKey, 10)))
+    if (localStorage.getItem(globalFontUpgradeKey)) return current
+    const upgraded = Math.min(24, current + 4)
+    localStorage.setItem(interactionFontSizeKey, String(upgraded))
+    localStorage.setItem(globalFontUpgradeKey, '1')
+    return upgraded
+  })
   const lineBuffers = useRef(new Map<string, string>())
   const hexBuffers = useRef(new Map<string, string>())
   const pauseLineBuffers = useRef(new Map<string, string>())
