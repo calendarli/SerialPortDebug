@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import appIcon from '../assets/app-icon.png'
 
 const repositoryUrl = 'https://github.com/calendarli/SerialPortDebug'
 
@@ -34,9 +35,7 @@ export function AboutPanel(): React.JSX.Element {
   return (
     <section className="about-panel">
       <div className="about-identity">
-        <span className="about-logo" aria-hidden="true">
-          S
-        </span>
+        <img className="about-logo" src={appIcon} alt="SerialFlow 图标" />
         <div>
           <h2>SerialFlow</h2>
           <p>高速串口调试助手</p>

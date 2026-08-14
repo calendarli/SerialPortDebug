@@ -33,18 +33,6 @@ header {
   align-items: center;
   gap: 12px;
 }
-.brand-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  display: grid;
-  place-items: center;
-  color: #fff;
-  font-weight: 800;
-  font-size: 25px;
-  background: linear-gradient(145deg, #38bdf8, #2563eb);
-  box-shadow: 0 8px 18px #2563eb35;
-}
 .brand h1 {
   font-size: 21px;
   margin: 0;
@@ -903,13 +891,8 @@ footer > span:first-child {
   width: 48px;
   height: 48px;
   flex: none;
-  display: grid;
-  place-items: center;
-  border-radius: 14px;
-  color: #fff;
-  font-size: 28px;
-  font-weight: 800;
-  background: linear-gradient(145deg, #38bdf8, #2563eb);
+  display: block;
+  object-fit: contain;
   box-shadow: 0 8px 20px #2563eb35;
 }
 .about-identity h2 {

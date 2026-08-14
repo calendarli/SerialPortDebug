@@ -1090,7 +1090,6 @@ function App(): React.JSX.Element {
     <main className="app-shell">
       <header>
         <div className="brand">
-          <span className="brand-icon">S</span>
           <div>
             <h1>SerialFlow</h1>
             <small>高速串口调试助手</small>

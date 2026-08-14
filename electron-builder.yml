@@ -13,7 +13,7 @@ asarUnpack:
   - resources/**
 win:
   executableName: SerialFlow
-  icon: build/icon.ico
+  icon: build/icon-v3.ico
   target:
     - nsis
 nsis:
@@ -25,8 +25,8 @@ nsis:
   installerLanguages:
     - zh_CN
   displayLanguageSelector: false
-  installerIcon: build/icon.ico
-  uninstallerIcon: build/icon.ico
+  installerIcon: build/icon-v3.ico
+  uninstallerIcon: build/icon-v3.ico
   installerSidebar: build/installerSidebar.bmp
   uninstallerSidebar: build/installerSidebar.bmp
   shortcutName: ${productName}
@@ -36,6 +36,7 @@ nsis:
   runAfterFinish: true
   deleteAppDataOnUninstall: false
 mac:
+  icon: build/icon-v3.icns
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
     - NSCameraUsageDescription: Application requests access to the device's camera.

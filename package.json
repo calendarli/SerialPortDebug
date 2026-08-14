@@ -1,6 +1,6 @@
 {
   "name": "serialportdebug",
-  "version": "2.2.3",
+  "version": "2.2.5",
   "description": "高速串口数据调试与自动化交互工具",
   "main": "./out/main/index.js",
   "author": "SerialFlow",
