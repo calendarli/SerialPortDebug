@@ -1824,6 +1824,9 @@ footer > span:first-child {
   padding-bottom: 7px;
   color: #64748b;
 }
+.serial-pair-auto-form {
+  display: flex;
+}
 .serial-pair-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1846,6 +1849,24 @@ footer > span:first-child {
   font:
     12px/1.6 Consolas,
     monospace;
+}
+.serial-pair-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+.serial-pair-list > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 11px;
+  border: 1px solid #dbe4ee;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+.serial-pair-list button {
+  min-height: 28px;
+  color: #dc2626;
 }
 @media (max-width: 850px) {
   .serial-pair-form {

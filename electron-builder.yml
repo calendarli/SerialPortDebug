@@ -11,6 +11,11 @@ files:
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
 asarUnpack:
   - resources/**
+extraResources:
+  - from: driver/SerialFlowVirtualSerial/Manager/x64/Release/SerialFlowVirtualSerialManager.exe
+    to: virtual-serial/SerialFlowVirtualSerialManager.exe
+  - from: driver/SerialFlowVirtualSerial/ComPort/x64/Debug/VirtualSerial2um
+    to: virtual-serial
 win:
   executableName: SerialFlow
   icon: build/icon-v3.ico

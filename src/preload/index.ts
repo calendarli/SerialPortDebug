@@ -26,6 +26,8 @@ const api = {
   getVirtualPortStatus: () => ipcRenderer.invoke('virtualPorts:status'),
   createVirtualPortPair: (first: string, second: string) =>
     ipcRenderer.invoke('virtualPorts:create', first, second),
+  removeVirtualPortPair: (first: string, second: string) =>
+    ipcRenderer.invoke('virtualPorts:remove', first, second),
   openVirtualPortManager: () => ipcRenderer.invoke('virtualPorts:openManager'),
   openVirtualPortDownload: () => ipcRenderer.invoke('virtualPorts:openDownload'),
   openPort: (options: unknown) => ipcRenderer.invoke('serial:open', options),

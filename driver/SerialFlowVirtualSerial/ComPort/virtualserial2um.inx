@@ -1,0 +1,107 @@
+;
+; Copyright (C) Microsoft Corporation, All Rights Reserved.
+;
+; SerialFlowVirtualSerial.inf
+;
+; Installation Notes:
+;    Type "devcon install VirtualSerial2um.inf UMDF\VirtualSerial2um" to install
+;
+; Important:
+;     This INF depends on features for the Driver Store DIRIDs which are available starting Windows 10 1803
+
+[Version]
+Signature="$Windows NT$"
+Class=Ports
+ClassGuid={4D36E978-E325-11CE-BFC1-08002BE10318}
+Provider=%ProviderString%
+CatalogFile=SerialFlowVirtualSerial.cat
+DriverVer=08/19/2026,0.1.0.0
+PnpLockdown=1
+
+[Manufacturer]
+%ManufacturerString%=SerialFlow,NT$ARCH$.10.0...17134, NT$ARCH$.10.0...22000
+
+[SerialFlow.NT$ARCH$.10.0...17134]
+%VirtualSerialDeviceName%=VirtualSerial_Install,ROOT\SERIALFLOWVSP
+
+[SerialFlow.NT$ARCH$.10.0...22000]
+%VirtualSerialDeviceName%=VirtualSerial_Install_Win11,ROOT\SERIALFLOWVSP
+
+[DestinationDirs]
+DefaultDestDir = 13
+
+[SourceDisksFiles]
+SerialFlowVirtualSerial.dll=1
+
+[SourceDisksNames]
+1 = %MediaDescription%
+
+; =================== UMDF VirtualSerial Device Win11 ============================
+[VirtualSerial_Install_Win11.NT]
+CopyFiles=UMDriverCopy
+Include=WUDFRD.inf
+Needs=WUDFRD.NT
+
+[VirtualSerial_Install_Win11.NT.hw]
+AddReg=SetDeviceType_AddReg
+Include=WUDFRD.inf
+Needs=WUDFRD.NT.HW
+
+[VirtualSerial_Install_Win11.NT.Services]
+Include=WUDFRD.inf
+Needs=WUDFRD.NT.Services
+
+[VirtualSerial_Install_Win11.NT.Wdf]
+UmdfService                 = SerialFlowVirtualSerial, VirtualSerial_Umdf_Install
+UmdfServiceOrder            = SerialFlowVirtualSerial
+UmdfKernelModeClientPolicy  = AllowKernelModeClients
+UmdfFileObjectPolicy        = AllowNullAndUnknownFileObjects
+UmdfFsContextUsePolicy      = CannotUseFsContexts
+UmdfHostProcessSharing      = ProcessSharingEnabled
+
+; =================== UMDF VirtualSerial Device ==================================
+
+[VirtualSerial_Install.NT]
+CopyFiles=UMDriverCopy
+
+[VirtualSerial_Install.NT.hw]
+AddReg=SetDeviceType_AddReg
+
+[VirtualSerial_Install.NT.Services]
+AddService=WUDFRd,0x000001fa,WUDFRD_ServiceInstall
+
+[VirtualSerial_Install.NT.Wdf]
+UmdfService                 = SerialFlowVirtualSerial, VirtualSerial_Umdf_Install
+UmdfServiceOrder            = SerialFlowVirtualSerial
+UmdfKernelModeClientPolicy  = AllowKernelModeClients
+UmdfFileObjectPolicy        = AllowNullAndUnknownFileObjects
+UmdfFsContextUsePolicy      = CannotUseFsContexts
+UmdfHostProcessSharing      = ProcessSharingEnabled
+
+[WUDFRD_ServiceInstall]
+DisplayName     = %WudfRdDisplayName%
+ServiceType     = 1
+StartType       = 3
+ErrorControl    = 1
+ServiceBinary   = %12%\WUDFRd.sys
+
+; =================== Shared Sections ============================================
+
+[VirtualSerial_Umdf_Install]
+UmdfLibraryVersion=$UMDFVERSION$
+ServiceBinary=%13%\SerialFlowVirtualSerial.dll
+
+[SetDeviceType_AddReg]
+HKR,,DeviceType,0x10001,0x0000001b  ; 0x1b = FILE_DEVICE_SERIAL_PORT
+
+[UMDriverCopy]
+SerialFlowVirtualSerial.dll
+
+; =================== Generic ==================================
+
+[Strings]
+ProviderString="SerialFlow"
+ManufacturerString="SerialFlow"
+MediaDescription="SerialFlow Virtual Serial Pair Driver"
+WudfRdDisplayName="Windows Driver Foundation - User-mode Driver Framework Reflector"
+VirtualSerialDeviceName="SerialFlow Virtual Serial Port (UMDF 2)"

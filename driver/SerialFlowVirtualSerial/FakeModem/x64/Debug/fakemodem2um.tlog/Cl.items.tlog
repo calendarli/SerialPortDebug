@@ -1,0 +1,4 @@
+D:\project\Code\Software\SerialPortDebug\driver\SerialFlowVirtualSerial\device.c;D:\project\Code\Software\SerialPortDebug\driver\SerialFlowVirtualSerial\FakeModem\x64\Debug\device.obj
+D:\project\Code\Software\SerialPortDebug\driver\SerialFlowVirtualSerial\driver.c;D:\project\Code\Software\SerialPortDebug\driver\SerialFlowVirtualSerial\FakeModem\x64\Debug\driver.obj
+D:\project\Code\Software\SerialPortDebug\driver\SerialFlowVirtualSerial\queue.c;D:\project\Code\Software\SerialPortDebug\driver\SerialFlowVirtualSerial\FakeModem\x64\Debug\queue.obj
+D:\project\Code\Software\SerialPortDebug\driver\SerialFlowVirtualSerial\ringbuffer.c;D:\project\Code\Software\SerialPortDebug\driver\SerialFlowVirtualSerial\FakeModem\x64\Debug\ringbuffer.obj

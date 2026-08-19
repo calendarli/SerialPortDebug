@@ -90,33 +90,52 @@ let sessionEvents = 0
 let sessionBytes = 0
 let replayGeneration = 0
 
-function findCom0comTool(name: 'setupc.exe' | 'setupg.exe'): string | null {
-  const roots = [process.env.ProgramFiles, process.env['ProgramFiles(x86)']].filter(
-    (value): value is string => Boolean(value)
-  )
-  for (const root of roots) {
-    const candidate = join(root, 'com0com', name)
-    if (existsSync(candidate)) return candidate
+function virtualSerialPaths(): { manager: string; inf: string } {
+  const root = app.isPackaged
+    ? join(process.resourcesPath, 'virtual-serial')
+    : join(app.getAppPath(), 'driver', 'SerialFlowVirtualSerial')
+  return {
+    manager: app.isPackaged
+      ? join(root, 'SerialFlowVirtualSerialManager.exe')
+      : join(root, 'Manager', 'x64', 'Release', 'SerialFlowVirtualSerialManager.exe'),
+    inf: app.isPackaged
+      ? join(root, 'virtualserial2um.inf')
+      : join(root, 'ComPort', 'x64', 'Debug', 'VirtualSerial2um', 'virtualserial2um.inf')
   }
-  return null
+}
+
+function quotePowerShell(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`
 }
 
 function runTool(path: string, args: string[]): Promise<string> {
+  const argumentList = args.map(quotePowerShell).join(',')
+  const command = `$process = Start-Process -FilePath ${quotePowerShell(path)} -ArgumentList @(${argumentList}) -Verb RunAs -WindowStyle Hidden -Wait -PassThru; Write-Output $process.ExitCode`
   return new Promise((resolve, reject) =>
-    execFile(path, args, { windowsHide: true, timeout: 15000 }, (error, stdout, stderr) => {
-      if (error) {
-        const detail = String(stderr || stdout || error.message).trim()
-        reject(
-          new Error(
-            /access|denied|权限|管理员/i.test(detail)
-              ? '创建虚拟串口对需要管理员权限，请以管理员身份运行 SerialFlow 后重试'
-              : `com0com 操作失败：${detail}`
+    execFile(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-Command', command],
+      { windowsHide: true, timeout: 120000 },
+      (error, stdout, stderr) => {
+        const exitCode = Number(String(stdout).trim())
+        if (!error && (exitCode === 0 || exitCode === 1)) {
+          resolve(exitCode === 1 ? '操作完成，需要重启系统后完全生效' : '操作成功')
+          return
+        }
+        if (error) {
+          const detail = String(stderr || stdout || error.message).trim()
+          reject(
+            new Error(
+              /cancel|canceled|取消|1223/i.test(detail)
+                ? '已取消管理员授权，未更改虚拟串口配置'
+                : `SerialFlow 虚拟串口操作失败：${detail}`
+            )
           )
-        )
-        return
+          return
+        }
+        reject(new Error(`SerialFlow 虚拟串口操作失败，管理程序退出码：${exitCode}`))
       }
-      resolve(String(stdout || stderr).trim())
-    })
+    )
   )
 }
 
@@ -217,51 +236,54 @@ function registerSerialHandlers(): void {
     }
   })
   ipcMain.handle('virtualPorts:status', async () => {
-    const commandPath = findCom0comTool('setupc.exe')
-    if (!commandPath) return { installed: false, pairs: [] as string[] }
-    try {
-      const output = await runTool(commandPath, ['list'])
-      return {
-        installed: true,
-        pairs: output.split(/\r?\n/).filter((line) => /CNC[AB]\d+/i.test(line)),
-        commandPath
-      }
-    } catch (error) {
-      return {
-        installed: true,
-        pairs: [] as string[],
-        commandPath,
-        message: error instanceof Error ? error.message : String(error)
-      }
+    const paths = virtualSerialPaths()
+    const endpoints = (await SerialPort.list())
+      .filter((item) => item.manufacturer === 'SerialFlow')
+      .map((item) => item.path)
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+    const pairs: string[] = []
+    for (let index = 0; index < endpoints.length; index += 2)
+      pairs.push(`${endpoints[index]} ↔ ${endpoints[index + 1] || '等待对端'}`)
+    return {
+      installed: endpoints.length > 0 || (existsSync(paths.manager) && existsSync(paths.inf)),
+      pairs,
+      commandPath: paths.manager,
+      message: endpoints.length ? `SerialFlow 驱动已启动，共 ${endpoints.length} 个端点` : undefined
     }
   })
   ipcMain.handle('virtualPorts:create', async (_event, first: string, second: string) => {
-    const normalize = (value: string): string => value.trim().toUpperCase()
-    const portA = normalize(first)
-    const portB = normalize(second)
+    const paths = virtualSerialPaths()
+    if (!existsSync(paths.manager) || !existsSync(paths.inf))
+      throw new Error('SerialFlow 虚拟串口驱动包不完整')
+    const portA = first.trim().toUpperCase()
+    const portB = second.trim().toUpperCase()
     if (
       !/^COM(?:[1-9]|[1-9]\d|[1-9]\d{2})$/.test(portA) ||
       !/^COM(?:[1-9]|[1-9]\d|[1-9]\d{2})$/.test(portB)
     )
       throw new Error('端口名称必须是 COM1–COM999')
     if (portA === portB) throw new Error('串口对的两个端口不能相同')
-    const occupied = new Set((await SerialPort.list()).map((item) => item.path.toUpperCase()))
-    if (occupied.has(portA) || occupied.has(portB))
-      throw new Error(`${occupied.has(portA) ? portA : portB} 已被系统占用，请选择其他端口号`)
-    const commandPath = findCom0comTool('setupc.exe')
-    if (!commandPath) throw new Error('未检测到 com0com，请先安装驱动')
-    const output = await runTool(commandPath, ['install', `PortName=${portA}`, `PortName=${portB}`])
-    return { first: portA, second: portB, output }
+    const before = new Set((await SerialPort.list()).map((item) => item.path.toUpperCase()))
+    if (before.has(portA) || before.has(portB)) throw new Error('所选 COM 端口已被系统占用')
+    const output = await runTool(paths.manager, ['create-pair', paths.inf, portA, portB])
+    const created = (await SerialPort.list())
+      .filter((item) => item.manufacturer === 'SerialFlow' && !before.has(item.path))
+      .map((item) => item.path)
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+    return { first: created[0] || portA, second: created[1] || portB, output }
+  })
+  ipcMain.handle('virtualPorts:remove', async (_event, first: string, second: string) => {
+    const { manager } = virtualSerialPaths()
+    if (!existsSync(manager)) throw new Error('未检测到 SerialFlow 管理程序')
+    for (const port of [first, second]) if (openPorts.has(port)) await closePort(port)
+    return runTool(manager, ['remove-pair', first, second])
   })
   ipcMain.handle('virtualPorts:openManager', async () => {
-    const managerPath = findCom0comTool('setupg.exe')
-    if (!managerPath) throw new Error('未检测到 com0com 图形管理工具')
-    const error = await shell.openPath(managerPath)
-    if (error) throw new Error(`无法打开 com0com 管理工具：${error}`)
+    const { manager } = virtualSerialPaths()
+    if (!existsSync(manager)) throw new Error('未检测到 SerialFlow 管理程序')
+    shell.showItemInFolder(manager)
   })
-  ipcMain.handle('virtualPorts:openDownload', () =>
-    shell.openExternal('https://sourceforge.net/projects/com0com/files/com0com/3.0.0.0/')
-  )
+  ipcMain.handle('virtualPorts:openDownload', () => Promise.resolve())
   ipcMain.handle('session:start', async () => {
     if (!mainWindow) throw new Error('应用窗口尚未就绪')
     if (sessionStream) return { path: sessionFile }

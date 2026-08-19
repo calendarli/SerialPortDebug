@@ -45,6 +45,7 @@ declare global {
         first: string,
         second: string
       ): Promise<{ first: string; second: string; output: string }>
+      removeVirtualPortPair(first: string, second: string): Promise<string>
       openVirtualPortManager(): Promise<void>
       openVirtualPortDownload(): Promise<void>
       openPort(options: SerialOptions): Promise<boolean>

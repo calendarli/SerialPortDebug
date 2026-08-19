@@ -12,13 +12,15 @@ export function SerialPairPanel(): React.JSX.Element {
   const [second, setSecond] = useState('COM11')
   const [status, setStatus] = useState<Status | null>(null)
   const [busy, setBusy] = useState(false)
-  const [message, setMessage] = useState('正在检测 com0com…')
+  const [message, setMessage] = useState('正在检测 SerialFlow 虚拟串口驱动…')
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
       const next = await window.api.getVirtualPortStatus()
       setStatus(next)
-      setMessage(next.installed ? next.message || 'com0com 已就绪' : '未检测到 com0com 驱动工具')
+      setMessage(
+        next.installed ? next.message || 'SerialFlow 驱动包已就绪' : '未检测到 SerialFlow 驱动包'
+      )
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error))
     }
@@ -47,7 +49,7 @@ export function SerialPairPanel(): React.JSX.Element {
       <header>
         <div>
           <strong>虚拟串口对</strong>
-          <span>使用 com0com 内核驱动连接两个本地 COM 端口</span>
+          <span>使用 SerialFlow 自有 UMDF 2 驱动连接两个本地 COM 端口</span>
         </div>
         <button onClick={() => void refresh()}>刷新状态</button>
       </header>
@@ -55,7 +57,7 @@ export function SerialPairPanel(): React.JSX.Element {
       <div className={`serial-pair-status ${status?.installed ? 'ready' : ''}`}>
         <i />
         <div>
-          <strong>{status?.installed ? '驱动工具已检测到' : '需要安装 com0com'}</strong>
+          <strong>{status?.installed ? 'SerialFlow 驱动已就绪' : '驱动包不可用'}</strong>
           <span>{message}</span>
           {status?.commandPath && <small>{status.commandPath}</small>}
         </div>
@@ -67,11 +69,7 @@ export function SerialPairPanel(): React.JSX.Element {
         <div className="serial-pair-form">
           <label>
             端口 A
-            <input
-              value={first}
-              onChange={(event) => setFirst(event.target.value.toUpperCase())}
-              placeholder="COM10"
-            />
+            <input value={first} onChange={(event) => setFirst(event.target.value.toUpperCase())} />
           </label>
           <b>↔</b>
           <label>
@@ -79,7 +77,6 @@ export function SerialPairPanel(): React.JSX.Element {
             <input
               value={second}
               onChange={(event) => setSecond(event.target.value.toUpperCase())}
-              placeholder="COM11"
             />
           </label>
           <button
@@ -91,7 +88,7 @@ export function SerialPairPanel(): React.JSX.Element {
           </button>
         </div>
         <small>
-          端口范围 COM1–COM999；已存在或被硬件占用的端口不能重复创建。系统可能要求管理员权限。
+          端口范围 COM1–COM999，不能使用已被硬件或其他驱动占用的端口。创建设备需要管理员权限。
         </small>
       </div>
 
@@ -102,22 +99,45 @@ export function SerialPairPanel(): React.JSX.Element {
             disabled={!status?.installed}
             onClick={() => void window.api.openVirtualPortManager()}
           >
-            打开 com0com 管理器
-          </button>
-          <button onClick={() => void window.api.openVirtualPortDownload()}>
-            打开官方 SourceForge 下载页
+            定位 SerialFlow 管理程序
           </button>
         </div>
         <p className="serial-pair-warning">
-          com0com 是第三方内核驱动。Windows 10/11
-          可能因驱动签名、安全启动或企业策略拒绝加载；本应用不会自动关闭这些安全设置。
+          开发构建使用本机测试证书；正式发布包必须使用 Microsoft 签名。本应用不会自动关闭 Secure
+          Boot 或修改系统测试模式。
         </p>
       </div>
 
       {Boolean(status?.pairs.length) && (
         <div className="serial-pair-card">
-          <h2>com0com 当前配置</h2>
-          <pre>{status!.pairs.join('\n')}</pre>
+          <h2>SerialFlow 当前串口对</h2>
+          <div className="serial-pair-list">
+            {status!.pairs.map((pair) => {
+              const [a, b] = pair.split(' ↔ ')
+              return (
+                <div key={pair}>
+                  <strong>{pair}</strong>
+                  <button
+                    disabled={busy || b === '等待对端'}
+                    onClick={async () => {
+                      setBusy(true)
+                      try {
+                        await window.api.removeVirtualPortPair(a, b)
+                        setMessage(`已删除 ${pair}`)
+                        await refresh()
+                      } catch (error) {
+                        setMessage(error instanceof Error ? error.message : String(error))
+                      } finally {
+                        setBusy(false)
+                      }
+                    }}
+                  >
+                    删除
+                  </button>
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
     </section>
