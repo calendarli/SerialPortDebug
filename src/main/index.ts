@@ -1,5 +1,6 @@
 import { app, shell, BrowserWindow, dialog, ipcMain } from 'electron'
-import { createWriteStream, type WriteStream } from 'fs'
+import { execFile } from 'child_process'
+import { createWriteStream, existsSync, type WriteStream } from 'fs'
 import { readFile, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -88,6 +89,36 @@ let sessionFile = ''
 let sessionEvents = 0
 let sessionBytes = 0
 let replayGeneration = 0
+
+function findCom0comTool(name: 'setupc.exe' | 'setupg.exe'): string | null {
+  const roots = [process.env.ProgramFiles, process.env['ProgramFiles(x86)']].filter(
+    (value): value is string => Boolean(value)
+  )
+  for (const root of roots) {
+    const candidate = join(root, 'com0com', name)
+    if (existsSync(candidate)) return candidate
+  }
+  return null
+}
+
+function runTool(path: string, args: string[]): Promise<string> {
+  return new Promise((resolve, reject) =>
+    execFile(path, args, { windowsHide: true, timeout: 15000 }, (error, stdout, stderr) => {
+      if (error) {
+        const detail = String(stderr || stdout || error.message).trim()
+        reject(
+          new Error(
+            /access|denied|权限|管理员/i.test(detail)
+              ? '创建虚拟串口对需要管理员权限，请以管理员身份运行 SerialFlow 后重试'
+              : `com0com 操作失败：${detail}`
+          )
+        )
+        return
+      }
+      resolve(String(stdout || stderr).trim())
+    })
+  )
+}
 
 function recordSession(direction: 'rx' | 'tx', path: string, data: Uint8Array): void {
   if (!sessionStream) return
@@ -185,6 +216,52 @@ function registerSerialHandlers(): void {
       throw explainRuntimeError(error, '读取端口列表')
     }
   })
+  ipcMain.handle('virtualPorts:status', async () => {
+    const commandPath = findCom0comTool('setupc.exe')
+    if (!commandPath) return { installed: false, pairs: [] as string[] }
+    try {
+      const output = await runTool(commandPath, ['list'])
+      return {
+        installed: true,
+        pairs: output.split(/\r?\n/).filter((line) => /CNC[AB]\d+/i.test(line)),
+        commandPath
+      }
+    } catch (error) {
+      return {
+        installed: true,
+        pairs: [] as string[],
+        commandPath,
+        message: error instanceof Error ? error.message : String(error)
+      }
+    }
+  })
+  ipcMain.handle('virtualPorts:create', async (_event, first: string, second: string) => {
+    const normalize = (value: string): string => value.trim().toUpperCase()
+    const portA = normalize(first)
+    const portB = normalize(second)
+    if (
+      !/^COM(?:[1-9]|[1-9]\d|[1-9]\d{2})$/.test(portA) ||
+      !/^COM(?:[1-9]|[1-9]\d|[1-9]\d{2})$/.test(portB)
+    )
+      throw new Error('端口名称必须是 COM1–COM999')
+    if (portA === portB) throw new Error('串口对的两个端口不能相同')
+    const occupied = new Set((await SerialPort.list()).map((item) => item.path.toUpperCase()))
+    if (occupied.has(portA) || occupied.has(portB))
+      throw new Error(`${occupied.has(portA) ? portA : portB} 已被系统占用，请选择其他端口号`)
+    const commandPath = findCom0comTool('setupc.exe')
+    if (!commandPath) throw new Error('未检测到 com0com，请先安装驱动')
+    const output = await runTool(commandPath, ['install', `PortName=${portA}`, `PortName=${portB}`])
+    return { first: portA, second: portB, output }
+  })
+  ipcMain.handle('virtualPorts:openManager', async () => {
+    const managerPath = findCom0comTool('setupg.exe')
+    if (!managerPath) throw new Error('未检测到 com0com 图形管理工具')
+    const error = await shell.openPath(managerPath)
+    if (error) throw new Error(`无法打开 com0com 管理工具：${error}`)
+  })
+  ipcMain.handle('virtualPorts:openDownload', () =>
+    shell.openExternal('https://sourceforge.net/projects/com0com/files/com0com/3.0.0.0/')
+  )
   ipcMain.handle('session:start', async () => {
     if (!mainWindow) throw new Error('应用窗口尚未就绪')
     if (sessionStream) return { path: sessionFile }
@@ -265,6 +342,36 @@ function registerSerialHandlers(): void {
     })
     if (result.canceled || !result.filePaths[0]) return null
     return { path: result.filePaths[0], content: await readFile(result.filePaths[0], 'utf8') }
+  })
+  ipcMain.handle('modbus:openMap', async () => {
+    if (!mainWindow) throw new Error('应用窗口尚未就绪')
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: '导入 Modbus Poll 寄存器映射',
+      properties: ['openFile'],
+      filters: [
+        { name: 'Modbus 配置', extensions: ['mbp', 'json'] },
+        { name: 'Modbus Poll 配置', extensions: ['mbp'] },
+        { name: 'SerialFlow Modbus 配置', extensions: ['json'] }
+      ]
+    })
+    if (result.canceled || !result.filePaths[0]) return null
+    const content = await readFile(result.filePaths[0])
+    return {
+      path: result.filePaths[0],
+      name: result.filePaths[0].split(/[\\/]/).at(-1) || 'Modbus map.mbp',
+      base64: content.toString('base64')
+    }
+  })
+  ipcMain.handle('modbus:saveMap', async (_event, config: unknown) => {
+    if (!mainWindow) throw new Error('应用窗口尚未就绪')
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: '导出 Modbus RTU 配置',
+      defaultPath: 'modbus-register-map.json',
+      filters: [{ name: 'SerialFlow Modbus 配置', extensions: ['json'] }]
+    })
+    if (result.canceled || !result.filePath) return null
+    await writeFile(result.filePath, JSON.stringify(config, null, 2), 'utf8')
+    return result.filePath
   })
   ipcMain.handle('serial:open', async (_event, options: PortOptions) =>
     enqueuePortOperation(async () => {

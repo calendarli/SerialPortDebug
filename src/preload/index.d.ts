@@ -32,7 +32,21 @@ declare global {
       stopReplay(): Promise<void>
       saveProject(project: unknown): Promise<string | null>
       openProject(): Promise<{ path: string; content: string } | null>
+      openModbusMap(): Promise<{ path: string; name: string; base64: string } | null>
+      saveModbusMap(config: unknown): Promise<string | null>
       listPorts(): Promise<SerialPortInfo[]>
+      getVirtualPortStatus(): Promise<{
+        installed: boolean
+        pairs: string[]
+        commandPath?: string
+        message?: string
+      }>
+      createVirtualPortPair(
+        first: string,
+        second: string
+      ): Promise<{ first: string; second: string; output: string }>
+      openVirtualPortManager(): Promise<void>
+      openVirtualPortDownload(): Promise<void>
       openPort(options: SerialOptions): Promise<boolean>
       closePort(path: string): Promise<void>
       write(path: string, base64: string): Promise<number>

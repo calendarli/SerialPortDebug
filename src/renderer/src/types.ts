@@ -80,6 +80,7 @@ export type InteractionEntry = {
   id: number
   direction: 'rx' | 'tx' | 'script'
   text: string
+  rawHex?: string
   plotText?: string
   timestampMs?: number
   bytes: number

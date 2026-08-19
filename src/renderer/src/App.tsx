@@ -7,6 +7,7 @@ import { AboutPanel } from './components/AboutPanel'
 import { CommandsPanel } from './components/CommandsPanel'
 import { SendPanel } from './components/SendPanel'
 import { SerialConfigPanel } from './components/SerialConfigPanel'
+import { SerialPairPanel } from './components/SerialPairPanel'
 import { Sidebar } from './components/Sidebar'
 import { defaultSerialFraming, SerialFramer } from './serial-framer'
 import { ScriptFramer } from './scripts/script-framer'
@@ -167,15 +168,17 @@ function loadCommandGroups(): CommandGroup[] {
   }
 }
 
-function convertRuleParameter(value: string, inputMode: 'ascii' | 'dec' | 'hex', hex: boolean): string {
+function convertRuleParameter(
+  value: string,
+  inputMode: 'ascii' | 'dec' | 'hex',
+  hex: boolean
+): string {
   if (!value) return ''
   if (inputMode === 'ascii') return hex ? bytesToHex(new TextEncoder().encode(value)) : value
   const clean = value.trim()
   if (inputMode === 'hex' ? !/^[0-9a-f]+$/i.test(clean) : !/^\d+$/.test(clean))
     throw new Error(
-      inputMode === 'hex'
-        ? 'HEX 参数只能包含 0-9、A-F'
-        : 'DEC 参数只能输入十进制数字 0-9'
+      inputMode === 'hex' ? 'HEX 参数只能包含 0-9、A-F' : 'DEC 参数只能输入十进制数字 0-9'
     )
   const numericValue = BigInt(inputMode === 'hex' ? `0x${clean}` : clean)
   if (!hex) return numericValue.toString(10)
@@ -189,7 +192,7 @@ function fillRuleParameters(rule: Rule, values?: Record<string, string>): string
       template.replaceAll(
         `{{${parameter.id}}}`,
         rule.parameterMode === 'program'
-          ? values?.[parameter.id] ?? parameter.value
+          ? (values?.[parameter.id] ?? parameter.value)
           : convertRuleParameter(
               values?.[parameter.id] ?? parameter.value,
               parameter.inputMode || (rule.hex ? 'hex' : 'ascii'),
@@ -441,7 +444,7 @@ function App(): React.JSX.Element {
   const [commandGroups, setCommandGroups] = useState<CommandGroup[]>(loadCommandGroups)
   const [scripts, setScripts] = useState<UserScript[]>(() => ensureInitialScripts(loadScripts()))
   const [sideTab, setSideTab] = useState<
-    'serial' | 'commands' | 'rules' | 'scripts' | 'modbus' | 'about'
+    'serial' | 'pairs' | 'commands' | 'rules' | 'scripts' | 'modbus' | 'about'
   >('serial')
   const [rxCommunicationCount, setRxCommunicationCount] = useState(0)
   const [txCommunicationCount, setTxCommunicationCount] = useState(0)
@@ -551,7 +554,8 @@ function App(): React.JSX.Element {
       text: string,
       bytes: number,
       visible = true,
-      plotText?: string
+      plotText?: string,
+      rawHex?: string
     ): void => {
       const pending = pendingInteractionsRef.current
       if (direction === 'rx') {
@@ -567,6 +571,7 @@ function App(): React.JSX.Element {
           direction,
           port,
           text,
+          rawHex,
           plotText,
           timestampMs: Date.now(),
           bytes,
@@ -877,7 +882,8 @@ function App(): React.JSX.Element {
         rendered,
         bytes.length,
         !paused && !replaceRawDisplay,
-        text
+        text,
+        bytesToHex(bytes)
       )
       for (const script of scriptsRef.current) {
         if (
@@ -1377,7 +1383,9 @@ function App(): React.JSX.Element {
           }
           aboutContent={<AboutPanel />}
         />
-        {sideTab === 'scripts' ? (
+        {sideTab === 'pairs' ? (
+          <SerialPairPanel />
+        ) : sideTab === 'scripts' ? (
           <section className="script-content">
             <Suspense fallback={<div className="script-loading">正在加载 Monaco 编辑器…</div>}>
               <ScriptPanel scripts={scripts} setScripts={setScripts} ports={configuredPorts} />
@@ -1386,6 +1394,7 @@ function App(): React.JSX.Element {
         ) : sideTab === 'modbus' ? (
           <ModbusPanel
             ports={openedPortList}
+            entries={interactionCache.entries}
             onSend={(text, hex, port) => sendCommandData(text, hex, null, port)}
           />
         ) : (

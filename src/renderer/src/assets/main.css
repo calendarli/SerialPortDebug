@@ -1691,6 +1691,581 @@ footer > span:first-child {
   text-align: center;
   color: var(--muted);
 }
+
+.modbus-monitor {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  background: #f4f7fb;
+}
+.serial-pair-panel {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 18px;
+  background: #f4f7fb;
+}
+.serial-pair-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding: 13px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+}
+.serial-pair-panel > header > div {
+  display: flex;
+  flex-direction: column;
+}
+.serial-pair-panel > header strong {
+  color: #172033;
+  font-size: 18px;
+}
+.serial-pair-panel > header span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.serial-pair-panel button {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #fff;
+  color: #334155;
+}
+.serial-pair-panel button.primary {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+.serial-pair-panel button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.serial-pair-status,
+.serial-pair-card {
+  max-width: 780px;
+  margin: 0 auto 14px;
+  border: 1px solid #d8e1ec;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 4px 16px #3341550a;
+}
+.serial-pair-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 16px;
+}
+.serial-pair-status > i {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+  background: #f59e0b;
+}
+.serial-pair-status.ready > i {
+  background: #10b981;
+  box-shadow: 0 0 0 4px #d1fae5;
+}
+.serial-pair-status > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+.serial-pair-status span,
+.serial-pair-status small {
+  margin-top: 2px;
+  color: #64748b;
+  overflow-wrap: anywhere;
+}
+.serial-pair-card {
+  padding: 18px;
+}
+.serial-pair-card h2 {
+  margin: 0 0 7px;
+  color: #263348;
+  font-size: 17px;
+}
+.serial-pair-card p,
+.serial-pair-card > small {
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.serial-pair-form {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto minmax(120px, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+  margin: 16px 0 10px;
+}
+.serial-pair-form label {
+  color: #64748b;
+  font-size: 13px;
+}
+.serial-pair-form input {
+  width: 100%;
+  height: 34px;
+  margin-top: 5px;
+  padding: 0 9px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  text-transform: uppercase;
+}
+.serial-pair-form > b {
+  align-self: end;
+  padding-bottom: 7px;
+  color: #64748b;
+}
+.serial-pair-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin: 14px 0;
+}
+.serial-pair-warning {
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: #fff7ed;
+  color: #9a3412 !important;
+}
+.serial-pair-card pre {
+  overflow: auto;
+  margin: 10px 0 0;
+  padding: 11px;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #dbeafe;
+  font:
+    12px/1.6 Consolas,
+    monospace;
+}
+@media (max-width: 850px) {
+  .serial-pair-form {
+    grid-template-columns: 1fr auto 1fr;
+  }
+  .serial-pair-form > button {
+    grid-column: 1 / -1;
+  }
+}
+.modbus-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 4px 16px #3341550a;
+}
+.modbus-menu-toolbar {
+  align-items: center;
+  flex-wrap: nowrap;
+  padding-block: 8px;
+}
+.modbus-menubar {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.modbus-menu-root {
+  position: relative;
+}
+.modbus-menu-root > button {
+  min-width: 62px;
+  border-color: transparent;
+  background: transparent;
+}
+.modbus-menu-root > button:hover,
+.modbus-menu-root > button:focus-visible {
+  border-color: #cbd5e1;
+  background: #f1f5f9;
+}
+.modbus-menu-popover {
+  position: absolute;
+  z-index: 900;
+  top: calc(100% + 5px);
+  right: 0;
+  min-width: 170px;
+  padding: 5px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 12px 30px #0f172a2b;
+}
+.modbus-menu-popover button {
+  width: 100%;
+  height: 32px;
+  justify-content: flex-start;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.modbus-menu-popover button:hover:not(:disabled) {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+.modbus-title {
+  min-width: 250px;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-self: center;
+}
+.modbus-title strong {
+  color: #172033;
+  font-size: 18px;
+}
+.modbus-title span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.modbus-toolbar label {
+  min-width: 88px;
+  color: #64748b;
+  font-size: 12px;
+}
+.modbus-toolbar label:first-of-type {
+  min-width: 150px;
+}
+.modbus-toolbar input,
+.modbus-toolbar select {
+  width: 100%;
+  height: 32px;
+  margin-top: 4px;
+  padding: 0 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #fff;
+  color: var(--text);
+}
+.modbus-rate-input {
+  position: relative;
+  display: block;
+}
+.modbus-rate-input input {
+  padding-right: 28px;
+}
+.modbus-rate-input i {
+  position: absolute;
+  right: 7px;
+  bottom: 8px;
+  color: #94a3b8;
+  font-size: 11px;
+  font-style: normal;
+  pointer-events: none;
+}
+.modbus-toolbar button {
+  height: 32px;
+  flex: none;
+  padding: 0 13px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #fff;
+  color: #334155;
+}
+.modbus-toolbar button.primary {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+.modbus-toolbar button.stop {
+  border-color: #ef4444;
+  background: #fff1f2;
+  color: #be123c;
+}
+.modbus-toolbar button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.modbus-status {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 7px 12px;
+  border: 1px solid #d8e1ec;
+  border-radius: 8px;
+  background: #fff;
+  color: #334155;
+  font:
+    12px/1.2 Consolas,
+    'Microsoft YaHei UI',
+    monospace;
+}
+.modbus-status b {
+  color: #d97706;
+  font-weight: 600;
+}
+.modbus-status b.connected {
+  color: #059669;
+}
+.modbus-status b.error {
+  color: #dc2626;
+}
+.modbus-status time {
+  margin-left: auto;
+  color: #94a3b8;
+}
+.modbus-table-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid #aeb8c6;
+  border-radius: 7px;
+  background: #fff;
+}
+.modbus-register-table {
+  width: 100%;
+  min-width: 960px;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  color: #172033;
+  font:
+    12px/1.2 'Microsoft YaHei UI',
+    'Segoe UI',
+    sans-serif;
+}
+.modbus-register-table th,
+.modbus-register-table td {
+  height: 34px;
+  padding: 0 8px;
+  overflow: hidden;
+  border-right: 1px solid #c3cad4;
+  border-bottom: 1px solid #c3cad4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.modbus-register-table thead th {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  height: 38px;
+  background: #eef2f7;
+  box-shadow: inset 0 -1px #9aa6b5;
+  font-weight: 500;
+}
+.modbus-register-table thead th:first-child,
+.modbus-register-table tbody th {
+  width: 34px;
+  padding: 0;
+  background: #eef2f7;
+  color: #526175;
+  text-align: center;
+}
+.modbus-register-table thead th:not(:first-child) {
+  padding: 0;
+}
+.modbus-register-table thead th span,
+.modbus-register-table thead th strong {
+  display: inline-flex;
+  width: 50%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+}
+.modbus-register-table thead th strong {
+  border-left: 1px solid #c3cad4;
+  color: #172033;
+  font:
+    600 12px/1 Consolas,
+    monospace;
+}
+.modbus-register-table tbody th {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+.modbus-register-table td {
+  width: calc((100% - 34px) / 10);
+}
+.modbus-register-table td.modbus-alias {
+  background: #fbfcfe;
+  text-align: right;
+}
+.modbus-register-table td.modbus-value {
+  cursor: cell;
+  background: #fff;
+  text-align: right;
+  font-family: Consolas, monospace;
+}
+.modbus-register-table tbody tr:hover td {
+  background: #f7faff;
+}
+.modbus-register-table td.modbus-value.selected {
+  background: #087fce;
+  color: #fff;
+  box-shadow: inset 0 0 0 1px #0369a1;
+}
+.modbus-hint {
+  color: #718096;
+  font-size: 12px;
+  text-align: right;
+}
+.modbus-dialog-backdrop {
+  position: fixed;
+  z-index: 1100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: #0f172a52;
+  backdrop-filter: blur(2px);
+}
+.modbus-dialog {
+  width: min(390px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 24px 64px #0f172a40;
+}
+.modbus-dialog > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.modbus-dialog > header strong {
+  color: #172033;
+  font-size: 17px;
+}
+.modbus-dialog > header button {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #64748b;
+  font-size: 21px;
+}
+.modbus-dialog > p {
+  margin: 0;
+  color: #64748b;
+  font:
+    12px/1.4 Consolas,
+    'Microsoft YaHei UI',
+    monospace;
+}
+.modbus-dialog > p.warning {
+  padding: 11px;
+  border-radius: 7px;
+  background: #fff1f2;
+  color: #9f1239;
+  font-family: inherit;
+}
+.modbus-dialog label {
+  color: #526175;
+  font-size: 13px;
+}
+.modbus-dialog input,
+.modbus-dialog select {
+  width: 100%;
+  height: 36px;
+  margin-top: 5px;
+  padding: 0 9px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #fff;
+  color: var(--text);
+}
+.modbus-dialog > footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 2px;
+}
+.modbus-dialog > footer button {
+  height: 34px;
+  padding: 0 15px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #fff;
+  color: #334155;
+}
+.modbus-dialog > footer button.primary {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+.modbus-dialog > footer button.danger {
+  border-color: #e11d48;
+  background: #e11d48;
+  color: #fff;
+}
+.modbus-settings-dialog {
+  width: min(460px, calc(100vw - 32px));
+}
+.modbus-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.modbus-settings-grid label.wide {
+  grid-column: 1 / -1;
+}
+.modbus-settings-grid .modbus-rate-input input {
+  margin-top: 6px;
+}
+.modbus-context-menu {
+  position: fixed;
+  z-index: 1000;
+  width: 178px;
+  display: flex;
+  flex-direction: column;
+  padding: 5px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 12px 30px #0f172a2b;
+}
+.modbus-context-menu button {
+  height: 31px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #334155;
+  text-align: left;
+}
+.modbus-context-menu button:hover:not(:disabled) {
+  background: #eef5ff;
+  color: #075aa4;
+}
+.modbus-context-menu button.danger {
+  color: #be123c;
+}
+.modbus-context-menu button.danger:hover:not(:disabled) {
+  background: #fff1f2;
+}
+.modbus-context-menu button:disabled {
+  color: #a8b1bf;
+}
+.modbus-context-menu i {
+  height: 1px;
+  margin: 4px 3px;
+  background: #e2e8f0;
+}
+@media (max-width: 1180px) {
+  .modbus-toolbar {
+    flex-wrap: wrap;
+  }
+  .modbus-title {
+    min-width: 100%;
+  }
+}
 @media (max-width: 1050px) {
   .workspace {
     grid-template-columns: auto minmax(0, 1fr);
@@ -3815,6 +4390,23 @@ footer > span:first-child {
 .send-port-select:focus {
   border-color: #79a7f8;
   box-shadow: 0 0 0 3px #2563eb12;
+}
+
+/* Keep dense title-bar controls visually secondary to their panel titles. */
+.interaction-head .head-tools button,
+.interaction-head .head-tools label,
+.interaction-head .head-tools span,
+.interaction-head .head-tools input,
+.interaction-head .head-tools select,
+.sender .card-head .head-tools button,
+.sender .card-head .head-tools label,
+.sender .card-head .head-tools span,
+.sender .card-head .head-tools input,
+.sender .card-head .head-tools select,
+.plot-toolbar > label,
+.plot-toolbar > label input,
+.plot-toolbar > button {
+  font-size: 13px;
 }
 .port-badge {
   max-width: 78px;
