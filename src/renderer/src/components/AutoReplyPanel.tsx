@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import type { Rule } from '../types'
+import type { Rule, TargetPortOption } from '../types'
 import { defaultAutoReplyProgram, upgradeAutoReplyProgram } from '../scripts/auto-reply-program'
 
 type Props = {
   rules: Rule[]
   setRules: (rules: Rule[]) => void
-  targetPorts: string[]
+  targetPorts: TargetPortOption[]
   onResetState: (ruleId: number, notify?: boolean) => void
 }
 type DraftParameter = { id: string }
@@ -73,6 +73,7 @@ export function AutoReplyPanel({
   const [draft, setDraft] = useState<Draft>(emptyDraft)
   const [error, setError] = useState('')
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
+  const [collapsedRuleIds, setCollapsedRuleIds] = useState<Set<number>>(new Set())
   const [menu, setMenu] = useState<{ x: number; y: number; ruleId: number | null } | null>(null)
   const modalRef = useRef<HTMLDivElement>(null)
 
@@ -132,6 +133,17 @@ export function AutoReplyPanel({
       )
     })
   }
+  const updateParameterMode = (
+    rule: Rule,
+    parameterId: string,
+    inputMode: 'ascii' | 'dec' | 'hex'
+  ): void => {
+    update(rule.id, {
+      parameters: rule.parameters.map((parameter) =>
+        parameter.id === parameterId ? { ...parameter, inputMode } : parameter
+      )
+    })
+  }
   const updateDraftParameter = (index: number, patch: Partial<DraftParameter>): void => {
     setDraft((current) => ({
       ...current,
@@ -142,7 +154,7 @@ export function AutoReplyPanel({
   }
   const openCreate = (): void => {
     setEditingRuleId(null)
-    setDraft({ ...emptyDraft(), targetPort: targetPorts[0] || '' })
+    setDraft({ ...emptyDraft(), targetPort: targetPorts[0]?.path || '' })
     setError('')
     setCreating(true)
   }
@@ -154,10 +166,10 @@ export function AutoReplyPanel({
       name: rule.name,
       pattern: rule.pattern,
       regex: rule.regex !== false,
-      receiveHex: Boolean(rule.receiveHex),
+      receiveHex: rule.hex,
       reply: rule.reply,
       hex: rule.hex,
-      targetPort: rule.targetPort || targetPorts[0] || '',
+      targetPort: rule.targetPort || targetPorts[0]?.path || '',
       parameterMode:
         rule.parameterMode === 'program' ||
         rule.parameters.some((parameter) => parameter.mode === 'program')
@@ -259,7 +271,11 @@ export function AutoReplyPanel({
           targetPort: draft.targetPort,
           parameterMode: draft.parameterMode,
           parameterProgram: draft.parameterProgram,
-          parameters: parameters.map((parameter) => ({ ...parameter, value: '' }))
+          parameters: parameters.map((parameter) => ({
+            ...parameter,
+            value: '',
+            inputMode: draft.hex ? ('hex' as const) : ('ascii' as const)
+          }))
         }
       ])
     } else {
@@ -281,7 +297,10 @@ export function AutoReplyPanel({
                 parameterProgram: draft.parameterProgram,
                 parameters: parameters.map((parameter) => ({
                   ...parameter,
-                  value: current.parameters.find((item) => item.id === parameter.id)?.value || ''
+                  value: current.parameters.find((item) => item.id === parameter.id)?.value || '',
+                  inputMode:
+                    current.parameters.find((item) => item.id === parameter.id)?.inputMode ||
+                    (draft.hex ? ('hex' as const) : ('ascii' as const))
                 }))
               }
             : rule
@@ -311,13 +330,29 @@ export function AutoReplyPanel({
         <span>{rules.filter((rule) => rule.enabled).length} 启用</span>
       </div>
       <div className="reply-list">
-        {rules.map((rule) => (
+        {rules.map((rule) => {
+          const isCollapsed = collapsedRuleIds.has(rule.id)
+          return (
           <section
-            className="reply-item"
+            className={`reply-item ${isCollapsed ? 'collapsed' : ''}`}
             key={rule.id}
             onContextMenu={(event) => openMenu(event, rule.id)}
           >
             <div className="reply-item-head">
+              <button
+                className="reply-collapse-button"
+                title={isCollapsed ? '展开规则' : '收起规则'}
+                onClick={() =>
+                  setCollapsedRuleIds((current) => {
+                    const next = new Set(current)
+                    if (next.has(rule.id)) next.delete(rule.id)
+                    else next.add(rule.id)
+                    return next
+                  })
+                }
+              >
+                {isCollapsed ? '▸' : '▾'}
+              </button>
               <label className="rule-enable">
                 <input
                   type="checkbox"
@@ -339,7 +374,7 @@ export function AutoReplyPanel({
                 </button>
               )}
             </div>
-            <dl>
+            {!isCollapsed && <><dl>
               <div>
                 <dt>
                   接收（{rule.receiveHex ? 'HEX' : 'ASCII'}
@@ -360,9 +395,38 @@ export function AutoReplyPanel({
                     <code>{`{{${parameter.id}}}`}</code>
                     <input
                       value={parameter.value}
+                      inputMode={parameter.inputMode === 'dec' ? 'numeric' : 'text'}
                       placeholder={`输入 ${parameter.id}`}
-                      onChange={(event) => updateParameter(rule, parameter.id, event.target.value)}
+                      onChange={(event) => {
+                        const inputMode = parameter.inputMode || (rule.hex ? 'hex' : 'ascii')
+                        const value = event.target.value
+                        if (
+                          inputMode === 'ascii' ||
+                          !value ||
+                          (inputMode === 'dec' ? /^\d+$/.test(value) : /^[0-9a-f]+$/i.test(value))
+                        )
+                          updateParameter(
+                            rule,
+                            parameter.id,
+                            inputMode === 'hex' ? value.toUpperCase() : value
+                          )
+                      }}
                     />
+                    <select
+                      aria-label={`${parameter.id} 参数格式`}
+                      value={parameter.inputMode || (rule.hex ? 'hex' : 'ascii')}
+                      onChange={(event) =>
+                        updateParameterMode(
+                          rule,
+                          parameter.id,
+                          event.target.value as 'ascii' | 'dec' | 'hex'
+                        )
+                      }
+                    >
+                      <option value="ascii">ASCII</option>
+                      <option value="dec">DEC</option>
+                      <option value="hex">HEX</option>
+                    </select>
                   </label>
                 ))}
               </div>
@@ -382,8 +446,10 @@ export function AutoReplyPanel({
               {isProgramRule(rule) ? '编程模式' : '参数模式'}
             </span>
             <span className="port-badge">{rule.targetPort || '未指定端口'}</span>
+            </>}
           </section>
-        ))}
+          )
+        })}
         {!rules.length && <div className="empty-rules">在空白处右键新建规则</div>}
       </div>
       {menu && (
@@ -467,17 +533,17 @@ export function AutoReplyPanel({
               <label>
                 接收内容
                 <div className="receive-format-row">
-                  <span>接收格式</span>
+                  <span>收发编码</span>
                   <div className="mini-segment">
                     <button
                       className={!draft.receiveHex ? 'active' : ''}
-                      onClick={() => setDraft({ ...draft, receiveHex: false })}
+                      onClick={() => setDraft({ ...draft, receiveHex: false, hex: false })}
                     >
                       ASCII
                     </button>
                     <button
                       className={draft.receiveHex ? 'active' : ''}
-                      onClick={() => setDraft({ ...draft, receiveHex: true })}
+                      onClick={() => setDraft({ ...draft, receiveHex: true, hex: true })}
                     >
                       HEX
                     </button>
@@ -523,26 +589,7 @@ export function AutoReplyPanel({
                 </small>
               </label>
               <label className="auto-reply-send-field">
-                <div className="auto-reply-send-head">
-                  <span>发送（发送指令）</span>
-                  <div className="auto-reply-send-encoding">
-                    <span>最终发送编码</span>
-                    <div className="mini-segment">
-                      <button
-                        className={!draft.hex ? 'active' : ''}
-                        onClick={() => setDraft({ ...draft, hex: false })}
-                      >
-                        ASCII
-                      </button>
-                      <button
-                        className={draft.hex ? 'active' : ''}
-                        onClick={() => setDraft({ ...draft, hex: true })}
-                      >
-                        HEX
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                <span>发送（发送指令）</span>
                 <textarea
                   className="auto-reply-send-input"
                   value={draft.reply}
@@ -561,7 +608,7 @@ export function AutoReplyPanel({
                 >
                   <option value="">选择目标端口</option>
                   {targetPorts.map((port) => (
-                    <option key={port}>{port}</option>
+                    <option key={port.path} value={port.path}>{port.name}（{port.path}）</option>
                   ))}
                 </select>
                 <small>仅匹配该端口收到的数据，并从该端口发送回复</small>

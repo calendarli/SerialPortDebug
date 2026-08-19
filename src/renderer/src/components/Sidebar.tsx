@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
-type Tab = 'serial' | 'commands' | 'rules' | 'scripts' | 'tests' | 'modbus' | 'about'
+type Tab = 'serial' | 'commands' | 'rules' | 'scripts' | 'modbus' | 'about'
 type Props = {
   activeTab: Tab
   commandCount: number
@@ -27,7 +27,7 @@ function initialWidth(): number {
 }
 
 export function Sidebar(props: Props): React.JSX.Element {
-  const fullPage = ['scripts', 'tests', 'modbus'].includes(props.activeTab)
+  const fullPage = ['scripts', 'modbus'].includes(props.activeTab)
   const [width, setWidth] = useState(initialWidth)
   const [resizing, setResizing] = useState(false)
   const dragStart = useRef({ x: 0, width: defaultWidth })
@@ -108,14 +108,6 @@ export function Sidebar(props: Props): React.JSX.Element {
           <span className="tab-icon">{'{ }'}</span>
           <span>脚本</span>
           {props.enabledScriptCount > 0 && <b>{props.enabledScriptCount}</b>}
-        </button>
-        <button
-          title="自动化测试"
-          className={props.activeTab === 'tests' ? 'active' : ''}
-          onClick={() => props.onTabChange('tests')}
-        >
-          <span className="tab-icon">✓</span>
-          <span>测试</span>
         </button>
         <button
           title="Modbus RTU"

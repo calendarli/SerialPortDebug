@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { DataBits, Parity, Port, SerialConfig, SerialFramingMode, StopBits } from '../types'
 
 type Props = {
@@ -20,6 +21,7 @@ const baudRates = [
 ]
 
 export function SerialConfigPanel(props: Props): React.JSX.Element {
+  const [collapsedIds, setCollapsedIds] = useState<Set<number>>(new Set())
   return (
     <div className="serial-config-content multi-serial-config">
       <div className="panel-title">
@@ -53,12 +55,34 @@ export function SerialConfigPanel(props: Props): React.JSX.Element {
         {props.configs.map((config, index) => {
           const isOpen = props.openedPorts.has(config.path)
           const disabled = isOpen || props.busy
+          const isCollapsed = collapsedIds.has(config.id)
           return (
-            <section className={`serial-profile ${isOpen ? 'open' : ''}`} key={config.id}>
+            <section className={`serial-profile ${isOpen ? 'open' : ''} ${isCollapsed ? 'collapsed' : ''}`} key={config.id}>
               <div className="serial-profile-head">
-                <strong>串口 {index + 1}</strong>
+                <button
+                  className="serial-collapse-button"
+                  title={isCollapsed ? '展开配置' : '收起配置'}
+                  onClick={() =>
+                    setCollapsedIds((current) => {
+                      const next = new Set(current)
+                      if (next.has(config.id)) next.delete(config.id)
+                      else next.add(config.id)
+                      return next
+                    })
+                  }
+                >
+                  {isCollapsed ? '▸' : '▾'}
+                </button>
+                <input
+                  className="serial-group-name"
+                  aria-label={`串口组 ${index + 1} 名称`}
+                  value={config.name}
+                  placeholder={`串口组 ${index + 1}`}
+                  onChange={(event) => props.onChange(config.id, { name: event.target.value })}
+                />
                 <span>{isOpen ? '已打开' : '未打开'}</span>
                 <button
+                  className="serial-remove-button"
                   title="删除配置"
                   disabled={disabled || props.configs.length === 1}
                   onClick={() => props.onRemove(config.id)}
@@ -66,6 +90,7 @@ export function SerialConfigPanel(props: Props): React.JSX.Element {
                   ×
                 </button>
               </div>
+              {!isCollapsed && <>
               <label>
                 端口
                 <select
@@ -281,6 +306,7 @@ export function SerialConfigPanel(props: Props): React.JSX.Element {
               >
                 {props.busy ? '正在处理…' : isOpen ? '关闭此串口' : '打开此串口'}
               </button>
+              </>}
             </section>
           )
         })}

@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState } from 'react'
 import { bytesToHex, convertSerialText } from '../serial-utils'
-import type { CommandGroup, CrcMode, SavedCommand } from '../types'
+import type { CommandGroup, CrcMode, SavedCommand, TargetPortOption } from '../types'
 
 type Props = {
   commands: SavedCommand[]
@@ -8,7 +8,7 @@ type Props = {
   groups: CommandGroup[]
   setGroups: (value: CommandGroup[]) => void
   connected: boolean
-  targetPorts: string[]
+  targetPorts: TargetPortOption[]
   onSend: (
     text: string,
     hex: boolean,
@@ -382,7 +382,7 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
   const openCommandCreator = (parentId: number | null): void => {
     setEditingCommandId(null)
     setTargetParentId(parentId)
-    setDraft({ ...emptyDraft(), targetPort: props.targetPorts[0] || '' })
+    setDraft({ ...emptyDraft(), targetPort: props.targetPorts[0]?.path || '' })
     setError('')
     setCreating(true)
     setMenu(null)
@@ -402,7 +402,7 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
       autoSendCount: command.autoSendCount || 0,
       crcEnabled: Boolean(command.crcMode),
       crcMode: command.crcMode || 'modbus',
-      targetPort: command.targetPort || props.targetPorts[0] || '',
+      targetPort: command.targetPort || props.targetPorts[0]?.path || '',
       parameters: command.parameters.map((parameter) => ({
         id: parameter.id,
         byteLength: parameter.byteLength || 1
@@ -771,29 +771,18 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
               }}
             />
           </label>
-          <div className="mini-segment parameter-modes">
-            <button
-              title="ASCII 文本"
-              className={parameter.inputMode === 'ascii' ? 'active' : ''}
-              onClick={() => switchParameterMode(command, parameter.id, 'ascii')}
-            >
-              ASCII
-            </button>
-            <button
-              title="十进制（Decimal）"
-              className={parameter.inputMode === 'dec' ? 'active' : ''}
-              onClick={() => switchParameterMode(command, parameter.id, 'dec')}
-            >
-              DEC
-            </button>
-            <button
-              title="十六进制（Hexadecimal）"
-              className={parameter.inputMode === 'hex' ? 'active' : ''}
-              onClick={() => switchParameterMode(command, parameter.id, 'hex')}
-            >
-              HEX
-            </button>
-          </div>
+          <select
+            className="parameter-mode-select"
+            aria-label={`${parameter.id} 参数格式`}
+            value={parameter.inputMode}
+            onChange={(event) =>
+              switchParameterMode(command, parameter.id, event.target.value as ParameterMode)
+            }
+          >
+            <option value="ascii">ASCII</option>
+            <option value="dec">DEC</option>
+            <option value="hex">HEX</option>
+          </select>
         </div>
       ))}
     </section>
@@ -958,7 +947,7 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
                   >
                     <option value="">不修改</option>
                     {props.targetPorts.map((port) => (
-                      <option key={port}>{port}</option>
+                      <option key={port.path} value={port.path}>{port.name}（{port.path}）</option>
                     ))}
                   </select>
                   <small>保存后同时修改当前组及所有子组内的指令</small>
@@ -1013,6 +1002,23 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
                   使用完整参数名字定位，例如 <code>{'{{目标速度}}'}</code>
                 </small>
               </label>
+              <div className="form-row">
+                <span>收发编码</span>
+                <div className="mini-segment">
+                  <button
+                    className={!draft.hex ? 'active' : ''}
+                    onClick={() => setDraft({ ...draft, hex: false })}
+                  >
+                    ASCII
+                  </button>
+                  <button
+                    className={draft.hex ? 'active' : ''}
+                    onClick={() => setDraft({ ...draft, hex: true })}
+                  >
+                    HEX
+                  </button>
+                </div>
+              </div>
               <label>
                 抬起发送指令（可选）
                 <textarea
@@ -1031,28 +1037,11 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
                 >
                   <option value="">选择目标端口</option>
                   {props.targetPorts.map((port) => (
-                    <option key={port}>{port}</option>
+                    <option key={port.path} value={port.path}>{port.name}（{port.path}）</option>
                   ))}
                 </select>
                 <small>发送时该端口必须处于已打开状态</small>
               </label>
-              <div className="form-row">
-                <span>最终发送编码</span>
-                <div className="mini-segment">
-                  <button
-                    className={!draft.hex ? 'active' : ''}
-                    onClick={() => setDraft({ ...draft, hex: false })}
-                  >
-                    ASCII
-                  </button>
-                  <button
-                    className={draft.hex ? 'active' : ''}
-                    onClick={() => setDraft({ ...draft, hex: true })}
-                  >
-                    HEX
-                  </button>
-                </div>
-              </div>
               <div className="command-crc-settings">
                 <label>
                   <input

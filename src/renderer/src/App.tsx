@@ -2,7 +2,6 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { ReceivePanel } from './components/ReceivePanel'
 import { PlotPanel } from './components/PlotPanel'
 import { ModbusPanel } from './components/ModbusPanel'
-import { TestPanel } from './components/TestPanel'
 import { AutoReplyPanel } from './components/AutoReplyPanel'
 import { AboutPanel } from './components/AboutPanel'
 import { CommandsPanel } from './components/CommandsPanel'
@@ -77,7 +76,16 @@ function loadRules(): Rule[] {
       parameters: Array.isArray(rule.parameters)
         ? rule.parameters
             .filter((item) => item?.id)
-            .map((item) => ({ id: item.id, value: item.value || '' }))
+            .map((item) => ({
+              id: item.id,
+              value: item.value || '',
+              inputMode:
+                item.inputMode === 'ascii' || item.inputMode === 'dec' || item.inputMode === 'hex'
+                  ? item.inputMode
+                  : rule.hex
+                    ? 'hex'
+                    : 'ascii'
+            }))
         : []
     }))
   } catch {
@@ -159,10 +167,35 @@ function loadCommandGroups(): CommandGroup[] {
   }
 }
 
+function convertRuleParameter(value: string, inputMode: 'ascii' | 'dec' | 'hex', hex: boolean): string {
+  if (!value) return ''
+  if (inputMode === 'ascii') return hex ? bytesToHex(new TextEncoder().encode(value)) : value
+  const clean = value.trim()
+  if (inputMode === 'hex' ? !/^[0-9a-f]+$/i.test(clean) : !/^\d+$/.test(clean))
+    throw new Error(
+      inputMode === 'hex'
+        ? 'HEX 参数只能包含 0-9、A-F'
+        : 'DEC 参数只能输入十进制数字 0-9'
+    )
+  const numericValue = BigInt(inputMode === 'hex' ? `0x${clean}` : clean)
+  if (!hex) return numericValue.toString(10)
+  const converted = numericValue.toString(16).toUpperCase()
+  return converted.padStart(converted.length + (converted.length % 2), '0')
+}
+
 function fillRuleParameters(rule: Rule, values?: Record<string, string>): string {
   return rule.parameters.reduce(
     (template, parameter) =>
-      template.replaceAll(`{{${parameter.id}}}`, values?.[parameter.id] ?? parameter.value),
+      template.replaceAll(
+        `{{${parameter.id}}}`,
+        rule.parameterMode === 'program'
+          ? values?.[parameter.id] ?? parameter.value
+          : convertRuleParameter(
+              values?.[parameter.id] ?? parameter.value,
+              parameter.inputMode || (rule.hex ? 'hex' : 'ascii'),
+              rule.hex
+            )
+      ),
     rule.reply
   )
 }
@@ -220,6 +253,7 @@ function formatFrequency(frequency: number): string {
     : Math.round(frequency).toLocaleString()
 }
 type PersistedSerialConfig = {
+  name?: string
   path: string
   baudRate: number
   dataBits: DataBits
@@ -290,6 +324,7 @@ function loadSerialConfigs(): SerialConfig[] {
       return saved.map((config, index) => ({
         ...config,
         id: Number(config.id) || Date.now() + index,
+        name: config.name?.trim() || `串口组 ${index + 1}`,
         framing: normalizeSerialFraming(config.framing),
         plotEnabled: config.plotEnabled !== false
       }))
@@ -297,7 +332,7 @@ function loadSerialConfigs(): SerialConfig[] {
   } catch {
     /* Migrate the previous single-port setting below. */
   }
-  return [{ id: Date.now(), ...loadSerialConfig() }]
+  return [{ id: Date.now(), name: '串口组 1', ...loadSerialConfig() }]
 }
 function loadPositiveSetting(key: string, fallback: number): number {
   const value = Number(localStorage.getItem(key))
@@ -352,6 +387,16 @@ function App(): React.JSX.Element {
     () => [...new Set(serialConfigs.map((config) => config.path).filter(Boolean))],
     [serialConfigs]
   )
+  const targetPortOptions = useMemo(
+    () =>
+      serialConfigs
+        .filter((config) => Boolean(config.path))
+        .map((config, index) => ({
+          path: config.path,
+          name: config.name?.trim() || `串口组 ${index + 1}`
+        })),
+    [serialConfigs]
+  )
   const plotPorts = useMemo(
     () =>
       serialConfigs
@@ -396,7 +441,7 @@ function App(): React.JSX.Element {
   const [commandGroups, setCommandGroups] = useState<CommandGroup[]>(loadCommandGroups)
   const [scripts, setScripts] = useState<UserScript[]>(() => ensureInitialScripts(loadScripts()))
   const [sideTab, setSideTab] = useState<
-    'serial' | 'commands' | 'rules' | 'scripts' | 'tests' | 'modbus' | 'about'
+    'serial' | 'commands' | 'rules' | 'scripts' | 'modbus' | 'about'
   >('serial')
   const [rxCommunicationCount, setRxCommunicationCount] = useState(0)
   const [txCommunicationCount, setTxCommunicationCount] = useState(0)
@@ -1045,6 +1090,7 @@ function App(): React.JSX.Element {
       ...current,
       {
         id: Date.now(),
+        name: `串口组 ${current.length + 1}`,
         path: unused?.path || '',
         baudRate: 115200,
         dataBits: 8,
@@ -1240,6 +1286,7 @@ function App(): React.JSX.Element {
           (project.serialConfigs as SerialConfig[]).map((config, index) => ({
             ...config,
             id: Number(config.id) || Date.now() + index,
+            name: config.name?.trim() || `串口组 ${index + 1}`,
             framing: normalizeSerialFraming(config.framing),
             plotEnabled: config.plotEnabled !== false
           }))
@@ -1316,7 +1363,7 @@ function App(): React.JSX.Element {
               groups={commandGroups}
               setGroups={setCommandGroups}
               connected={connected}
-              targetPorts={configuredPorts}
+              targetPorts={targetPortOptions}
               onSend={sendCommandData}
             />
           }
@@ -1324,7 +1371,7 @@ function App(): React.JSX.Element {
             <AutoReplyPanel
               rules={rules}
               setRules={setRules}
-              targetPorts={configuredPorts}
+              targetPorts={targetPortOptions}
               onResetState={resetAutoReplyState}
             />
           }
@@ -1336,12 +1383,6 @@ function App(): React.JSX.Element {
               <ScriptPanel scripts={scripts} setScripts={setScripts} ports={configuredPorts} />
             </Suspense>
           </section>
-        ) : sideTab === 'tests' ? (
-          <TestPanel
-            entries={interactionCache.entries}
-            ports={openedPortList}
-            onSend={(text, hex, port) => sendCommandData(text, hex, null, port)}
-          />
         ) : sideTab === 'modbus' ? (
           <ModbusPanel
             ports={openedPortList}

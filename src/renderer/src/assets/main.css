@@ -1040,6 +1040,9 @@ footer > span:first-child {
 }
 .plot-panel.embedded.collapsed .plot-toolbar {
   height: 58px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 .plot-panel.embedded .plot-legend {
   max-height: 35px;
@@ -1077,6 +1080,7 @@ footer > span:first-child {
   position: relative;
   height: auto;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 9px;
   padding: 12px 14px;
@@ -1086,15 +1090,19 @@ footer > span:first-child {
 }
 .plot-toolbar > div {
   display: flex;
+  flex: none;
   flex-direction: column;
   margin-right: auto;
+  white-space: nowrap;
 }
 .plot-toolbar strong {
+  white-space: nowrap;
   font-size: 18px;
 }
 .plot-toolbar span {
   color: var(--muted);
   font-size: 13px;
+  white-space: nowrap;
 }
 .plot-toolbar label {
   color: var(--muted);
@@ -1117,6 +1125,11 @@ footer > span:first-child {
 .plot-toolbar button:disabled {
   opacity: 0.45;
   cursor: default;
+}
+.plot-toolbar > label,
+.plot-toolbar > button {
+  flex: none;
+  white-space: nowrap;
 }
 .plot-color-settings,
 .plot-pid-settings {
@@ -1477,6 +1490,8 @@ footer > span:first-child {
   box-shadow: var(--shadow);
 }
 .plot-canvas svg {
+  position: relative;
+  z-index: 2;
   width: 100%;
   height: 100%;
   display: block;
@@ -1590,15 +1605,13 @@ footer > span:first-child {
   color: #42526a;
   font-size: 18px;
 }
-.protocol-panel,
-.test-panel {
+.protocol-panel {
   min-width: 0;
   min-height: 0;
   padding: 14px;
   overflow: auto;
 }
-.protocol-panel > header,
-.test-toolbar {
+.protocol-panel > header {
   display: flex;
   align-items: center;
   gap: 9px;
@@ -1607,18 +1620,15 @@ footer > span:first-child {
   border-radius: 12px;
   background: #fff;
 }
-.protocol-panel > header > div,
-.test-toolbar > div {
+.protocol-panel > header > div {
   display: flex;
   flex: 1;
   flex-direction: column;
 }
-.protocol-panel header strong,
-.test-toolbar strong {
+.protocol-panel header strong {
   font-size: 19px;
 }
-.protocol-panel header span,
-.test-toolbar span {
+.protocol-panel header span {
   color: var(--muted);
   font-size: 14px;
 }
@@ -1639,9 +1649,7 @@ footer > span:first-child {
   font-size: 15px;
 }
 .protocol-form input,
-.protocol-form select,
-.test-toolbar select,
-.test-step input {
+.protocol-form select {
   width: 100%;
   height: 35px;
   margin-top: 5px;
@@ -1681,81 +1689,6 @@ footer > span:first-child {
   text-align: center;
   color: var(--muted);
 }
-.test-toolbar select {
-  width: 150px;
-  margin: 0;
-}
-.test-toolbar button,
-.add-test-step {
-  height: 34px;
-  padding: 0 11px;
-  border: 1px solid #cfe0fb;
-  border-radius: 8px;
-  background: var(--primary-soft);
-  color: var(--primary);
-}
-.test-step-list {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-  margin-top: 12px;
-}
-.test-step {
-  display: grid;
-  grid-template-columns: 32px 130px 104px minmax(150px, 1fr) minmax(170px, 1fr) 125px 75px 58px;
-  align-items: center;
-  gap: 8px;
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: #fff;
-}
-.test-step > b {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--primary-soft);
-  color: var(--primary);
-}
-.test-step input {
-  margin: 0;
-}
-.test-step label {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--muted);
-  font-size: 13px;
-  white-space: nowrap;
-}
-.test-step label input {
-  width: 65px;
-}
-.test-status {
-  color: var(--muted);
-  text-align: center;
-  font-size: 13px;
-}
-.test-status.通过 {
-  color: #059669;
-}
-.test-status.超时,
-.test-status.发送失败,
-.test-status.正则错误 {
-  color: #dc2626;
-}
-.test-step .delete {
-  height: 30px;
-  border: 1px solid #fecaca;
-  border-radius: 7px;
-  background: #fff;
-  color: #dc2626;
-}
-.add-test-step {
-  margin-top: 10px;
-}
 @media (max-width: 1050px) {
   .workspace {
     grid-template-columns: auto minmax(0, 1fr);
@@ -1779,8 +1712,17 @@ footer > span:first-child {
 .reply-item-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 5px;
   margin-bottom: 9px;
+}
+.plot-curve-canvas {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 .reply-item-head > button {
   border: 0;
@@ -1790,6 +1732,7 @@ footer > span:first-child {
 }
 .reply-item-head > button.rule-state-reset {
   flex: none;
+  margin-left: auto;
   height: 27px;
   padding: 0 8px;
   border: 1px solid #cbdcf7;
@@ -1887,6 +1830,29 @@ footer > span:first-child {
   color: var(--text);
   outline: 0;
   font-size: 16px;
+}
+.reply-item-head > button.reply-collapse-button {
+  flex: none;
+  width: 22px;
+  padding: 0;
+  color: #64748b;
+  font-size: 16px;
+}
+.reply-item.collapsed .reply-item-head {
+  margin-bottom: 0;
+}
+.parameter-list label {
+  grid-template-columns: minmax(70px, auto) minmax(0, 1fr) 78px;
+}
+.parameter-list select,
+.parameter-mode-select {
+  height: 30px;
+  padding: 0 7px;
+  border: 1px solid #d8e1ec;
+  border-radius: 6px;
+  background: #fbfdff;
+  color: #344258;
+  outline: 0;
 }
 .program-output-list {
   display: flex;
@@ -2309,7 +2275,8 @@ footer > span:first-child {
     14px Consolas,
     monospace;
 }
-.command-parameter .mini-segment {
+.command-parameter .parameter-mode-select {
+  min-width: 78px;
   margin-bottom: 1px;
 }
 .command-send {
@@ -3666,25 +3633,59 @@ footer > span:first-child {
   font-size: 17px;
 }
 .serial-profile-head span {
+  flex: none;
   padding: 2px 6px;
   border-radius: 10px;
   background: #f1f5f9;
   color: #718096;
   font-size: 14px;
+  white-space: nowrap;
 }
 .serial-profile.open .serial-profile-head span {
   background: #e8f8f0;
   color: #078451;
 }
 .serial-profile-head button {
-  margin-left: auto;
   border: 0;
   background: transparent;
   color: #a0aec0;
   font-size: 19px;
 }
-.serial-profile-head button:not(:disabled):hover {
+.serial-profile-head .serial-remove-button {
+  flex: none;
+  margin-left: auto;
+}
+.serial-profile-head .serial-remove-button:not(:disabled):hover {
   color: #e11d48;
+}
+.serial-profile-head .serial-collapse-button {
+  flex: none;
+  width: 20px;
+  padding: 0;
+  color: #64748b;
+  font-size: 16px;
+}
+.serial-profile-head .serial-group-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 0;
+  height: 29px;
+  padding: 0 7px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #334155;
+  font-size: 17px;
+  font-weight: 650;
+  outline: 0;
+}
+.serial-profile-head .serial-group-name:hover,
+.serial-profile-head .serial-group-name:focus {
+  border-color: #cbd5e1;
+  background: #fff;
+}
+.serial-profile.collapsed .serial-profile-head {
+  margin-bottom: 0;
 }
 .multi-serial-config .panel-title > div {
   display: flex;

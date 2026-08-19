@@ -8,6 +8,7 @@ type PlotColors = { background: string; grid: string; series: string[] }
 type YRange = { min: number; max: number }
 type HoverValue = { name: string; color: string; value: number; y: number }
 type HoverState = { x: number; timestamp: number; values: HoverValue[] }
+type SeriesPoint = { timestamp: number; value: number }
 type PidSettings = {
   enabled: boolean
   channel: string
@@ -191,6 +192,30 @@ function formatAxisValue(value: number): string {
   return Number(value.toPrecision(5)).toLocaleString()
 }
 
+function downsampleMinMax(points: SeriesPoint[], bucketCount: number): SeriesPoint[] {
+  if (points.length <= bucketCount * 2 || bucketCount < 2) return points
+  const result: SeriesPoint[] = []
+  const size = points.length / bucketCount
+  for (let bucket = 0; bucket < bucketCount; bucket += 1) {
+    const from = Math.floor(bucket * size)
+    const to = Math.min(points.length, Math.floor((bucket + 1) * size))
+    if (from >= to) continue
+    let minIndex = from
+    let maxIndex = from
+    for (let index = from + 1; index < to; index += 1) {
+      if (points[index].value < points[minIndex].value) minIndex = index
+      if (points[index].value > points[maxIndex].value) maxIndex = index
+    }
+    if (minIndex <= maxIndex) {
+      result.push(points[minIndex])
+      if (maxIndex !== minIndex) result.push(points[maxIndex])
+    } else {
+      result.push(points[maxIndex], points[minIndex])
+    }
+  }
+  return result
+}
+
 export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): React.JSX.Element {
   const [paused, setPaused] = useState(false)
   const [frozenEntries, setFrozenEntries] = useState<InteractionEntry[]>([])
@@ -214,6 +239,15 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
   const [openPanel, setOpenPanel] = useState<'colors' | 'pid' | null>(null)
   const resizeStart = useRef({ y: 0, height: defaultPlotHeight, max: 520 })
   const plotCanvasRef = useRef<HTMLDivElement | null>(null)
+  const curveCanvasRef = useRef<HTMLCanvasElement | null>(null)
+  const lastDrawEndRef = useRef(0)
+  const lastDrawRangeRef = useRef<YRange | null>(null)
+  const sampleCacheRef = useRef<{
+    key: string
+    lastEntryId: number
+    samples: Sample[]
+  }>({ key: '', lastEntryId: 0, samples: [] })
+  const hoverFrameRef = useRef(0)
   const colorButtonRef = useRef<HTMLButtonElement | null>(null)
   const pidButtonRef = useRef<HTMLButtonElement | null>(null)
   const latestHeight = useRef(height)
@@ -232,15 +266,28 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
   }, [collapsed])
 
   const enabledPortSet = useMemo(() => new Set(enabledPorts), [enabledPorts])
-  const allSamples = useMemo(
-    () =>
-      (paused ? frozenEntries : entries)
-        .filter((entry) => entry.id > startId && enabledPortSet.has(entry.port))
-        .map((entry) => parseSample(entry, enabledPorts.length > 1))
-        .filter((item): item is Sample => Boolean(item))
-        .slice(-pointLimit),
-    [enabledPortSet, enabledPorts.length, entries, frozenEntries, paused, pointLimit, startId]
-  )
+  const allSamples = useMemo(() => {
+    const source = paused ? frozenEntries : entries
+    const key = `${paused ? 'paused' : 'live'}\u0000${startId}\u0000${pointLimit}\u0000${enabledPorts.join('\u0000')}`
+    const cache = sampleCacheRef.current
+    const latestEntryId = source.at(-1)?.id || 0
+    const reset = cache.key !== key || latestEntryId < cache.lastEntryId
+    const lastEntryId = reset ? 0 : cache.lastEntryId
+    const additions = source
+      .filter(
+        (entry) =>
+          entry.id > Math.max(startId, lastEntryId) && enabledPortSet.has(entry.port)
+      )
+      .map((entry) => parseSample(entry, enabledPorts.length > 1))
+      .filter((item): item is Sample => Boolean(item))
+    const oldestEntryId = source[0]?.id || 0
+    const retained = reset
+      ? []
+      : cache.samples.filter((sample) => sample.id >= oldestEntryId && sample.id > startId)
+    const samples = [...retained, ...additions].slice(-pointLimit)
+    sampleCacheRef.current = { key, lastEntryId: latestEntryId, samples }
+    return samples
+  }, [enabledPortSet, enabledPorts, entries, frozenEntries, paused, pointLimit, startId])
   const liveEndTime = allSamples.at(-1)?.timestamp ?? 0
   const endTime = viewEndTime ?? liveEndTime
   const startTime = endTime - xWindowMs
@@ -264,8 +311,17 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
       )
     )
     if (!values.length) return { min: -1, max: 1 }
-    const min = Math.min(...values)
-    const max = Math.max(...values)
+    let min: number
+    let max: number
+    if (values.length >= 40) {
+      const sorted = [...values].sort((left, right) => left - right)
+      const trimCount = Math.max(1, Math.floor(sorted.length * 0.01))
+      min = sorted[trimCount]
+      max = sorted[sorted.length - 1 - trimCount]
+    } else {
+      min = Math.min(...values)
+      max = Math.max(...values)
+    }
     const padding = (max - min || Math.max(Math.abs(max), 1)) * 0.1
     return { min: min - padding, max: max + padding }
   }, [activeChannelNames, visibleSamples])
@@ -297,16 +353,73 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
           max: values.length ? Math.max(...values) : 0,
           latest: values.at(-1) ?? 0,
           points,
-          polyline: points
-            .map(
-              (point) =>
-                `${timeToX(point.timestamp).toFixed(1)},${valueToY(point.value).toFixed(1)}`
-            )
-            .join(' ')
+          renderPoints: downsampleMinMax(points, Math.max(100, Math.floor(canvasWidth)))
         }
       }),
-    [activeChannelNames, channelNames, plotColors.series, timeToX, valueToY, visibleSamples]
+    [activeChannelNames, canvasWidth, channelNames, plotColors.series, visibleSamples]
   )
+
+  useEffect(() => {
+    const canvas = curveCanvasRef.current
+    const host = plotCanvasRef.current
+    if (!canvas || !host || collapsed || !series.length) return
+    const rect = host.getBoundingClientRect()
+    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    canvas.width = Math.max(1, Math.round(rect.width * dpr))
+    canvas.height = Math.max(1, Math.round(rect.height * dpr))
+    const context = canvas.getContext('2d')
+    if (!context) return
+    const previousEnd = lastDrawEndRef.current || endTime
+    const previousRange = lastDrawRangeRef.current || yRange
+    const duration = viewEndTime === null ? Math.min(160, Math.max(50, endTime - previousEnd)) : 0
+    const animationStart = performance.now()
+    let frame = 0
+    const draw = (now: number): void => {
+      const progress = duration ? Math.min(1, (now - animationStart) / duration) : 1
+      const eased = 1 - (1 - progress) ** 3
+      const drawEnd = previousEnd + (endTime - previousEnd) * eased
+      const drawRange = manualYRange
+        ? manualYRange
+        : {
+            min: previousRange.min + (yRange.min - previousRange.min) * eased,
+            max: previousRange.max + (yRange.max - previousRange.max) * eased
+          }
+      const drawSpan = Math.max(Number.EPSILON, drawRange.max - drawRange.min)
+      context.setTransform(dpr * (rect.width / 1000), 0, 0, dpr * (rect.height / 420), 0, 0)
+      context.clearRect(0, 0, 1000, 420)
+      context.save()
+      context.beginPath()
+      context.rect(plotLeft, plotTop, plotWidth, plotHeight)
+      context.clip()
+      context.lineWidth = 2.5 * (1000 / Math.max(rect.width, 1))
+      context.lineJoin = 'round'
+      context.lineCap = 'round'
+      for (const item of series) {
+        if (!item.renderPoints.length) continue
+        context.beginPath()
+        let drawing = false
+        item.renderPoints.forEach((point) => {
+          const x = plotLeft + ((point.timestamp - (drawEnd - xWindowMs)) / xWindowMs) * plotWidth
+          const y = plotBottom - ((point.value - drawRange.min) / drawSpan) * plotHeight
+          if (y < plotTop || y > plotBottom) {
+            drawing = false
+            return
+          }
+          if (!drawing) context.moveTo(x, y)
+          else context.lineTo(x, y)
+          drawing = true
+        })
+        context.strokeStyle = item.color
+        context.stroke()
+      }
+      context.restore()
+      lastDrawEndRef.current = drawEnd
+      lastDrawRangeRef.current = drawRange
+      if (progress < 1) frame = window.requestAnimationFrame(draw)
+    }
+    frame = window.requestAnimationFrame(draw)
+    return () => window.cancelAnimationFrame(frame)
+  }, [collapsed, endTime, manualYRange, series, viewEndTime, xWindowMs, yRange])
   const xTickCount = clamp(Math.floor(canvasWidth / 135) + 1, 6, 16)
   const xTicks = useMemo(
     () =>
@@ -669,25 +782,35 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
   const handlePlotHover = (event: React.PointerEvent<SVGRectElement>): void => {
     const rect = event.currentTarget.ownerSVGElement?.getBoundingClientRect()
     if (!rect || !series.length || !visibleSamples.length) return setHover(null)
-    const pointerX = clamp(((event.clientX - rect.left) / rect.width) * 1000, plotLeft, plotRight)
-    const pointerTime = startTime + ((pointerX - plotLeft) / plotWidth) * xWindowMs
-    const nearestSample = visibleSamples.reduce((best, sample) =>
-      Math.abs(sample.timestamp - pointerTime) < Math.abs(best.timestamp - pointerTime)
-        ? sample
-        : best
-    )
-    const timestamp = nearestSample.timestamp
-    const x = timeToX(timestamp)
-    const values = series.flatMap<HoverValue>((item) => {
-      if (!item.points.length) return []
-      const nearest = item.points.reduce((best, point) =>
-        Math.abs(point.timestamp - timestamp) < Math.abs(best.timestamp - timestamp) ? point : best
+    const clientX = event.clientX
+    window.cancelAnimationFrame(hoverFrameRef.current)
+    hoverFrameRef.current = window.requestAnimationFrame(() => {
+      const pointerX = clamp(((clientX - rect.left) / rect.width) * 1000, plotLeft, plotRight)
+      const pointerTime = startTime + ((pointerX - plotLeft) / plotWidth) * xWindowMs
+      const nearestSample = visibleSamples.reduce((best, sample) =>
+        Math.abs(sample.timestamp - pointerTime) < Math.abs(best.timestamp - pointerTime)
+          ? sample
+          : best
       )
-      return [
-        { name: item.name, color: item.color, value: nearest.value, y: valueToY(nearest.value) }
-      ]
+      const timestamp = nearestSample.timestamp
+      const x = timeToX(timestamp)
+      const values = series.flatMap<HoverValue>((item) => {
+        if (!item.points.length) return []
+        const nearest = item.points.reduce((best, point) =>
+          Math.abs(point.timestamp - timestamp) < Math.abs(best.timestamp - timestamp)
+            ? point
+            : best
+        )
+        return [
+          { name: item.name, color: item.color, value: nearest.value, y: valueToY(nearest.value) }
+        ]
+      })
+      setHover({ x, timestamp, values })
     })
-    setHover({ x, timestamp, values })
+  }
+  const clearPlotHover = (): void => {
+    window.cancelAnimationFrame(hoverFrameRef.current)
+    setHover(null)
   }
 
   return (
@@ -1101,6 +1224,8 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
           style={{ background: plotColors.background }}
         >
           {series.length ? (
+            <>
+            <canvas ref={curveCanvasRef} className="plot-curve-canvas" aria-hidden="true" />
             <svg viewBox="0 0 1000 420" preserveAspectRatio="none" aria-label="实时数据曲线">
               {xTicks.map((tick) => (
                 <g key={tick.timestamp}>
@@ -1140,17 +1265,6 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
                 y2={plotBottom}
                 className="plot-axis"
               />
-              {series.map((item) => (
-                <polyline
-                  key={item.name}
-                  points={item.polyline}
-                  fill="none"
-                  stroke={item.color}
-                  strokeWidth="2.5"
-                  vectorEffect="non-scaling-stroke"
-                  className="plot-series-line"
-                />
-              ))}
               {hover && (
                 <g className="plot-crosshair" pointerEvents="none">
                   <line x1={hover.x} y1={plotTop} x2={hover.x} y2={plotBottom} />
@@ -1164,7 +1278,7 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
                 fill="transparent"
                 className="plot-hover-area"
                 onPointerMove={handlePlotHover}
-                onPointerLeave={() => setHover(null)}
+                onPointerLeave={clearPlotHover}
               />
               <rect
                 x={plotLeft}
@@ -1193,6 +1307,7 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
                 onPointerCancel={finishYDrag}
               />
             </svg>
+            </>
           ) : (
             <div className="plot-empty">
               <strong>{enabledPorts.length ? '等待数值数据…' : '尚未启用曲线端口'}</strong>

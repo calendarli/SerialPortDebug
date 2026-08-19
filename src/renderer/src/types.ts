@@ -1,6 +1,7 @@
 export type Port = { path: string; manufacturer?: string }
 export type SerialConfig = {
   id: number
+  name: string
   path: string
   baudRate: number
   dataBits: DataBits
@@ -9,6 +10,8 @@ export type SerialConfig = {
   framing: SerialFraming
   plotEnabled: boolean
 }
+
+export type TargetPortOption = { path: string; name: string }
 
 export type SerialFramingMode = 'raw' | 'delimiter' | 'fixed' | 'header-footer' | 'idle'
 export type SerialFraming = {
@@ -30,7 +33,12 @@ export type Rule = {
   hex: boolean
   enabled: boolean
   targetPort?: string
-  parameters: Array<{ id: string; value: string; mode?: 'manual' | 'program' }>
+  parameters: Array<{
+    id: string
+    value: string
+    mode?: 'manual' | 'program'
+    inputMode?: 'ascii' | 'dec' | 'hex'
+  }>
   parameterMode?: 'parameters' | 'program'
   parameterProgram?: string
 }
