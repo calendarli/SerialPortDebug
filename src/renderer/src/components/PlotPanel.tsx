@@ -216,6 +216,18 @@ function downsampleMinMax(points: SeriesPoint[], bucketCount: number): SeriesPoi
   return result
 }
 
+function interpolateSeriesValue(points: SeriesPoint[], timestamp: number): number | null {
+  if (!points.length) return null
+  const nextIndex = points.findIndex((point) => point.timestamp >= timestamp)
+  if (nextIndex <= 0) return points[nextIndex < 0 ? points.length - 1 : 0].value
+  const previous = points[nextIndex - 1]
+  const next = points[nextIndex]
+  const duration = next.timestamp - previous.timestamp
+  if (duration <= 0) return next.value
+  const ratio = (timestamp - previous.timestamp) / duration
+  return previous.value + (next.value - previous.value) * ratio
+}
+
 export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): React.JSX.Element {
   const [paused, setPaused] = useState(false)
   const [frozenEntries, setFrozenEntries] = useState<InteractionEntry[]>([])
@@ -296,6 +308,15 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
       allSamples.filter((sample) => sample.timestamp >= startTime && sample.timestamp <= endTime),
     [allSamples, endTime, startTime]
   )
+  const drawableSamples = useMemo(() => {
+    if (!visibleSamples.length) return visibleSamples
+    const firstVisibleIndex = allSamples.indexOf(visibleSamples[0])
+    const lastVisibleIndex = allSamples.indexOf(visibleSamples[visibleSamples.length - 1])
+    return allSamples.slice(
+      Math.max(0, firstVisibleIndex - 1),
+      Math.min(allSamples.length, lastVisibleIndex + 2)
+    )
+  }, [allSamples, visibleSamples])
   const channelNames = useMemo(
     () => [...new Set(allSamples.flatMap((item) => Object.keys(item.values)))].slice(0, 8),
     [allSamples]
@@ -331,15 +352,16 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
     (value: number): number => plotBottom - ((value - yRange.min) / ySpan) * plotHeight,
     [yRange.min, ySpan]
   )
-  const timeToX = useCallback(
-    (timestamp: number): number => plotLeft + ((timestamp - startTime) / xWindowMs) * plotWidth,
-    [startTime, xWindowMs]
-  )
   const series = useMemo(
     () =>
       activeChannelNames.map((name) => {
         const colorIndex = channelNames.indexOf(name)
         const points = visibleSamples.flatMap((sample) =>
+          Number.isFinite(sample.values[name])
+            ? [{ timestamp: sample.timestamp, value: sample.values[name] }]
+            : []
+        )
+        const drawablePoints = drawableSamples.flatMap((sample) =>
           Number.isFinite(sample.values[name])
             ? [{ timestamp: sample.timestamp, value: sample.values[name] }]
             : []
@@ -352,11 +374,21 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
           min: values.length ? Math.min(...values) : 0,
           max: values.length ? Math.max(...values) : 0,
           latest: values.at(-1) ?? 0,
-          points,
-          renderPoints: downsampleMinMax(points, Math.max(100, Math.floor(canvasWidth)))
+          hoverPoints: drawablePoints,
+          renderPoints: downsampleMinMax(
+            drawablePoints,
+            Math.max(100, Math.floor(canvasWidth))
+          )
         }
       }),
-    [activeChannelNames, canvasWidth, channelNames, plotColors.series, visibleSamples]
+    [
+      activeChannelNames,
+      canvasWidth,
+      channelNames,
+      drawableSamples,
+      plotColors.series,
+      visibleSamples
+    ]
   )
 
   useEffect(() => {
@@ -399,14 +431,10 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
         context.beginPath()
         let drawing = false
         item.renderPoints.forEach((point) => {
-          const x = plotLeft + ((point.timestamp - (drawEnd - xWindowMs)) / xWindowMs) * plotWidth
-          const y = plotBottom - ((point.value - drawRange.min) / drawSpan) * plotHeight
-          if (y < plotTop || y > plotBottom) {
-            drawing = false
-            return
-          }
-          if (!drawing) context.moveTo(x, y)
-          else context.lineTo(x, y)
+           const x = plotLeft + ((point.timestamp - (drawEnd - xWindowMs)) / xWindowMs) * plotWidth
+           const y = plotBottom - ((point.value - drawRange.min) / drawSpan) * plotHeight
+           if (!drawing) context.moveTo(x, y)
+           else context.lineTo(x, y)
           drawing = true
         })
         context.strokeStyle = item.color
@@ -787,25 +815,14 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
     hoverFrameRef.current = window.requestAnimationFrame(() => {
       const pointerX = clamp(((clientX - rect.left) / rect.width) * 1000, plotLeft, plotRight)
       const pointerTime = startTime + ((pointerX - plotLeft) / plotWidth) * xWindowMs
-      const nearestSample = visibleSamples.reduce((best, sample) =>
-        Math.abs(sample.timestamp - pointerTime) < Math.abs(best.timestamp - pointerTime)
-          ? sample
-          : best
-      )
-      const timestamp = nearestSample.timestamp
-      const x = timeToX(timestamp)
       const values = series.flatMap<HoverValue>((item) => {
-        if (!item.points.length) return []
-        const nearest = item.points.reduce((best, point) =>
-          Math.abs(point.timestamp - timestamp) < Math.abs(best.timestamp - timestamp)
-            ? point
-            : best
-        )
+        const value = interpolateSeriesValue(item.hoverPoints, pointerTime)
+        if (value === null) return []
         return [
-          { name: item.name, color: item.color, value: nearest.value, y: valueToY(nearest.value) }
+          { name: item.name, color: item.color, value, y: valueToY(value) }
         ]
       })
-      setHover({ x, timestamp, values })
+      setHover({ x: pointerX, timestamp: pointerTime, values })
     })
   }
   const clearPlotHover = (): void => {
@@ -1360,7 +1377,8 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
                     style={{
                       left: `${(hover.x / 1000) * 100}%`,
                       top: `${(item.y / 420) * 100}%`,
-                      background: item.color
+                      background: item.color,
+                      borderColor: item.color
                     }}
                   />
                 ))}

@@ -1529,6 +1529,7 @@ footer > span:first-child {
 }
 .plot-axis-label-layer {
   position: absolute;
+  z-index: 4;
   inset: 0;
   overflow: hidden;
   color: #64748b;
@@ -1580,6 +1581,7 @@ footer > span:first-child {
 }
 .plot-hover-markers {
   position: absolute;
+  z-index: 4;
   inset: 0;
   pointer-events: none;
 }
@@ -1718,7 +1720,7 @@ footer > span:first-child {
 }
 .plot-curve-canvas {
   position: absolute;
-  z-index: 1;
+  z-index: 3;
   inset: 0;
   width: 100%;
   height: 100%;

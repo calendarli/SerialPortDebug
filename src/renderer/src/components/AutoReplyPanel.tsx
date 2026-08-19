@@ -39,6 +39,12 @@ function isProgramRule(rule: Rule | undefined): boolean {
   return rule?.parameterMode === 'program'
 }
 
+function parameterValuePlaceholder(mode: 'ascii' | 'dec' | 'hex'): string {
+  if (mode === 'ascii') return 'ASCII 文本'
+  if (mode === 'dec') return 'DEC 0 及以上'
+  return 'HEX 0-9、A-F（任意位）'
+}
+
 function extractPlaceholderIds(template: string): string[] {
   return [
     ...new Set(
@@ -396,7 +402,9 @@ export function AutoReplyPanel({
                     <input
                       value={parameter.value}
                       inputMode={parameter.inputMode === 'dec' ? 'numeric' : 'text'}
-                      placeholder={`输入 ${parameter.id}`}
+                      placeholder={parameterValuePlaceholder(
+                        parameter.inputMode || (rule.hex ? 'hex' : 'ascii')
+                      )}
                       onChange={(event) => {
                         const inputMode = parameter.inputMode || (rule.hex ? 'hex' : 'ascii')
                         const value = event.target.value

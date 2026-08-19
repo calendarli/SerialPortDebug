@@ -282,7 +282,7 @@ function loadSerialConfig(): PersistedSerialConfig {
     stopBits: 1,
     parity: 'none',
     framing: defaultSerialFraming,
-    plotEnabled: true
+    plotEnabled: false
   }
   try {
     const saved = JSON.parse(
@@ -310,7 +310,7 @@ function loadSerialConfig(): PersistedSerialConfig {
       stopBits,
       parity,
       framing: normalizeSerialFraming(saved.framing),
-      plotEnabled: saved.plotEnabled !== false
+      plotEnabled: saved.plotEnabled === true
     }
   } catch {
     return fallback
@@ -326,7 +326,7 @@ function loadSerialConfigs(): SerialConfig[] {
         id: Number(config.id) || Date.now() + index,
         name: config.name?.trim() || `串口组 ${index + 1}`,
         framing: normalizeSerialFraming(config.framing),
-        plotEnabled: config.plotEnabled !== false
+        plotEnabled: config.plotEnabled === true
       }))
     }
   } catch {
@@ -1097,7 +1097,7 @@ function App(): React.JSX.Element {
         stopBits: 1,
         parity: 'none',
         framing: { ...defaultSerialFraming },
-        plotEnabled: true
+        plotEnabled: false
       }
     ])
   }
@@ -1288,7 +1288,7 @@ function App(): React.JSX.Element {
             id: Number(config.id) || Date.now() + index,
             name: config.name?.trim() || `串口组 ${index + 1}`,
             framing: normalizeSerialFraming(config.framing),
-            plotEnabled: config.plotEnabled !== false
+            plotEnabled: config.plotEnabled === true
           }))
         )
       if (Array.isArray(project.rules)) setRules(project.rules as Rule[])
