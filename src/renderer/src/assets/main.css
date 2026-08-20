@@ -1048,6 +1048,10 @@ footer > span:first-child {
   max-height: 35px;
   overflow: auto;
 }
+.plot-panel.embedded:not(.collapsed) .plot-legend,
+.plot-panel.embedded:not(.collapsed) .plot-canvas {
+  margin-right: 116px;
+}
 .plot-panel-resizer {
   position: absolute;
   z-index: 8;
@@ -1094,6 +1098,32 @@ footer > span:first-child {
   flex-direction: column;
   margin-right: auto;
   white-space: nowrap;
+}
+.plot-toolbar > .plot-side-controls {
+  position: absolute;
+  z-index: 9;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 108px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 7px;
+  margin: 0;
+  white-space: normal;
+}
+.plot-side-controls > button {
+  width: 100%;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid #cfe0fb;
+  border-radius: 7px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  white-space: nowrap;
+}
+.plot-side-controls > button:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 .plot-toolbar strong {
   white-space: nowrap;

@@ -287,8 +287,7 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
     const lastEntryId = reset ? 0 : cache.lastEntryId
     const additions = source
       .filter(
-        (entry) =>
-          entry.id > Math.max(startId, lastEntryId) && enabledPortSet.has(entry.port)
+        (entry) => entry.id > Math.max(startId, lastEntryId) && enabledPortSet.has(entry.port)
       )
       .map((entry) => parseSample(entry, enabledPorts.length > 1))
       .filter((item): item is Sample => Boolean(item))
@@ -375,10 +374,7 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
           max: values.length ? Math.max(...values) : 0,
           latest: values.at(-1) ?? 0,
           hoverPoints: drawablePoints,
-          renderPoints: downsampleMinMax(
-            drawablePoints,
-            Math.max(100, Math.floor(canvasWidth))
-          )
+          renderPoints: downsampleMinMax(drawablePoints, Math.max(100, Math.floor(canvasWidth)))
         }
       }),
     [
@@ -431,10 +427,10 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
         context.beginPath()
         let drawing = false
         item.renderPoints.forEach((point) => {
-           const x = plotLeft + ((point.timestamp - (drawEnd - xWindowMs)) / xWindowMs) * plotWidth
-           const y = plotBottom - ((point.value - drawRange.min) / drawSpan) * plotHeight
-           if (!drawing) context.moveTo(x, y)
-           else context.lineTo(x, y)
+          const x = plotLeft + ((point.timestamp - (drawEnd - xWindowMs)) / xWindowMs) * plotWidth
+          const y = plotBottom - ((point.value - drawRange.min) / drawSpan) * plotHeight
+          if (!drawing) context.moveTo(x, y)
+          else context.lineTo(x, y)
           drawing = true
         })
         context.strokeStyle = item.color
@@ -818,9 +814,7 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
       const values = series.flatMap<HoverValue>((item) => {
         const value = interpolateSeriesValue(item.hoverPoints, pointerTime)
         if (value === null) return []
-        return [
-          { name: item.name, color: item.color, value, y: valueToY(value) }
-        ]
+        return [{ name: item.name, color: item.color, value, y: valueToY(value) }]
       })
       setHover({ x: pointerX, timestamp: pointerTime, values })
     })
@@ -858,335 +852,354 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
             }}
           />
         </label>
-        <button disabled={viewEndTime === null} onClick={() => setViewEndTime(null)}>
-          回到实时
-        </button>
-        <button disabled={manualYRange === null} onClick={() => setManualYRange(null)}>
-          Y 自动
-        </button>
-        <button
-          onClick={() => {
-            if (!paused) setFrozenEntries(entries)
-            setPaused((value) => !value)
-          }}
-        >
-          {paused ? '继续绘图' : '暂停绘图'}
-        </button>
-        <button onClick={() => setStartId(entries.at(-1)?.id || 0)}>清空曲线</button>
-        <button
-          ref={colorButtonRef}
-          className={openPanel === 'colors' ? 'active' : ''}
-          aria-expanded={openPanel === 'colors'}
-          onClick={() => setOpenPanel((current) => (current === 'colors' ? null : 'colors'))}
-        >
-          配色
-        </button>
-        <FloatingPanel
-          anchorRef={colorButtonRef}
-          open={openPanel === 'colors'}
-          onClose={closeFloatingPanel}
-        >
-          <div className="plot-color-popover">
-            <strong>实时曲线配色</strong>
-            <div className="plot-color-grid">
-              <label>
-                背景
-                <input
-                  type="color"
-                  value={plotColors.background}
-                  onChange={(event) =>
-                    changePlotColors({ ...plotColors, background: event.target.value })
-                  }
-                />
-              </label>
-              <label>
-                网格
-                <input
-                  type="color"
-                  value={plotColors.grid}
-                  onChange={(event) =>
-                    changePlotColors({ ...plotColors, grid: event.target.value })
-                  }
-                />
-              </label>
-              {plotColors.series.map((color, index) => (
-                <label key={index}>
-                  曲线 {index + 1}
-                  <input
-                    type="color"
-                    value={color}
-                    onChange={(event) => changeSeriesColor(index, event.target.value)}
-                  />
-                </label>
-              ))}
-            </div>
-            <button
-              onClick={() =>
-                changePlotColors({ ...defaultPlotColors, series: [...defaultSeriesColors] })
-              }
-            >
-              恢复默认配色
+        {!collapsed && (
+          <div className="plot-side-controls">
+            <button disabled={viewEndTime === null} onClick={() => setViewEndTime(null)}>
+              回到实时
             </button>
-          </div>
-        </FloatingPanel>
-        <button
-          ref={pidButtonRef}
-          className={openPanel === 'pid' ? 'active' : ''}
-          aria-expanded={openPanel === 'pid'}
-          onClick={() => setOpenPanel((current) => (current === 'pid' ? null : 'pid'))}
-        >
-          PID 调参
-        </button>
-        <FloatingPanel
-          anchorRef={pidButtonRef}
-          open={openPanel === 'pid'}
-          onClose={closeFloatingPanel}
-        >
-          <div className="plot-pid-popover">
-            <div className="plot-pid-title">
-              <strong>PID 实时调参建议</strong>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={pidSettings.enabled}
-                  onChange={(event) => updatePidSettings({ enabled: event.target.checked })}
-                />
-                启用
-              </label>
-            </div>
-            <div className="plot-pid-grid">
-              <label>
-                反馈通道
-                <select
-                  disabled={!pidSettings.enabled || !channelNames.length}
-                  value={pidChannel}
-                  onChange={(event) => updatePidSettings({ channel: event.target.value })}
-                >
-                  {!channelNames.length && <option value="">暂无通道</option>}
-                  {channelNames.map((name) => (
-                    <option key={name}>{name}</option>
+            <button disabled={manualYRange === null} onClick={() => setManualYRange(null)}>
+              Y 自动
+            </button>
+            <button
+              onClick={() => {
+                if (!paused) setFrozenEntries(entries)
+                setPaused((value) => !value)
+              }}
+            >
+              {paused ? '继续绘图' : '暂停绘图'}
+            </button>
+            <button onClick={() => setStartId(entries.at(-1)?.id || 0)}>清空曲线</button>
+            <button
+              ref={colorButtonRef}
+              className={openPanel === 'colors' ? 'active' : ''}
+              aria-expanded={openPanel === 'colors'}
+              onClick={() => setOpenPanel((current) => (current === 'colors' ? null : 'colors'))}
+            >
+              配色
+            </button>
+            <FloatingPanel
+              anchorRef={colorButtonRef}
+              open={openPanel === 'colors'}
+              onClose={closeFloatingPanel}
+            >
+              <div className="plot-color-popover">
+                <strong>实时曲线配色</strong>
+                <div className="plot-color-grid">
+                  <label>
+                    背景
+                    <input
+                      type="color"
+                      value={plotColors.background}
+                      onChange={(event) =>
+                        changePlotColors({ ...plotColors, background: event.target.value })
+                      }
+                    />
+                  </label>
+                  <label>
+                    网格
+                    <input
+                      type="color"
+                      value={plotColors.grid}
+                      onChange={(event) =>
+                        changePlotColors({ ...plotColors, grid: event.target.value })
+                      }
+                    />
+                  </label>
+                  {plotColors.series.map((color, index) => (
+                    <label key={index}>
+                      曲线 {index + 1}
+                      <input
+                        type="color"
+                        value={color}
+                        onChange={(event) => changeSeriesColor(index, event.target.value)}
+                      />
+                    </label>
                   ))}
-                </select>
-              </label>
-              <label>
-                目标值
-                <input
-                  type="number"
-                  step="any"
-                  disabled={!pidSettings.enabled}
-                  value={pidSettings.target}
-                  onChange={(event) => updatePidSettings({ target: Number(event.target.value) })}
-                />
-              </label>
-              {(['kp', 'ki', 'kd'] as const).map((key) => (
-                <label key={key}>
-                  当前 {key.slice(1).toUpperCase()}
-                  <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    disabled={!pidSettings.enabled}
-                    value={pidSettings[key]}
-                    onChange={(event) =>
-                      updatePidSettings({ [key]: Math.max(0, Number(event.target.value) || 0) })
-                    }
-                  />
-                </label>
-              ))}
-              <label>
-                分析窗口
-                <span className="plot-pid-window-input">
-                  <input
-                    type="number"
-                    min="1"
-                    max="60"
-                    disabled={!pidSettings.enabled}
-                    value={pidSettings.windowSeconds}
-                    onChange={(event) =>
-                      updatePidSettings({
-                        windowSeconds: clamp(Number(event.target.value) || 1, 1, 60)
-                      })
-                    }
-                  />
-                  秒
-                </span>
-              </label>
-              <label>
-                控制方向
-                <select
-                  disabled={!pidSettings.enabled}
-                  value={pidSettings.direction}
-                  onChange={(event) =>
-                    updatePidSettings({
-                      direction: event.target.value as PidSettings['direction']
-                    })
+                </div>
+                <button
+                  onClick={() =>
+                    changePlotColors({ ...defaultPlotColors, series: [...defaultSeriesColors] })
                   }
                 >
-                  <option value="direct">正向（误差增大→输出增大）</option>
-                  <option value="reverse">反向（误差增大→输出减小）</option>
-                </select>
-              </label>
-              <label>
-                误差死区
-                <input
-                  type="number"
-                  min="0"
-                  step="any"
-                  disabled={!pidSettings.enabled}
-                  value={pidSettings.deadband}
-                  onChange={(event) =>
-                    updatePidSettings({ deadband: Math.max(0, Number(event.target.value) || 0) })
-                  }
-                />
-              </label>
-              <label>
-                输出下限
-                <input
-                  type="number"
-                  step="any"
-                  disabled={!pidSettings.enabled}
-                  value={pidSettings.outputMin}
-                  onChange={(event) => updatePidSettings({ outputMin: Number(event.target.value) })}
-                />
-              </label>
-              <label>
-                输出上限
-                <input
-                  type="number"
-                  step="any"
-                  disabled={!pidSettings.enabled}
-                  value={pidSettings.outputMax}
-                  onChange={(event) => updatePidSettings({ outputMax: Number(event.target.value) })}
-                />
-              </label>
-              <label>
-                积分限幅
-                <input
-                  type="number"
-                  min="0"
-                  step="any"
-                  disabled={!pidSettings.enabled}
-                  value={pidSettings.integralLimit}
-                  onChange={(event) =>
-                    updatePidSettings({
-                      integralLimit: Math.max(0, Number(event.target.value) || 0)
-                    })
-                  }
-                />
-              </label>
-              <label>
-                D 低通截止频率
-                <span className="plot-pid-window-input">
-                  <input
-                    type="number"
-                    min="0.01"
-                    max="1000"
-                    step="any"
-                    disabled={!pidSettings.enabled}
-                    value={pidSettings.derivativeFilterHz}
-                    onChange={(event) =>
-                      updatePidSettings({
-                        derivativeFilterHz: clamp(Number(event.target.value) || 0.01, 0.01, 1000)
-                      })
-                    }
-                  />
-                  Hz
-                </span>
-              </label>
-              <label className="plot-pid-check-option">
-                <input
-                  type="checkbox"
-                  disabled={!pidSettings.enabled}
-                  checked={pidSettings.antiWindup}
-                  onChange={(event) => updatePidSettings({ antiWindup: event.target.checked })}
-                />
-                输出饱和时停止同向积分
-              </label>
-            </div>
-            {!pidSettings.enabled ? (
-              <div className="plot-pid-empty">
-                启用后将计算控制增量、辨识阶跃响应并给出 P/I/D 增减建议
+                  恢复默认配色
+                </button>
               </div>
-            ) : !pidAnalysis?.ready ? (
-              <div className="plot-pid-empty">{pidAnalysis?.message || '等待实时数据'}</div>
-            ) : (
-              <div className="plot-pid-result">
-                <div className="plot-pid-metrics">
-                  <span>实时值 {formatAxisValue(pidAnalysis.current)}</span>
-                  <span>误差 {formatAxisValue(pidAnalysis.error)}</span>
-                  <span>样本 {pidAnalysis.sampleCount}</span>
-                  <span>周期 {pidAnalysis.samplePeriodMs.toFixed(2)} ms</span>
-                  <span>抖动 {(pidAnalysis.sampleJitter * 100).toFixed(1)}%</span>
+            </FloatingPanel>
+            <button
+              ref={pidButtonRef}
+              className={openPanel === 'pid' ? 'active' : ''}
+              aria-expanded={openPanel === 'pid'}
+              onClick={() => setOpenPanel((current) => (current === 'pid' ? null : 'pid'))}
+            >
+              PID 调参
+            </button>
+            <FloatingPanel
+              anchorRef={pidButtonRef}
+              open={openPanel === 'pid'}
+              onClose={closeFloatingPanel}
+            >
+              <div className="plot-pid-popover">
+                <div className="plot-pid-title">
+                  <strong>PID 实时调参建议</strong>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={pidSettings.enabled}
+                      onChange={(event) => updatePidSettings({ enabled: event.target.checked })}
+                    />
+                    启用
+                  </label>
                 </div>
-                <div className="plot-pid-control-output">
-                  <div>
-                    <small>建议控制增量</small>
-                    <strong>{formatAxisValue(pidAnalysis.controlOutput)}</strong>
-                  </div>
-                  <span>P {formatAxisValue(pidAnalysis.pTerm)}</span>
-                  <span>I {formatAxisValue(pidAnalysis.iTerm)}</span>
-                  <span>D {formatAxisValue(pidAnalysis.dTerm)}</span>
-                  {pidAnalysis.antiWindupActive && <b>抗饱和已介入</b>}
-                </div>
-                <div className="plot-pid-identification">
-                  <strong>
-                    阶跃辨识可信度
-                    <b
-                      className={
-                        pidAnalysis.identificationConfidence >= 75
-                          ? 'high'
-                          : pidAnalysis.identificationConfidence >= 50
-                            ? 'medium'
-                            : 'low'
+                <div className="plot-pid-grid">
+                  <label>
+                    反馈通道
+                    <select
+                      disabled={!pidSettings.enabled || !channelNames.length}
+                      value={pidChannel}
+                      onChange={(event) => updatePidSettings({ channel: event.target.value })}
+                    >
+                      {!channelNames.length && <option value="">暂无通道</option>}
+                      {channelNames.map((name) => (
+                        <option key={name}>{name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    目标值
+                    <input
+                      type="number"
+                      step="any"
+                      disabled={!pidSettings.enabled}
+                      value={pidSettings.target}
+                      onChange={(event) =>
+                        updatePidSettings({ target: Number(event.target.value) })
+                      }
+                    />
+                  </label>
+                  {(['kp', 'ki', 'kd'] as const).map((key) => (
+                    <label key={key}>
+                      当前 {key.slice(1).toUpperCase()}
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        disabled={!pidSettings.enabled}
+                        value={pidSettings[key]}
+                        onChange={(event) =>
+                          updatePidSettings({ [key]: Math.max(0, Number(event.target.value) || 0) })
+                        }
+                      />
+                    </label>
+                  ))}
+                  <label>
+                    分析窗口
+                    <span className="plot-pid-window-input">
+                      <input
+                        type="number"
+                        min="1"
+                        max="60"
+                        disabled={!pidSettings.enabled}
+                        value={pidSettings.windowSeconds}
+                        onChange={(event) =>
+                          updatePidSettings({
+                            windowSeconds: clamp(Number(event.target.value) || 1, 1, 60)
+                          })
+                        }
+                      />
+                      秒
+                    </span>
+                  </label>
+                  <label>
+                    控制方向
+                    <select
+                      disabled={!pidSettings.enabled}
+                      value={pidSettings.direction}
+                      onChange={(event) =>
+                        updatePidSettings({
+                          direction: event.target.value as PidSettings['direction']
+                        })
                       }
                     >
-                      {pidAnalysis.identificationConfidence}%
-                    </b>
-                  </strong>
-                  <span>
-                    上升时间{' '}
-                    {pidAnalysis.riseTimeMs === null
-                      ? '未识别'
-                      : `${pidAnalysis.riseTimeMs.toFixed(1)} ms`}
-                  </span>
-                  <span>
-                    稳定时间{' '}
-                    {pidAnalysis.settlingTimeMs === null
-                      ? '未稳定'
-                      : `${pidAnalysis.settlingTimeMs.toFixed(1)} ms`}
-                  </span>
-                  <span>超调 {(pidAnalysis.overshootRatio * 100).toFixed(1)}%</span>
+                      <option value="direct">正向（误差增大→输出增大）</option>
+                      <option value="reverse">反向（误差增大→输出减小）</option>
+                    </select>
+                  </label>
+                  <label>
+                    误差死区
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      disabled={!pidSettings.enabled}
+                      value={pidSettings.deadband}
+                      onChange={(event) =>
+                        updatePidSettings({
+                          deadband: Math.max(0, Number(event.target.value) || 0)
+                        })
+                      }
+                    />
+                  </label>
+                  <label>
+                    输出下限
+                    <input
+                      type="number"
+                      step="any"
+                      disabled={!pidSettings.enabled}
+                      value={pidSettings.outputMin}
+                      onChange={(event) =>
+                        updatePidSettings({ outputMin: Number(event.target.value) })
+                      }
+                    />
+                  </label>
+                  <label>
+                    输出上限
+                    <input
+                      type="number"
+                      step="any"
+                      disabled={!pidSettings.enabled}
+                      value={pidSettings.outputMax}
+                      onChange={(event) =>
+                        updatePidSettings({ outputMax: Number(event.target.value) })
+                      }
+                    />
+                  </label>
+                  <label>
+                    积分限幅
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      disabled={!pidSettings.enabled}
+                      value={pidSettings.integralLimit}
+                      onChange={(event) =>
+                        updatePidSettings({
+                          integralLimit: Math.max(0, Number(event.target.value) || 0)
+                        })
+                      }
+                    />
+                  </label>
+                  <label>
+                    D 低通截止频率
+                    <span className="plot-pid-window-input">
+                      <input
+                        type="number"
+                        min="0.01"
+                        max="1000"
+                        step="any"
+                        disabled={!pidSettings.enabled}
+                        value={pidSettings.derivativeFilterHz}
+                        onChange={(event) =>
+                          updatePidSettings({
+                            derivativeFilterHz: clamp(
+                              Number(event.target.value) || 0.01,
+                              0.01,
+                              1000
+                            )
+                          })
+                        }
+                      />
+                      Hz
+                    </span>
+                  </label>
+                  <label className="plot-pid-check-option">
+                    <input
+                      type="checkbox"
+                      disabled={!pidSettings.enabled}
+                      checked={pidSettings.antiWindup}
+                      onChange={(event) => updatePidSettings({ antiWindup: event.target.checked })}
+                    />
+                    输出饱和时停止同向积分
+                  </label>
                 </div>
-                <div className="plot-pid-recommendations">
-                  {pidAnalysis.recommendations.map((item) => (
-                    <div key={item.name}>
-                      <strong>{item.name}</strong>
-                      <span
-                        className={item.delta > 0 ? 'increase' : item.delta < 0 ? 'decrease' : ''}
-                      >
-                        {item.delta > 0 ? '+' : ''}
-                        {formatAxisValue(item.delta)}
-                      </span>
-                      <span>建议 {formatAxisValue(item.next)}</span>
+                {!pidSettings.enabled ? (
+                  <div className="plot-pid-empty">
+                    启用后将计算控制增量、辨识阶跃响应并给出 P/I/D 增减建议
+                  </div>
+                ) : !pidAnalysis?.ready ? (
+                  <div className="plot-pid-empty">{pidAnalysis?.message || '等待实时数据'}</div>
+                ) : (
+                  <div className="plot-pid-result">
+                    <div className="plot-pid-metrics">
+                      <span>实时值 {formatAxisValue(pidAnalysis.current)}</span>
+                      <span>误差 {formatAxisValue(pidAnalysis.error)}</span>
+                      <span>样本 {pidAnalysis.sampleCount}</span>
+                      <span>周期 {pidAnalysis.samplePeriodMs.toFixed(2)} ms</span>
+                      <span>抖动 {(pidAnalysis.sampleJitter * 100).toFixed(1)}%</span>
                     </div>
-                  ))}
-                </div>
-                {pidAnalysis.reasons.map((reason) => (
-                  <p key={reason}>{reason}</p>
-                ))}
+                    <div className="plot-pid-control-output">
+                      <div>
+                        <small>建议控制增量</small>
+                        <strong>{formatAxisValue(pidAnalysis.controlOutput)}</strong>
+                      </div>
+                      <span>P {formatAxisValue(pidAnalysis.pTerm)}</span>
+                      <span>I {formatAxisValue(pidAnalysis.iTerm)}</span>
+                      <span>D {formatAxisValue(pidAnalysis.dTerm)}</span>
+                      {pidAnalysis.antiWindupActive && <b>抗饱和已介入</b>}
+                    </div>
+                    <div className="plot-pid-identification">
+                      <strong>
+                        阶跃辨识可信度
+                        <b
+                          className={
+                            pidAnalysis.identificationConfidence >= 75
+                              ? 'high'
+                              : pidAnalysis.identificationConfidence >= 50
+                                ? 'medium'
+                                : 'low'
+                          }
+                        >
+                          {pidAnalysis.identificationConfidence}%
+                        </b>
+                      </strong>
+                      <span>
+                        上升时间{' '}
+                        {pidAnalysis.riseTimeMs === null
+                          ? '未识别'
+                          : `${pidAnalysis.riseTimeMs.toFixed(1)} ms`}
+                      </span>
+                      <span>
+                        稳定时间{' '}
+                        {pidAnalysis.settlingTimeMs === null
+                          ? '未稳定'
+                          : `${pidAnalysis.settlingTimeMs.toFixed(1)} ms`}
+                      </span>
+                      <span>超调 {(pidAnalysis.overshootRatio * 100).toFixed(1)}%</span>
+                    </div>
+                    <div className="plot-pid-recommendations">
+                      {pidAnalysis.recommendations.map((item) => (
+                        <div key={item.name}>
+                          <strong>{item.name}</strong>
+                          <span
+                            className={
+                              item.delta > 0 ? 'increase' : item.delta < 0 ? 'decrease' : ''
+                            }
+                          >
+                            {item.delta > 0 ? '+' : ''}
+                            {formatAxisValue(item.delta)}
+                          </span>
+                          <span>建议 {formatAxisValue(item.next)}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {pidAnalysis.reasons.map((reason) => (
+                      <p key={reason}>{reason}</p>
+                    ))}
+                  </div>
+                )}
+                <small>
+                  使用真实采样 Δt
+                  进行积分和微分补偿。建议不会自动写入设备，请先确认方向和输出范围，并在低风险工况下逐项小幅验证。
+                </small>
               </div>
-            )}
-            <small>
-              使用真实采样 Δt
-              进行积分和微分补偿。建议不会自动写入设备，请先确认方向和输出范围，并在低风险工况下逐项小幅验证。
-            </small>
+            </FloatingPanel>
           </div>
-        </FloatingPanel>
+        )}
         {embedded && (
           <button
             title={collapsed ? '展开实时曲线' : '收起实时曲线'}
             onClick={() => {
               const next = !collapsed
+              if (next) setOpenPanel(null)
               setCollapsed(next)
               localStorage.setItem('serialflow.plotCollapsed', String(next))
             }}
@@ -1242,88 +1255,88 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
         >
           {series.length ? (
             <>
-            <canvas ref={curveCanvasRef} className="plot-curve-canvas" aria-hidden="true" />
-            <svg viewBox="0 0 1000 420" preserveAspectRatio="none" aria-label="实时数据曲线">
-              {xTicks.map((tick) => (
-                <g key={tick.timestamp}>
-                  <line
-                    x1={tick.x}
-                    y1={plotTop}
-                    x2={tick.x}
-                    y2={plotBottom}
-                    className="plot-grid-line"
-                    style={{ stroke: plotColors.grid }}
-                  />
-                </g>
-              ))}
-              {yTicks.map((tick) => (
-                <g key={tick.y}>
-                  <line
-                    x1={plotLeft}
-                    y1={tick.y}
-                    x2={plotRight}
-                    y2={tick.y}
-                    className="plot-grid-line"
-                    style={{ stroke: plotColors.grid }}
-                  />
-                </g>
-              ))}
-              <line
-                x1={plotLeft}
-                y1={plotBottom}
-                x2={plotRight}
-                y2={plotBottom}
-                className="plot-axis"
-              />
-              <line
-                x1={plotRight}
-                y1={plotTop}
-                x2={plotRight}
-                y2={plotBottom}
-                className="plot-axis"
-              />
-              {hover && (
-                <g className="plot-crosshair" pointerEvents="none">
-                  <line x1={hover.x} y1={plotTop} x2={hover.x} y2={plotBottom} />
-                </g>
-              )}
-              <rect
-                x={plotLeft}
-                y={plotTop}
-                width={plotWidth}
-                height={plotHeight}
-                fill="transparent"
-                className="plot-hover-area"
-                onPointerMove={handlePlotHover}
-                onPointerLeave={clearPlotHover}
-              />
-              <rect
-                x={plotLeft}
-                y={plotBottom - 10}
-                width={plotWidth}
-                height="50"
-                fill="transparent"
-                className="plot-x-axis-hit"
-                onWheel={handleXWheel}
-                onPointerDown={beginXDrag}
-                onPointerMove={moveXDrag}
-                onPointerUp={finishXDrag}
-                onPointerCancel={finishXDrag}
-              />
-              <rect
-                x={plotRight - 10}
-                y={plotTop}
-                width="90"
-                height={plotHeight}
-                fill="transparent"
-                className="plot-y-axis-hit"
-                onWheel={handleYWheel}
-                onPointerDown={beginYDrag}
-                onPointerMove={moveYDrag}
-                onPointerUp={finishYDrag}
-                onPointerCancel={finishYDrag}
-              />
-            </svg>
+              <canvas ref={curveCanvasRef} className="plot-curve-canvas" aria-hidden="true" />
+              <svg viewBox="0 0 1000 420" preserveAspectRatio="none" aria-label="实时数据曲线">
+                {xTicks.map((tick) => (
+                  <g key={tick.timestamp}>
+                    <line
+                      x1={tick.x}
+                      y1={plotTop}
+                      x2={tick.x}
+                      y2={plotBottom}
+                      className="plot-grid-line"
+                      style={{ stroke: plotColors.grid }}
+                    />
+                  </g>
+                ))}
+                {yTicks.map((tick) => (
+                  <g key={tick.y}>
+                    <line
+                      x1={plotLeft}
+                      y1={tick.y}
+                      x2={plotRight}
+                      y2={tick.y}
+                      className="plot-grid-line"
+                      style={{ stroke: plotColors.grid }}
+                    />
+                  </g>
+                ))}
+                <line
+                  x1={plotLeft}
+                  y1={plotBottom}
+                  x2={plotRight}
+                  y2={plotBottom}
+                  className="plot-axis"
+                />
+                <line
+                  x1={plotRight}
+                  y1={plotTop}
+                  x2={plotRight}
+                  y2={plotBottom}
+                  className="plot-axis"
+                />
+                {hover && (
+                  <g className="plot-crosshair" pointerEvents="none">
+                    <line x1={hover.x} y1={plotTop} x2={hover.x} y2={plotBottom} />
+                  </g>
+                )}
+                <rect
+                  x={plotLeft}
+                  y={plotTop}
+                  width={plotWidth}
+                  height={plotHeight}
+                  fill="transparent"
+                  className="plot-hover-area"
+                  onPointerMove={handlePlotHover}
+                  onPointerLeave={clearPlotHover}
+                />
+                <rect
+                  x={plotLeft}
+                  y={plotBottom - 10}
+                  width={plotWidth}
+                  height="50"
+                  fill="transparent"
+                  className="plot-x-axis-hit"
+                  onWheel={handleXWheel}
+                  onPointerDown={beginXDrag}
+                  onPointerMove={moveXDrag}
+                  onPointerUp={finishXDrag}
+                  onPointerCancel={finishXDrag}
+                />
+                <rect
+                  x={plotRight - 10}
+                  y={plotTop}
+                  width="90"
+                  height={plotHeight}
+                  fill="transparent"
+                  className="plot-y-axis-hit"
+                  onWheel={handleYWheel}
+                  onPointerDown={beginYDrag}
+                  onPointerMove={moveYDrag}
+                  onPointerUp={finishYDrag}
+                  onPointerCancel={finishYDrag}
+                />
+              </svg>
             </>
           ) : (
             <div className="plot-empty">
