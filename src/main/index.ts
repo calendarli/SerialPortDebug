@@ -1,6 +1,6 @@
 import { app, shell, BrowserWindow, dialog, ipcMain } from 'electron'
 import { execFile } from 'child_process'
-import { createWriteStream, existsSync, type WriteStream } from 'fs'
+import { existsSync } from 'fs'
 import { readFile, stat, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -85,11 +85,6 @@ const receiveBatches = new Map<
   { chunks: Uint8Array[]; bytes: number; timer?: NodeJS.Timeout }
 >()
 let portOperationQueue: Promise<void> = Promise.resolve()
-let sessionStream: WriteStream | null = null
-let sessionFile = ''
-let sessionEvents = 0
-let sessionBytes = 0
-let replayGeneration = 0
 let fileTransferManager: FileTransferManager | null = null
 
 function virtualSerialPaths(): { manager: string; inf: string } {
@@ -201,37 +196,6 @@ function runTool(path: string, args: string[]): Promise<string> {
   )
 }
 
-function recordSession(direction: 'rx' | 'tx', path: string, data: Uint8Array): void {
-  if (!sessionStream) return
-  const entry = JSON.stringify({
-    type: 'data',
-    timestamp: Date.now(),
-    direction,
-    port: path,
-    bytes: data.length,
-    base64: Buffer.from(data).toString('base64')
-  })
-  sessionStream.write(`${entry}\n`)
-  sessionEvents += 1
-  sessionBytes += data.length
-}
-
-async function stopSession(): Promise<{
-  path: string
-  events: number
-  bytes: number
-} | null> {
-  if (!sessionStream) return null
-  const stream = sessionStream
-  const result = { path: sessionFile, events: sessionEvents, bytes: sessionBytes }
-  sessionStream = null
-  sessionFile = ''
-  await new Promise<void>((resolve, reject) =>
-    stream.end((error?: Error | null) => (error ? reject(error) : resolve()))
-  )
-  return result
-}
-
 function enqueuePortOperation<T>(operation: () => Promise<T>): Promise<T> {
   const task = portOperationQueue.catch(() => undefined).then(operation)
   portOperationQueue = task.then(
@@ -255,7 +219,6 @@ function flushReceiveBatch(path: string): void {
 
 function queueReceivedData(path: string, chunk: Buffer): void {
   if (fileTransferManager?.handleIncoming(path, chunk)) return
-  recordSession('rx', path, chunk)
   const batch = receiveBatches.get(path) || { chunks: [], bytes: 0 }
   batch.chunks.push(new Uint8Array(chunk))
   batch.bytes += chunk.length
@@ -409,66 +372,6 @@ function registerSerialHandlers(): void {
   ipcMain.handle('fileTransfer:cancel', (_event, taskId: string) =>
     fileTransferManager!.cancel(taskId)
   )
-  ipcMain.handle('session:start', async () => {
-    if (!mainWindow) throw new Error('应用窗口尚未就绪')
-    if (sessionStream) return { path: sessionFile }
-    const result = await dialog.showSaveDialog(mainWindow, {
-      title: '保存串口会话',
-      defaultPath: `SerialFlow-${new Date().toISOString().replace(/[:.]/g, '-')}.serialflow-session`,
-      filters: [{ name: 'SerialFlow 会话', extensions: ['serialflow-session'] }]
-    })
-    if (result.canceled || !result.filePath) return null
-    sessionFile = result.filePath
-    sessionEvents = 0
-    sessionBytes = 0
-    sessionStream = createWriteStream(sessionFile, { encoding: 'utf8' })
-    sessionStream.write(
-      `${JSON.stringify({ type: 'header', version: 1, application: 'SerialFlow', createdAt: Date.now() })}\n`
-    )
-    return { path: sessionFile }
-  })
-  ipcMain.handle('session:stop', () => stopSession())
-  ipcMain.handle('session:replay', async () => {
-    if (!mainWindow) throw new Error('应用窗口尚未就绪')
-    const selected = await dialog.showOpenDialog(mainWindow, {
-      title: '回放串口会话',
-      properties: ['openFile'],
-      filters: [{ name: 'SerialFlow 会话', extensions: ['serialflow-session'] }]
-    })
-    if (selected.canceled || !selected.filePaths[0]) return null
-    const generation = ++replayGeneration
-    const lines = (await readFile(selected.filePaths[0], 'utf8')).split(/\r?\n/)
-    let previousTimestamp = 0
-    let events = 0
-    for (const line of lines) {
-      if (generation !== replayGeneration) break
-      if (!line.trim()) continue
-      const item = JSON.parse(line) as {
-        type?: string
-        timestamp?: number
-        direction?: string
-        port?: string
-        base64?: string
-      }
-      if (item.type !== 'data' || item.direction !== 'rx' || !item.base64) continue
-      const timestamp = Number(item.timestamp) || previousTimestamp
-      if (previousTimestamp && timestamp > previousTimestamp)
-        await new Promise((resolve) =>
-          setTimeout(resolve, Math.min(2000, timestamp - previousTimestamp))
-        )
-      previousTimestamp = timestamp
-      emit('serial:data', {
-        path: `[回放] ${item.port || '串口'}`,
-        chunks: [new Uint8Array(Buffer.from(item.base64, 'base64'))],
-        replay: true
-      })
-      events += 1
-    }
-    return { path: selected.filePaths[0], events, stopped: generation !== replayGeneration }
-  })
-  ipcMain.handle('session:stopReplay', () => {
-    replayGeneration += 1
-  })
   ipcMain.handle('project:save', async (_event, project: unknown) => {
     if (!mainWindow) throw new Error('应用窗口尚未就绪')
     const result = await dialog.showSaveDialog(mainWindow, {
@@ -580,7 +483,6 @@ function registerSerialHandlers(): void {
               active.drain((drainError) => (drainError ? reject(drainError) : resolve()))
             })
           })
-          recordSession('tx', path, data)
         } catch (error) {
           throw explainRuntimeError(error, '发送数据', active.path)
         }
@@ -652,7 +554,6 @@ app.whenReady().then(() => {
 })
 
 app.on('before-quit', () => {
-  void stopSession()
   void closeAllPorts()
 })
 app.on('window-all-closed', () => {

@@ -437,8 +437,6 @@ function App(): React.JSX.Element {
   const [rxHex, setRxHex] = useState(() => loadBooleanSetting(receiveHexKey, false))
   const [timestamp, setTimestamp] = useState(() => loadBooleanSetting(timestampKey, true))
   const [paused, setPaused] = useState(false)
-  const [sessionRecording, setSessionRecording] = useState(false)
-  const [replayRunning, setReplayRunning] = useState(false)
   const [autoPauseEnabled, setAutoPauseEnabled] = useState(() =>
     loadBooleanSetting(autoPauseEnabledKey, false)
   )
@@ -812,7 +810,7 @@ function App(): React.JSX.Element {
   }, [])
 
   useEffect(() => {
-    const processReceivedFrame = (sourcePort: string, bytes: Uint8Array, replay = false): void => {
+    const processReceivedFrame = (sourcePort: string, bytes: Uint8Array): void => {
       let decoder = textDecoders.current.get(sourcePort)
       if (!decoder) {
         decoder = new TextDecoder()
@@ -848,7 +846,7 @@ function App(): React.JSX.Element {
           return autoPauseExpression.test(candidate)
         })
       }
-      for (const { rule, expression } of replay ? [] : compiledRules) {
+      for (const { rule, expression } of compiledRules) {
         if (rule.targetPort && rule.targetPort !== sourcePort) continue
         const candidates = rule.receiveHex
           ? [hexBuffer, bytesToHex(bytes)]
@@ -969,7 +967,7 @@ function App(): React.JSX.Element {
         setMessage(`已按条件自动暂停：${autoPausePattern}`)
       }
     }
-    const offData = window.api.onData(({ path: sourcePort, chunks, replay }) => {
+    const offData = window.api.onData(({ path: sourcePort, chunks }) => {
       ipcTrafficRef.current.batches += 1
       ipcTrafficRef.current.chunks += chunks.length
       const framing =
@@ -977,7 +975,7 @@ function App(): React.JSX.Element {
       for (const chunk of chunks) {
         try {
           serialFramerRef.current.push(sourcePort, framing, chunk, (frame) =>
-            processReceivedFrame(sourcePort, frame, replay)
+            processReceivedFrame(sourcePort, frame)
           )
         } catch (cause) {
           showError(cause, `${sourcePort} 接收分帧失败`)
@@ -1286,48 +1284,6 @@ function App(): React.JSX.Element {
     setInteractionFontSize(next)
     localStorage.setItem(interactionFontSizeKey, String(next))
   }
-  const toggleSessionRecording = async (): Promise<void> => {
-    try {
-      if (sessionRecording) {
-        const result = await window.api.stopSession()
-        setSessionRecording(false)
-        if (result)
-          setMessage(
-            `会话已保存：${result.events.toLocaleString()} 条，${formatCacheBytes(result.bytes)}`
-          )
-        return
-      }
-      const result = await window.api.startSession()
-      if (!result) return
-      setSessionRecording(true)
-      setMessage(`正在录制原始串口会话：${result.path}`)
-    } catch (error) {
-      setSessionRecording(false)
-      showError(error, '串口会话录制失败')
-    }
-  }
-  const toggleReplay = async (): Promise<void> => {
-    try {
-      if (replayRunning) {
-        await window.api.stopReplay()
-        setReplayRunning(false)
-        setMessage('会话回放已停止')
-        return
-      }
-      setReplayRunning(true)
-      const result = await window.api.replaySession()
-      setReplayRunning(false)
-      if (result)
-        setMessage(
-          result.stopped
-            ? '会话回放已停止'
-            : `会话回放完成：${result.events.toLocaleString()} 条 RX 数据`
-        )
-    } catch (error) {
-      setReplayRunning(false)
-      showError(error, '回放串口会话失败')
-    }
-  }
   const exportProject = async (): Promise<void> => {
     try {
       const path = await window.api.saveProject({
@@ -1511,8 +1467,6 @@ function App(): React.JSX.Element {
                 cacheSizeMb={interactionCacheMb}
                 cacheEntryLimit={interactionCacheEntries}
                 fontSize={interactionFontSize}
-                sessionRecording={sessionRecording}
-                replayRunning={replayRunning}
                 onClear={clearReceive}
                 onRxHexChange={setRxHex}
                 onTimestampChange={setTimestamp}
@@ -1524,8 +1478,6 @@ function App(): React.JSX.Element {
                 onCacheSizeChange={changeInteractionCacheMb}
                 onCacheEntryLimitChange={changeInteractionEntryLimit}
                 onFontSizeChange={changeInteractionFontSize}
-                onToggleSessionRecording={() => void toggleSessionRecording()}
-                onToggleReplay={() => void toggleReplay()}
               />
             </div>
             <SendPanel

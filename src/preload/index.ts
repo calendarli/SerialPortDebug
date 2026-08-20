@@ -14,10 +14,6 @@ const electron = {
 
 const api = {
   getAppInfo: () => ipcRenderer.invoke('app:info'),
-  startSession: () => ipcRenderer.invoke('session:start'),
-  stopSession: () => ipcRenderer.invoke('session:stop'),
-  replaySession: () => ipcRenderer.invoke('session:replay'),
-  stopReplay: () => ipcRenderer.invoke('session:stopReplay'),
   saveProject: (project: unknown) => ipcRenderer.invoke('project:save', project),
   openProject: () => ipcRenderer.invoke('project:open'),
   openModbusMap: () => ipcRenderer.invoke('modbus:openMap'),
@@ -45,10 +41,10 @@ const api = {
   openPort: (options: unknown) => ipcRenderer.invoke('serial:open', options),
   closePort: (path: string) => ipcRenderer.invoke('serial:close', path),
   write: (path: string, base64: string) => ipcRenderer.invoke('serial:write', path, base64),
-  onData: (callback: (data: { path: string; chunks: Uint8Array[]; replay?: boolean }) => void) => {
+  onData: (callback: (data: { path: string; chunks: Uint8Array[] }) => void) => {
     const listener = (
       _event: Electron.IpcRendererEvent,
-      data: { path: string; chunks: Uint8Array[]; replay?: boolean }
+      data: { path: string; chunks: Uint8Array[] }
     ): void => callback(data)
     ipcRenderer.on('serial:data', listener)
     return () => ipcRenderer.removeListener('serial:data', listener)

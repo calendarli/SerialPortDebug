@@ -564,26 +564,6 @@ footer > span:first-child {
   background: var(--surface-soft);
   color: #64748b;
 }
-.session-record {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-.session-record i {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #94a3b8;
-}
-.session-record.recording {
-  border-color: #fecaca;
-  background: #fff1f2;
-  color: #dc2626;
-}
-.session-record.recording i {
-  background: #ef4444;
-  box-shadow: 0 0 0 4px #fecaca80;
-}
 .card-head .interval {
   margin-left: 0;
 }
@@ -3615,12 +3595,12 @@ footer > span:first-child {
 }
 .interaction-head > div:first-child {
   min-width: 0;
-  flex: 1 1 340px;
+  flex: 0 0 auto;
   line-height: 1.45;
 }
 .interaction-head .head-tools {
   min-width: 0;
-  flex: 1 1 520px;
+  flex: 1 1 auto;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 9px;

@@ -43,10 +43,6 @@ declare global {
     }
     api: {
       getAppInfo(): Promise<{ version: string; platform: string; arch: string }>
-      startSession(): Promise<{ path: string } | null>
-      stopSession(): Promise<{ path: string; events: number; bytes: number } | null>
-      replaySession(): Promise<{ path: string; events: number; stopped: boolean } | null>
-      stopReplay(): Promise<void>
       saveProject(project: unknown): Promise<string | null>
       openProject(): Promise<{ path: string; content: string } | null>
       openModbusMap(): Promise<{ path: string; name: string; base64: string } | null>
@@ -84,7 +80,7 @@ declare global {
       closePort(path: string): Promise<void>
       write(path: string, base64: string): Promise<number>
       onData(
-        callback: (data: { path: string; chunks: Uint8Array[]; replay?: boolean }) => void
+        callback: (data: { path: string; chunks: Uint8Array[] }) => void
       ): () => void
       onStatus(callback: (status: { open: boolean; path: string }) => void): () => void
       onError(callback: (error: { path: string; message: string }) => void): () => void
