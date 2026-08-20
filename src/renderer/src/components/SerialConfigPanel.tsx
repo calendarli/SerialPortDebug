@@ -94,6 +94,7 @@ export function SerialConfigPanel(props: Props): React.JSX.Element {
               <label>
                 端口
                 <select
+                  className={`serial-port-select ${isOpen ? 'port-open' : ''}`}
                   value={config.path}
                   disabled={disabled}
                   onChange={(event) => props.onChange(config.id, { path: event.target.value })}
@@ -103,11 +104,15 @@ export function SerialConfigPanel(props: Props): React.JSX.Element {
                     <option
                       key={port.path}
                       value={port.path}
+                      className={props.openedPorts.has(port.path) ? 'port-open' : 'port-closed'}
                       disabled={props.configs.some(
                         (item) => item.id !== config.id && item.path === port.path
                       )}
                     >
                       {port.path}
+                      {port.friendlyName || port.manufacturer
+                        ? ` · ${port.friendlyName || port.manufacturer}`
+                        : ''}
                     </option>
                   ))}
                 </select>

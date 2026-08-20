@@ -2,6 +2,7 @@ type SerialPortInfo = {
   path: string
   manufacturer?: string
   serialNumber?: string
+  friendlyName?: string
   vendorId?: string
   productId?: string
 }

@@ -4581,6 +4581,16 @@ footer > span:first-child {
   background: #f1f5f9;
   color: #8492a6;
 }
+.serial-profile select.serial-port-select.port-open,
+.serial-profile select.serial-port-select.port-open:disabled,
+.serial-port-select option.port-open {
+  background: #e8f8f0;
+  color: #078451;
+}
+.serial-port-select option.port-closed {
+  background: #fff;
+  color: var(--text);
+}
 .serial-profile .grid-two {
   gap: 7px;
 }

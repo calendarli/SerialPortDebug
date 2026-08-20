@@ -1,4 +1,8 @@
-export type Port = { path: string; manufacturer?: string }
+export type Port = {
+  path: string
+  manufacturer?: string
+  friendlyName?: string
+}
 export type SerialConfig = {
   id: number
   name: string
