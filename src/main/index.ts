@@ -642,25 +642,15 @@ function createWindow(): void {
   else mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
 }
 
-if (!app.requestSingleInstanceLock()) {
-  app.quit()
-} else {
-  app.on('second-instance', () => {
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore()
-      mainWindow.focus()
-    }
+app.whenReady().then(() => {
+  electronApp.setAppUserModelId('com.serialportdebug.app')
+  app.on('browser-window-created', (_, window) => optimizer.watchWindowShortcuts(window))
+  registerSerialHandlers()
+  createWindow()
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
-  app.whenReady().then(() => {
-    electronApp.setAppUserModelId('com.serialportdebug.app')
-    app.on('browser-window-created', (_, window) => optimizer.watchWindowShortcuts(window))
-    registerSerialHandlers()
-    createWindow()
-    app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) createWindow()
-    })
-  })
-}
+})
 
 app.on('before-quit', () => {
   void stopSession()
