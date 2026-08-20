@@ -16,6 +16,8 @@ extraResources:
     to: virtual-serial/SerialFlowVirtualSerialManager.exe
   - from: driver/SerialFlowVirtualSerial/ComPort/x64/Debug/VirtualSerial2um
     to: virtual-serial
+  - from: driver/SerialFlowVirtualSerial/ComPort/x64/Debug/SerialFlowVirtualSerial.cer
+    to: virtual-serial/SerialFlowVirtualSerial.cer
 win:
   executableName: SerialFlow
   icon: build/icon-v3.ico

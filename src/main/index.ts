@@ -104,6 +104,50 @@ function virtualSerialPaths(): { manager: string; inf: string } {
   }
 }
 
+function virtualSerialCertificatePath(): string {
+  return app.isPackaged
+    ? join(process.resourcesPath, 'virtual-serial', 'SerialFlowVirtualSerial.cer')
+    : join(
+        app.getAppPath(),
+        'driver',
+        'SerialFlowVirtualSerial',
+        'ComPort',
+        'x64',
+        'Debug',
+        'SerialFlowVirtualSerial.cer'
+      )
+}
+
+function runPowerShell(script: string): Promise<string> {
+  return new Promise((resolve, reject) =>
+    execFile(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-Command', script],
+      { windowsHide: true, timeout: 30000 },
+      (error, stdout, stderr) => {
+        if (!error) return resolve(String(stdout).trim())
+        reject(new Error(String(stderr || stdout || error.message).trim()))
+      }
+    )
+  )
+}
+
+async function isVirtualSerialCertificateInstalled(certificatePath: string): Promise<boolean> {
+  if (!existsSync(certificatePath)) return false
+  const script = `$certificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new(${quotePowerShell(certificatePath)}); $root = Test-Path ('Cert:\\LocalMachine\\Root\\' + $certificate.Thumbprint); $publisher = Test-Path ('Cert:\\LocalMachine\\TrustedPublisher\\' + $certificate.Thumbprint); Write-Output ($root -and $publisher)`
+  return (await runPowerShell(script)).trim().toLowerCase() === 'true'
+}
+
+function installVirtualSerialCertificate(certificatePath: string): Promise<string> {
+  const innerScript = `$ErrorActionPreference = 'Stop'; Import-Certificate -FilePath ${quotePowerShell(certificatePath)} -CertStoreLocation 'Cert:\\LocalMachine\\Root' | Out-Null; Import-Certificate -FilePath ${quotePowerShell(certificatePath)} -CertStoreLocation 'Cert:\\LocalMachine\\TrustedPublisher' | Out-Null`
+  const encoded = Buffer.from(innerScript, 'utf16le').toString('base64')
+  const outerScript = `$process = Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile','-NonInteractive','-EncodedCommand','${encoded}') -Verb RunAs -WindowStyle Hidden -Wait -PassThru; Write-Output $process.ExitCode`
+  return runPowerShell(outerScript).then((output) => {
+    if (Number(output) !== 0) throw new Error(`证书安装失败，安装程序退出码：${output}`)
+    return 'SerialFlow 测试签名证书已安装'
+  })
+}
+
 async function getVirtualPortAvailability(): Promise<{
   occupiedPorts: string[]
   availablePorts: string[]
@@ -253,6 +297,7 @@ function registerSerialHandlers(): void {
   })
   ipcMain.handle('virtualPorts:status', async () => {
     const paths = virtualSerialPaths()
+    const certificatePath = virtualSerialCertificatePath()
     const endpoints = (await SerialPort.list())
       .filter((item) => item.manufacturer === 'SerialFlow')
       .map((item) => item.path)
@@ -267,7 +312,23 @@ function registerSerialHandlers(): void {
       occupiedPorts,
       availablePorts,
       commandPath: paths.manager,
+      certificateAvailable: existsSync(certificatePath),
+      certificateInstalled: await isVirtualSerialCertificateInstalled(certificatePath),
       message: endpoints.length ? `SerialFlow 驱动已启动，共 ${endpoints.length} 个端点` : undefined
+    }
+  })
+  ipcMain.handle('virtualPorts:installCertificate', async () => {
+    const certificatePath = virtualSerialCertificatePath()
+    if (!existsSync(certificatePath)) throw new Error('未找到 SerialFlow 测试签名证书')
+    try {
+      return await installVirtualSerialCertificate(certificatePath)
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(
+        /cancel|canceled|取消|1223/i.test(detail)
+          ? '已取消管理员授权，证书未安装'
+          : `安装 SerialFlow 测试签名证书失败：${detail}`
+      )
     }
   })
   ipcMain.handle('virtualPorts:create', async (_event, first: string, second: string) => {

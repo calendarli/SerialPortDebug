@@ -29,6 +29,7 @@ const api = {
   removeVirtualPortPair: (first: string, second: string) =>
     ipcRenderer.invoke('virtualPorts:remove', first, second),
   openVirtualPortManager: () => ipcRenderer.invoke('virtualPorts:openManager'),
+  installVirtualPortCertificate: () => ipcRenderer.invoke('virtualPorts:installCertificate'),
   openVirtualPortDownload: () => ipcRenderer.invoke('virtualPorts:openDownload'),
   openPort: (options: unknown) => ipcRenderer.invoke('serial:open', options),
   closePort: (path: string) => ipcRenderer.invoke('serial:close', path),

@@ -41,6 +41,8 @@ declare global {
         occupiedPorts: string[]
         availablePorts: string[]
         commandPath?: string
+        certificateAvailable: boolean
+        certificateInstalled: boolean
         message?: string
       }>
       createVirtualPortPair(
@@ -49,6 +51,7 @@ declare global {
       ): Promise<{ first: string; second: string; output: string }>
       removeVirtualPortPair(first: string, second: string): Promise<string>
       openVirtualPortManager(): Promise<void>
+      installVirtualPortCertificate(): Promise<string>
       openVirtualPortDownload(): Promise<void>
       openPort(options: SerialOptions): Promise<boolean>
       closePort(path: string): Promise<void>

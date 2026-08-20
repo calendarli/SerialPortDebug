@@ -6,6 +6,8 @@ type Status = {
   occupiedPorts: string[]
   availablePorts: string[]
   commandPath?: string
+  certificateAvailable: boolean
+  certificateInstalled: boolean
   message?: string
 }
 
@@ -40,6 +42,19 @@ export function SerialPairPanel(): React.JSX.Element {
     try {
       const result = await window.api.createVirtualPortPair(first, second)
       setMessage(`已创建 ${result.first} ↔ ${result.second}`)
+      await refresh()
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const installCertificate = async (): Promise<void> => {
+    setBusy(true)
+    try {
+      const result = await window.api.installVirtualPortCertificate()
+      setMessage(result)
       await refresh()
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error))
@@ -139,6 +154,11 @@ export function SerialPairPanel(): React.JSX.Element {
       <div className="serial-pair-card">
         <h2>管理与安装</h2>
         <div className="serial-pair-actions">
+          {status?.certificateAvailable && !status.certificateInstalled && (
+            <button className="primary" disabled={busy} onClick={() => void installCertificate()}>
+              {busy ? '正在安装…' : '安装测试签名证书'}
+            </button>
+          )}
           <button
             disabled={!status?.installed}
             onClick={() => void window.api.openVirtualPortManager()}
@@ -147,8 +167,8 @@ export function SerialPairPanel(): React.JSX.Element {
           </button>
         </div>
         <p className="serial-pair-warning">
-          开发构建使用本机测试证书；正式发布包必须使用 Microsoft 签名。本应用不会自动关闭 Secure
-          Boot 或修改系统测试模式。
+          开发构建使用测试签名证书；正式发布包必须使用 Microsoft 签名。安装证书需要管理员权限，
+          本应用不会自动关闭 Secure Boot 或修改系统测试模式。
         </p>
       </div>
 
