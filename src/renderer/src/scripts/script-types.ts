@@ -42,6 +42,7 @@ export type ScriptContext = {
   match?: string[]
   groups?: Record<string, string>
   parameters?: Record<string, string>
+  global?: Record<string, unknown>
 }
 
 export type ScriptResult = {

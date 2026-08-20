@@ -70,6 +70,7 @@ export function RuleDialog({ rules, setRules, close }: Props): React.JSX.Element
               ...rules,
               {
                 id: Date.now(),
+                groupId: 1,
                 name: '新规则',
                 pattern: '',
                 reply: '',

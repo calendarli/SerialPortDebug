@@ -3,6 +3,8 @@ import { useCallback, useEffect, useState } from 'react'
 type Status = {
   installed: boolean
   pairs: string[]
+  occupiedPorts: string[]
+  availablePorts: string[]
   commandPath?: string
   message?: string
 }
@@ -18,6 +20,8 @@ export function SerialPairPanel(): React.JSX.Element {
     try {
       const next = await window.api.getVirtualPortStatus()
       setStatus(next)
+      setFirst(next.availablePorts[0] || '')
+      setSecond(next.availablePorts[1] || '')
       setMessage(
         next.installed ? next.message || 'SerialFlow 驱动包已就绪' : '未检测到 SerialFlow 驱动包'
       )
@@ -44,6 +48,15 @@ export function SerialPairPanel(): React.JSX.Element {
     }
   }
 
+  const canCreate =
+    Boolean(status?.installed) &&
+    Boolean(first && second) &&
+    first !== second &&
+    Boolean(status?.availablePorts.includes(first)) &&
+    Boolean(status?.availablePorts.includes(second))
+  const occupiedPortSet = new Set(status?.occupiedPorts ?? [])
+  const portOptions = Array.from({ length: 999 }, (_, index) => `COM${index + 1}`)
+
   return (
     <section className="serial-pair-panel">
       <header>
@@ -69,27 +82,58 @@ export function SerialPairPanel(): React.JSX.Element {
         <div className="serial-pair-form">
           <label>
             端口 A
-            <input value={first} onChange={(event) => setFirst(event.target.value.toUpperCase())} />
+            <select value={first} onChange={(event) => setFirst(event.target.value)}>
+              {portOptions.map((port) => (
+                <option
+                  key={port}
+                  value={port}
+                  className={occupiedPortSet.has(port) ? 'port-occupied' : 'port-available'}
+                  disabled={occupiedPortSet.has(port) || port === second}
+                >
+                  {occupiedPortSet.has(port) ? '🔴' : '🟢'} {port}（
+                  {occupiedPortSet.has(port) ? '已占用' : '可用'}）
+                </option>
+              ))}
+            </select>
           </label>
           <b>↔</b>
           <label>
             端口 B
-            <input
-              value={second}
-              onChange={(event) => setSecond(event.target.value.toUpperCase())}
-            />
+            <select value={second} onChange={(event) => setSecond(event.target.value)}>
+              {portOptions.map((port) => (
+                <option
+                  key={port}
+                  value={port}
+                  className={occupiedPortSet.has(port) ? 'port-occupied' : 'port-available'}
+                  disabled={occupiedPortSet.has(port) || port === first}
+                >
+                  {occupiedPortSet.has(port) ? '🔴' : '🟢'} {port}（
+                  {occupiedPortSet.has(port) ? '已占用' : '可用'}）
+                </option>
+              ))}
+            </select>
           </label>
           <button
             className="primary"
-            disabled={!status?.installed || busy}
+            disabled={!canCreate || busy}
             onClick={() => void createPair()}
           >
             {busy ? '正在创建…' : '创建虚拟串口对'}
           </button>
         </div>
         <small>
-          端口范围 COM1–COM999，不能使用已被硬件或其他驱动占用的端口。创建设备需要管理员权限。
+          已自动筛除当前被硬件或其他驱动占用的端口；创建前会再次检测。创建设备需要管理员权限。
         </small>
+        <div className="serial-port-availability">
+          <strong>端口检测</strong>
+          <span className="available">可用 {status?.availablePorts.length ?? 0} 个</span>
+          <span className="occupied">已占用 {status?.occupiedPorts.length ?? 0} 个</span>
+          <p>
+            {status?.occupiedPorts.length
+              ? `已占用：${status.occupiedPorts.join('、')}`
+              : '当前未检测到已占用的 COM 端口'}
+          </p>
+        </div>
       </div>
 
       <div className="serial-pair-card">

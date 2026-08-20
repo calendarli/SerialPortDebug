@@ -104,6 +104,22 @@ function virtualSerialPaths(): { manager: string; inf: string } {
   }
 }
 
+async function getVirtualPortAvailability(): Promise<{
+  occupiedPorts: string[]
+  availablePorts: string[]
+}> {
+  const occupiedPorts = (await SerialPort.list())
+    .map((item) => item.path.trim().toUpperCase())
+    .filter((path) => /^COM(?:[1-9]|[1-9]\d|[1-9]\d{2})$/.test(path))
+    .filter((path, index, ports) => ports.indexOf(path) === index)
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+  const occupied = new Set(occupiedPorts)
+  const availablePorts = Array.from({ length: 999 }, (_, index) => `COM${index + 1}`).filter(
+    (path) => !occupied.has(path)
+  )
+  return { occupiedPorts, availablePorts }
+}
+
 function quotePowerShell(value: string): string {
   return `'${value.replace(/'/g, "''")}'`
 }
@@ -241,12 +257,15 @@ function registerSerialHandlers(): void {
       .filter((item) => item.manufacturer === 'SerialFlow')
       .map((item) => item.path)
       .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+    const { occupiedPorts, availablePorts } = await getVirtualPortAvailability()
     const pairs: string[] = []
     for (let index = 0; index < endpoints.length; index += 2)
       pairs.push(`${endpoints[index]} ↔ ${endpoints[index + 1] || '等待对端'}`)
     return {
       installed: endpoints.length > 0 || (existsSync(paths.manager) && existsSync(paths.inf)),
       pairs,
+      occupiedPorts,
+      availablePorts,
       commandPath: paths.manager,
       message: endpoints.length ? `SerialFlow 驱动已启动，共 ${endpoints.length} 个端点` : undefined
     }
@@ -263,7 +282,8 @@ function registerSerialHandlers(): void {
     )
       throw new Error('端口名称必须是 COM1–COM999')
     if (portA === portB) throw new Error('串口对的两个端口不能相同')
-    const before = new Set((await SerialPort.list()).map((item) => item.path.toUpperCase()))
+    const { occupiedPorts } = await getVirtualPortAvailability()
+    const before = new Set(occupiedPorts)
     if (before.has(portA) || before.has(portB)) throw new Error('所选 COM 端口已被系统占用')
     const output = await runTool(paths.manager, ['create-pair', paths.inf, portA, portB])
     const created = (await SerialPort.list())
@@ -485,6 +505,26 @@ function createWindow(): void {
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     try {
       const target = new URL(url)
+      const isProgrammingManual = target.pathname.endsWith('/programming-manual.html')
+      const isLocalManual =
+        isProgrammingManual &&
+        (target.protocol === 'file:' ||
+          (is.dev &&
+            Boolean(process.env['ELECTRON_RENDERER_URL']) &&
+            target.origin === new URL(process.env['ELECTRON_RENDERER_URL']!).origin))
+      if (isLocalManual)
+        return {
+          action: 'allow',
+          overrideBrowserWindowOptions: {
+            width: 980,
+            height: 760,
+            minWidth: 720,
+            minHeight: 520,
+            autoHideMenuBar: true,
+            title: 'SerialFlow 编程参数手册',
+            webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false }
+          }
+        }
       if (target.protocol === 'https:' || target.protocol === 'http:') void shell.openExternal(url)
     } catch {
       /* Ignore invalid or unsafe external URLs. */

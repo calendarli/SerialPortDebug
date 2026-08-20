@@ -1810,7 +1810,8 @@ footer > span:first-child {
   color: #64748b;
   font-size: 13px;
 }
-.serial-pair-form input {
+.serial-pair-form input,
+.serial-pair-form select {
   width: 100%;
   height: 34px;
   margin-top: 5px;
@@ -1818,6 +1819,45 @@ footer > span:first-child {
   border: 1px solid #cbd5e1;
   border-radius: 7px;
   text-transform: uppercase;
+  background: #fff;
+}
+.serial-pair-form option.port-available {
+  color: #15803d;
+}
+.serial-pair-form option.port-occupied {
+  color: #dc2626;
+  background: #fff1f2;
+}
+.group-global-badge {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #15803d;
+  font-size: 10px;
+  font-style: normal;
+}
+.auto-reply-group-list {
+  display: grid;
+  gap: 5px;
+  margin: 8px 0;
+}
+.auto-reply-group-list > div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 8px;
+  border: 1px solid #dbe4ee;
+  border-radius: 7px;
+  background: #f8fafc;
+  font-size: 11px;
+}
+.auto-reply-group-list span {
+  margin-left: auto;
+  color: #15803d;
+}
+.auto-reply-group-list button {
+  min-height: 24px;
+  padding: 0 7px;
 }
 .serial-pair-form > b {
   align-self: end;
@@ -1826,6 +1866,35 @@ footer > span:first-child {
 }
 .serial-pair-auto-form {
   display: flex;
+}
+.serial-port-availability {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 12px;
+}
+.serial-port-availability > span {
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+.serial-port-availability .available {
+  background: #dcfce7;
+  color: #15803d;
+}
+.serial-port-availability .occupied {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.serial-port-availability p {
+  width: 100%;
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 .serial-pair-actions {
   display: flex;
@@ -4571,6 +4640,29 @@ footer > span:first-child {
   right: auto;
   left: -2px;
   font-family: Consolas, 'Microsoft YaHei', monospace;
+}
+.program-editor-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.program-manual-button {
+  width: 22px;
+  min-width: 22px;
+  min-height: 22px;
+  padding: 0;
+  border: 1px solid #93c5fd;
+  border-radius: 50%;
+  background: #eff6ff;
+  color: #2563eb;
+  font-weight: 700;
+  line-height: 20px;
+}
+.program-manual-button:hover,
+.program-manual-button:focus-visible {
+  border-color: #2563eb;
+  background: #dbeafe;
+  outline: none;
 }
 
 /* Portal-based help layer: never clipped by sidebars, modals, or scroll containers. */

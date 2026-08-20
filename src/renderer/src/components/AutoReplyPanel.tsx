@@ -1,16 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
-import type { Rule, TargetPortOption } from '../types'
+import type { AutoReplyGroup, Rule, TargetPortOption } from '../types'
 import { defaultAutoReplyProgram, upgradeAutoReplyProgram } from '../scripts/auto-reply-program'
 
 type Props = {
   rules: Rule[]
   setRules: (rules: Rule[]) => void
+  groups: AutoReplyGroup[]
+  setGroups: (groups: AutoReplyGroup[]) => void
   targetPorts: TargetPortOption[]
   onResetState: (ruleId: number, notify?: boolean) => void
 }
 type DraftParameter = { id: string }
 const ruleModalSizeKey = 'serialflow.autoReplyModalSize'
 type Draft = {
+  groupId: number
   name: string
   pattern: string
   regex: boolean
@@ -23,6 +26,7 @@ type Draft = {
   parameterProgram: string
 }
 const emptyDraft = (): Draft => ({
+  groupId: 1,
   name: '',
   pattern: '',
   regex: false,
@@ -71,6 +75,8 @@ function extractReturnedParameterIds(source: string): string[] {
 export function AutoReplyPanel({
   rules,
   setRules,
+  groups,
+  setGroups,
   targetPorts,
   onResetState
 }: Props): React.JSX.Element {
@@ -160,7 +166,11 @@ export function AutoReplyPanel({
   }
   const openCreate = (): void => {
     setEditingRuleId(null)
-    setDraft({ ...emptyDraft(), targetPort: targetPorts[0]?.path || '' })
+    setDraft({
+      ...emptyDraft(),
+      groupId: groups[0]?.id || 1,
+      targetPort: targetPorts[0]?.path || ''
+    })
     setError('')
     setCreating(true)
   }
@@ -169,6 +179,7 @@ export function AutoReplyPanel({
     if (!rule) return
     setEditingRuleId(id)
     setDraft({
+      groupId: rule.groupId || groups[0]?.id || 1,
       name: rule.name,
       pattern: rule.pattern,
       regex: rule.regex !== false,
@@ -250,7 +261,9 @@ export function AutoReplyPanel({
     if (new Set(ids).size !== ids.length) return setError('参数名字不能重复')
     if (draft.parameterMode === 'program' && placeholders.length && !returnedParameters.length)
       return setError('未识别到程序返回参数，请使用 return { 参数名: 值 } 格式')
-    const undefinedPlaceholder = placeholders.find((id) => !ids.includes(id))
+    const undefinedPlaceholder = placeholders.find(
+      (id) => !id.startsWith('global.') && !ids.includes(id)
+    )
     if (undefinedPlaceholder)
       return setError(
         draft.parameterMode === 'program'
@@ -267,6 +280,7 @@ export function AutoReplyPanel({
         ...rules,
         {
           id: Date.now(),
+          groupId: draft.groupId,
           name: draft.name.trim(),
           pattern: draft.pattern,
           regex: draft.regex,
@@ -292,6 +306,7 @@ export function AutoReplyPanel({
           rule.id === editingRuleId
             ? {
                 ...rule,
+                groupId: draft.groupId,
                 name: draft.name.trim(),
                 pattern: draft.pattern,
                 regex: draft.regex,
@@ -333,7 +348,39 @@ export function AutoReplyPanel({
           <strong>自动回复规则</strong>
           <small>右键新建或删除规则</small>
         </div>
+        <button
+          onClick={() => {
+            const name = window.prompt('自动回复分组名称')?.trim()
+            if (!name) return
+            setGroups([...groups, { id: Date.now(), name, globals: {} }])
+          }}
+        >
+          ＋ 分组
+        </button>
         <span>{rules.filter((rule) => rule.enabled).length} 启用</span>
+      </div>
+      <div className="auto-reply-group-list">
+        {groups.map((group) => (
+          <div key={group.id}>
+            <strong>{group.name}</strong>
+            <span>global · {Object.keys(group.globals).length}</span>
+            <button
+              disabled={!Object.keys(group.globals).length}
+              onClick={() => {
+                const firstRule = rules.find((rule) => rule.groupId === group.id)
+                if (firstRule) onResetState(firstRule.id)
+                else
+                  setGroups(
+                    groups.map((item) =>
+                      item.id === group.id ? { ...item, globals: {} } : item
+                    )
+                  )
+              }}
+            >
+              重置
+            </button>
+          </div>
+        ))}
       </div>
       <div className="reply-list">
         {rules.map((rule) => {
@@ -367,6 +414,9 @@ export function AutoReplyPanel({
                 />
                 <strong>{rule.name}</strong>
               </label>
+              <span className="port-badge">
+                {groups.find((group) => group.id === rule.groupId)?.name || '默认分组'}
+              </span>
               {isProgramRule(rule) && (
                 <button
                   className="rule-state-reset"
@@ -529,6 +579,18 @@ export function AutoReplyPanel({
               <button onClick={() => setCreating(false)}>×</button>
             </div>
             <div className="create-rule-form">
+              <label>
+                所属分组
+                <select
+                  value={draft.groupId}
+                  onChange={(event) => setDraft({ ...draft, groupId: Number(event.target.value) })}
+                >
+                  {groups.map((group) => (
+                    <option key={group.id} value={group.id}>{group.name}</option>
+                  ))}
+                </select>
+                <small>同一分组中的编程规则共享 global，分组之间相互隔离</small>
+              </label>
               <label>
                 规则名称
                 <input
@@ -723,7 +785,24 @@ export function AutoReplyPanel({
               )}
               {draft.parameterMode === 'program' && (
                 <label className="auto-reply-program-editor">
-                  编程参数程序（JavaScript）
+                  <span className="program-editor-title">
+                    编程参数程序（JavaScript）
+                    <button
+                      type="button"
+                      className="program-manual-button"
+                      title="打开编程参数手册"
+                      aria-label="打开编程参数手册"
+                      onClick={(event) => {
+                        event.preventDefault()
+                        window.open(
+                          new URL('programming-manual.html', window.location.href).toString(),
+                          'serialflow-programming-manual'
+                        )
+                      }}
+                    >
+                      ?
+                    </button>
+                  </span>
                   <textarea
                     spellCheck={false}
                     value={draft.parameterProgram}

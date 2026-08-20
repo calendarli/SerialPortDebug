@@ -38,6 +38,8 @@ declare global {
       getVirtualPortStatus(): Promise<{
         installed: boolean
         pairs: string[]
+        occupiedPorts: string[]
+        availablePorts: string[]
         commandPath?: string
         message?: string
       }>

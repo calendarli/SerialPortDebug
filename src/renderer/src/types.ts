@@ -25,6 +25,7 @@ export type SerialFraming = {
 
 export type Rule = {
   id: number
+  groupId: number
   name: string
   pattern: string
   regex?: boolean
@@ -74,6 +75,13 @@ export type CommandGroup = {
   autoLoop: boolean
   loopDelay: number
   loopCount: number
+  globals: Record<string, unknown>
+}
+
+export type AutoReplyGroup = {
+  id: number
+  name: string
+  globals: Record<string, unknown>
 }
 
 export type InteractionEntry = {

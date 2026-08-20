@@ -12,6 +12,7 @@ import { Sidebar } from './components/Sidebar'
 import { defaultSerialFraming, SerialFramer } from './serial-framer'
 import { ScriptFramer } from './scripts/script-framer'
 import { autoReplyProgramRuntime } from './scripts/auto-reply-program'
+import { fillGlobalPlaceholders, normalizeGroupGlobals } from './scripts/group-globals'
 import {
   bytesToPayload,
   payloadToBytes,
@@ -23,6 +24,7 @@ import type { SavedScript as UserScript } from './scripts/script-types'
 import { appendCrc, bytesToBase64, bytesToHex, convertSerialText, formatTime } from './serial-utils'
 import type {
   CommandGroup,
+  AutoReplyGroup,
   CrcMode,
   DataBits,
   InteractionEntry,
@@ -42,6 +44,7 @@ const ScriptPanel = lazy(() =>
 const defaultRules: Rule[] = [
   {
     id: 1,
+    groupId: 1,
     name: 'AT 应答',
     pattern: '^AT$',
     reply: 'OK\\r\\n',
@@ -58,6 +61,7 @@ function loadRules(): Rule[] {
     if (!Array.isArray(saved)) return defaultRules
     return saved.map((rule, index) => ({
       id: typeof rule.id === 'number' ? rule.id : Date.now() + index,
+      groupId: typeof rule.groupId === 'number' ? rule.groupId : 1,
       name: rule.name || `规则 ${index + 1}`,
       pattern: rule.pattern || '',
       regex: rule.regex !== false,
@@ -160,11 +164,29 @@ function loadCommandGroups(): CommandGroup[] {
           parentId: group.parentId ?? null,
           autoLoop: Boolean(group.autoLoop),
           loopDelay: Math.max(1, group.loopDelay || 100),
-          loopCount: Number.isInteger(group.loopCount) && group.loopCount >= 0 ? group.loopCount : 0
+          loopCount: Number.isInteger(group.loopCount) && group.loopCount >= 0 ? group.loopCount : 0,
+          globals: normalizeGroupGlobals(group.globals)
         }))
       : []
   } catch {
     return []
+  }
+}
+
+const defaultAutoReplyGroups: AutoReplyGroup[] = [{ id: 1, name: '默认分组', globals: {} }]
+
+function loadAutoReplyGroups(): AutoReplyGroup[] {
+  try {
+    const saved = JSON.parse(localStorage.getItem('serialflow.autoReplyGroups') || 'null') as
+      Partial<AutoReplyGroup>[] | null
+    if (!Array.isArray(saved) || !saved.length) return defaultAutoReplyGroups
+    return saved.map((group, index) => ({
+      id: typeof group.id === 'number' ? group.id : Date.now() + index,
+      name: group.name?.trim() || `分组 ${index + 1}`,
+      globals: normalizeGroupGlobals(group.globals)
+    }))
+  } catch {
+    return defaultAutoReplyGroups
   }
 }
 
@@ -440,6 +462,7 @@ function App(): React.JSX.Element {
   const [interval, setIntervalValue] = useState(() => loadPositiveSetting(sendIntervalKey, 1000))
   const [autoSendCount, setAutoSendCount] = useState(() => loadNonnegativeSetting(sendCountKey, 0))
   const [rules, setRules] = useState<Rule[]>(loadRules)
+  const [autoReplyGroups, setAutoReplyGroups] = useState<AutoReplyGroup[]>(loadAutoReplyGroups)
   const [commands, setCommands] = useState<SavedCommand[]>(loadCommands)
   const [commandGroups, setCommandGroups] = useState<CommandGroup[]>(loadCommandGroups)
   const [scripts, setScripts] = useState<UserScript[]>(() => ensureInitialScripts(loadScripts()))
@@ -496,6 +519,7 @@ function App(): React.JSX.Element {
   const scriptReceiveQueuesRef = useRef(new Map<string, Promise<void>>())
   const scriptErrorCountsRef = useRef(new Map<string, number>())
   const autoReplyErrorCountsRef = useRef(new Map<number, number>())
+  const autoReplyGroupsRef = useRef(autoReplyGroups)
   const scriptSendIndexRef = useRef(0)
 
   useEffect(() => {
@@ -836,11 +860,29 @@ function App(): React.JSX.Element {
           if (rule.parameterMode === 'program') {
             const match = Array.from(matchedResult, (value) => value ?? '')
             const groups = { ...(matchedResult.groups || {}) }
+            const replyGroup =
+              autoReplyGroupsRef.current.find((group) => group.id === rule.groupId) ||
+              autoReplyGroupsRef.current[0]
             void autoReplyProgramRuntime
-              .run(rule, { input: matchedCandidate, match, groups, port: sourcePort })
-              .then((values) => {
+              .run(
+                rule,
+                { input: matchedCandidate, match, groups, port: sourcePort },
+                replyGroup?.id || 1,
+                replyGroup?.globals || {}
+              )
+              .then(({ values, globals }) => {
+                if (replyGroup)
+                  setAutoReplyGroups((current) =>
+                    current.map((group) =>
+                      group.id === replyGroup.id ? { ...group, globals } : group
+                    )
+                  )
                 autoReplyErrorCountsRef.current.delete(rule.id)
-                const reply = fillRuleParameters(rule, values)
+                const reply = fillGlobalPlaceholders(
+                  fillRuleParameters(rule, values),
+                  globals,
+                  rule.hex
+                )
                   .replace(/\\r/g, '\r')
                   .replace(/\\n/g, '\n')
                 void send({
@@ -861,7 +903,16 @@ function App(): React.JSX.Element {
                 else setMessage(`自动回复“${rule.name}”编程执行失败 ${count} 次，规则仍保持启用`)
               })
           } else {
-            const reply = fillRuleParameters(rule).replace(/\\r/g, '\r').replace(/\\n/g, '\n')
+            const replyGroup =
+              autoReplyGroupsRef.current.find((group) => group.id === rule.groupId) ||
+              autoReplyGroupsRef.current[0]
+            const reply = fillGlobalPlaceholders(
+              fillRuleParameters(rule),
+              replyGroup?.globals || {},
+              rule.hex
+            )
+              .replace(/\\r/g, '\r')
+              .replace(/\\n/g, '\n')
             void send({ text: reply, hex: rule.hex, targetPort: rule.targetPort || sourcePort })
           }
           break
@@ -1023,6 +1074,11 @@ function App(): React.JSX.Element {
   }, [rules])
 
   useEffect(() => {
+    autoReplyGroupsRef.current = autoReplyGroups
+    localStorage.setItem('serialflow.autoReplyGroups', JSON.stringify(autoReplyGroups))
+  }, [autoReplyGroups])
+
+  useEffect(() => {
     localStorage.setItem('serialflow.commands', JSON.stringify(commands))
   }, [commands])
 
@@ -1179,10 +1235,16 @@ function App(): React.JSX.Element {
     setIpcChunksPerBatch(0)
   }
   const resetAutoReplyState = useCallback((ruleId: number, notify = true): void => {
-    autoReplyProgramRuntime.reset(ruleId)
+    const target = rules.find((rule) => rule.id === ruleId)
+    const groupId = target?.groupId || 1
+    const groupRuleIds = rules.filter((rule) => rule.groupId === groupId).map((rule) => rule.id)
+    autoReplyProgramRuntime.resetGroup(groupId, groupRuleIds)
+    setAutoReplyGroups((current) =>
+      current.map((group) => (group.id === groupId ? { ...group, globals: {} } : group))
+    )
     autoReplyErrorCountsRef.current.delete(ruleId)
-    if (notify) setMessage('自动回复编程状态已重置')
-  }, [])
+    if (notify) setMessage('当前自动回复分组的 global 和编程状态已重置')
+  }, [rules])
   const changeInteractionCacheMb = (value: number): void => {
     const next = Math.min(1024, Math.max(1, Number.isFinite(value) ? Math.round(value) : 8))
     setInteractionCacheMb(next)
@@ -1264,6 +1326,7 @@ function App(): React.JSX.Element {
         exportedAt: new Date().toISOString(),
         serialConfigs,
         rules,
+        autoReplyGroups,
         commands,
         commandGroups,
         scripts,
@@ -1297,10 +1360,28 @@ function App(): React.JSX.Element {
             plotEnabled: config.plotEnabled === true
           }))
         )
-      if (Array.isArray(project.rules)) setRules(project.rules as Rule[])
+      if (Array.isArray(project.rules))
+        setRules(
+          (project.rules as Rule[]).map((rule) => ({
+            ...rule,
+            groupId: Number(rule.groupId) || 1
+          }))
+        )
+      if (Array.isArray(project.autoReplyGroups))
+        setAutoReplyGroups(
+          (project.autoReplyGroups as AutoReplyGroup[]).map((group) => ({
+            ...group,
+            globals: normalizeGroupGlobals(group.globals)
+          }))
+        )
       if (Array.isArray(project.commands)) setCommands(project.commands as SavedCommand[])
       if (Array.isArray(project.commandGroups))
-        setCommandGroups(project.commandGroups as CommandGroup[])
+        setCommandGroups(
+          (project.commandGroups as CommandGroup[]).map((group) => ({
+            ...group,
+            globals: normalizeGroupGlobals(group.globals)
+          }))
+        )
       if (Array.isArray(project.scripts))
         setScripts(ensureInitialScripts(project.scripts as UserScript[]))
       const settings = project.settings as Record<string, unknown> | undefined
@@ -1377,6 +1458,8 @@ function App(): React.JSX.Element {
             <AutoReplyPanel
               rules={rules}
               setRules={setRules}
+              groups={autoReplyGroups}
+              setGroups={setAutoReplyGroups}
               targetPorts={targetPortOptions}
               onResetState={resetAutoReplyState}
             />

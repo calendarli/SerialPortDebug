@@ -83,12 +83,18 @@ HEX 指令参数可以指定占用字节数。DEC/HEX 数值会按无符号大�
 编程模式会在每次规则匹配时执行一次 JavaScript `calculate(input, match, context)`，函数应返回一个对象，对象键对应发送指令中的占位符。顶层变量会在多次触发之间保留，点击规则上的“重置状态”可重新初始化。
 
 ```javascript
-let i = 0
-
+/**
+ * 根据本次匹配计算发送指令中的参数。
+ * @param {string} input 本次匹配到的输入内容
+ * @param {string[]} match 正则匹配结果；未启用正则时为空数组
+ * @param {object} context 上下文，包含 port、groups 等信息
+ * @returns {Record<string, string | number>} 参数名与参数值组成的对象
+ */
 function calculate(input, match, context) {
-  i++
+  global.counter ??= 0
+  global.counter++
   return {
-    计数: i
+    计数: global.counter
   }
 }
 ```
@@ -100,6 +106,8 @@ AA {{计数}} BB
 ```
 
 当最终发送编码为 HEX 时，程序返回的数字按十进制数值转换为偶数位 HEX，例如 `1 → 01`、`10 → 0A`、`256 → 0100`；返回字符串则按原始 HEX 文本校验。编辑器会实时识别发送指令中的占位符并提供点击复制。编程框内按 `Tab` 插入制表符，按 `Ctrl + S` 保存规则。
+
+编程模式可通过 `global.counter` 读写所属自动回复分组的共享变量。快捷指令分组使用独立的 `global`，指令模板通过 `{{global.counter}}` 读取、`{{global.counter++}}` 发送后递增，或通过 `{{++global.counter}}` 递增后发送。各分组互不影响，变量随本地配置和导出的工程保存；“重置 global”会清空当前分组变量。
 
 ### JavaScript/TypeScript 脚本
 

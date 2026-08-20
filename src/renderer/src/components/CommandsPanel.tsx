@@ -1,6 +1,7 @@
 import { memo, useEffect, useRef, useState } from 'react'
 import { bytesToHex, convertSerialText } from '../serial-utils'
 import type { CommandGroup, CrcMode, SavedCommand, TargetPortOption } from '../types'
+import { evaluateGlobalPlaceholders } from '../scripts/group-globals'
 
 type Props = {
   commands: SavedCommand[]
@@ -117,7 +118,11 @@ function numericParameterPlaceholder(mode: ParameterMode, byteLength: number): s
     : `HEX 最多 ${byteLength * 2} 位`
 }
 
-function buildCommand(command: SavedCommand, template = command.template): string {
+function buildCommand(
+  command: SavedCommand,
+  template = command.template,
+  globals: Record<string, unknown> = {}
+): string {
   const result = command.parameters.reduce((current, parameter) => {
     const value = convertParameterForCommand(
       parameter.value,
@@ -127,7 +132,8 @@ function buildCommand(command: SavedCommand, template = command.template): strin
     )
     return current.replaceAll(`{{${parameter.id}}}`, value)
   }, template)
-  return command.hex ? result : result.replace(/\\r/g, '\r').replace(/\\n/g, '\n')
+  const withGlobals = evaluateGlobalPlaceholders(result, globals, command.hex)
+  return command.hex ? withGlobals : withGlobals.replace(/\\r/g, '\r').replace(/\\n/g, '\n')
 }
 
 export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JSX.Element {
@@ -151,6 +157,30 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
   const autoSendCountsRef = useRef(new Map<number, number>())
   const groupLoopTokensRef = useRef(new Map<number, number>())
   const pressedCommandIdsRef = useRef(new Set<number>())
+  const groupGlobalsRef = useRef(
+    new Map(props.groups.map((group) => [group.id, { ...group.globals }]))
+  )
+
+  useEffect(() => {
+    for (const group of props.groups)
+      groupGlobalsRef.current.set(group.id, { ...group.globals })
+    for (const id of groupGlobalsRef.current.keys())
+      if (!props.groups.some((group) => group.id === id)) groupGlobalsRef.current.delete(id)
+  }, [props.groups])
+
+  const buildGroupedCommand = (command: SavedCommand, template = command.template): string => {
+    const group = props.groups.find((item) => item.id === command.parentId)
+    if (!group) return buildCommand(command, template)
+    const globals = { ...(groupGlobalsRef.current.get(group.id) || group.globals) }
+    const result = buildCommand(command, template, globals)
+    if (JSON.stringify(globals) !== JSON.stringify(groupGlobalsRef.current.get(group.id))) {
+      groupGlobalsRef.current.set(group.id, globals)
+      props.setGroups(
+        props.groups.map((item) => (item.id === group.id ? { ...item, globals } : item))
+      )
+    }
+    return result
+  }
 
   useEffect(() => {
     if (!props.connected) return
@@ -164,7 +194,7 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
       const run = async (): Promise<void> => {
         try {
           const success = await props.onSend(
-            buildCommand(command),
+            buildGroupedCommand(command),
             command.hex,
             command.crcMode,
             command.targetPort
@@ -183,7 +213,7 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
           if (command.autoSendCount > 0 && completed >= command.autoSendCount) {
             if (command.releaseTemplate) {
               await props.onSend(
-                buildCommand(command, command.releaseTemplate),
+                buildGroupedCommand(command, command.releaseTemplate),
                 command.hex,
                 command.crcMode,
                 command.targetPort
@@ -299,7 +329,7 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
       if (command.releaseTemplate) {
         try {
           await props.onSend(
-            buildCommand(command, command.releaseTemplate),
+            buildGroupedCommand(command, command.releaseTemplate),
             command.hex,
             command.crcMode,
             command.targetPort
@@ -314,7 +344,7 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
     try {
       setError('')
       const success = await props.onSend(
-        buildCommand(command),
+        buildGroupedCommand(command),
         command.hex,
         command.crcMode,
         command.targetPort
@@ -323,7 +353,7 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
         if (command.autoSendCount === 1) {
           if (command.releaseTemplate)
             await props.onSend(
-              buildCommand(command, command.releaseTemplate),
+              buildGroupedCommand(command, command.releaseTemplate),
               command.hex,
               command.crcMode,
               command.targetPort
@@ -344,7 +374,7 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
     try {
       setError('')
       const success = await props.onSend(
-        buildCommand(command),
+        buildGroupedCommand(command),
         command.hex,
         command.crcMode,
         command.targetPort
@@ -360,7 +390,7 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
     if (!command.releaseTemplate) return
     try {
       await props.onSend(
-        buildCommand(command, command.releaseTemplate),
+        buildGroupedCommand(command, command.releaseTemplate),
         command.hex,
         command.crcMode,
         command.targetPort
@@ -455,7 +485,8 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
           name: groupName.trim(),
           autoLoop: groupAutoLoop,
           loopDelay: groupLoopDelay,
-          loopCount: groupLoopCount
+          loopCount: groupLoopCount,
+          globals: {}
         }
       ])
     else
@@ -647,7 +678,7 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
           const command = commands[index]
           try {
             const success = await props.onSend(
-              buildCommand(command),
+              buildGroupedCommand(command),
               command.hex,
               command.crcMode,
               command.targetPort
@@ -804,6 +835,9 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
               <b className="folder-icon">▰</b>
               <strong>{group.name}</strong>
               <em>{groupCommandCount(group.id)} 条指令</em>
+              <span className="group-global-badge">
+                global · {Object.keys(group.globals).length}
+              </span>
             </button>
             {group.autoLoop && (
               <button
@@ -871,6 +905,19 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
           {menu.type === 'group' && (
             <>
               <button onClick={() => openGroupEditor(menu.id!)}>✎ 编辑组</button>
+              <button
+                onClick={() => {
+                  props.setGroups(
+                    props.groups.map((group) =>
+                      group.id === menu.id ? { ...group, globals: {} } : group
+                    )
+                  )
+                  setMenu(null)
+                  setError('当前快捷指令组的 global 已重置')
+                }}
+              >
+                ↻ 重置 global
+              </button>
               <div className="menu-separator" />
               <button className="danger" onClick={() => deleteGroup(menu.id!)}>
                 删除组及内容
