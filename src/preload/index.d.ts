@@ -12,6 +12,21 @@ type SerialOptions = {
   stopBits: 1 | 1.5 | 2
   parity: 'none' | 'even' | 'odd' | 'mark' | 'space'
 }
+type FileTransferProgress = {
+  taskId: string
+  direction: 'send' | 'receive'
+  port: string
+  fileName: string
+  filePath?: string
+  totalBytes: number
+  transferredBytes: number
+  state:
+    'preparing' | 'waiting' | 'transferring' | 'verifying' | 'completed' | 'error' | 'cancelled'
+  message: string
+  retries: number
+  startedAt: number
+  bytesPerSecond: number
+}
 
 declare global {
   interface Window {
@@ -53,6 +68,11 @@ declare global {
       openVirtualPortManager(): Promise<void>
       installVirtualPortCertificate(): Promise<string>
       openVirtualPortDownload(): Promise<void>
+      selectTransferFile(): Promise<{ path: string; name: string; size: number } | null>
+      selectTransferDirectory(): Promise<string | null>
+      setFileReceiver(port: string, directory?: string): Promise<void>
+      startFileTransfer(port: string, filePath: string, chunkSize: number): Promise<string>
+      cancelFileTransfer(taskId: string): Promise<void>
       openPort(options: SerialOptions): Promise<boolean>
       closePort(path: string): Promise<void>
       write(path: string, base64: string): Promise<number>
@@ -61,6 +81,7 @@ declare global {
       ): () => void
       onStatus(callback: (status: { open: boolean; path: string }) => void): () => void
       onError(callback: (error: { path: string; message: string }) => void): () => void
+      onFileTransferProgress(callback: (progress: FileTransferProgress) => void): () => void
     }
   }
 }

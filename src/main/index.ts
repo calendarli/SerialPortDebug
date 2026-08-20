@@ -1,11 +1,12 @@
 import { app, shell, BrowserWindow, dialog, ipcMain } from 'electron'
 import { execFile } from 'child_process'
 import { createWriteStream, existsSync, type WriteStream } from 'fs'
-import { readFile, writeFile } from 'fs/promises'
+import { readFile, stat, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { SerialPort } from 'serialport'
 import icon from '../../resources/icon-v3.png?asset'
+import { FileTransferManager } from './file-transfer'
 
 type PortOptions = {
   path: string
@@ -89,6 +90,7 @@ let sessionFile = ''
 let sessionEvents = 0
 let sessionBytes = 0
 let replayGeneration = 0
+let fileTransferManager: FileTransferManager | null = null
 
 function virtualSerialPaths(): { manager: string; inf: string } {
   const root = app.isPackaged
@@ -252,6 +254,7 @@ function flushReceiveBatch(path: string): void {
 }
 
 function queueReceivedData(path: string, chunk: Buffer): void {
+  if (fileTransferManager?.handleIncoming(path, chunk)) return
   recordSession('rx', path, chunk)
   const batch = receiveBatches.get(path) || { chunks: [], bytes: 0 }
   batch.chunks.push(new Uint8Array(chunk))
@@ -282,7 +285,21 @@ async function closeAllPorts(): Promise<void> {
   await Promise.allSettled([...openPorts.keys()].map(closePort))
 }
 
+async function writeRawPort(path: string, data: Buffer): Promise<void> {
+  const active = openPorts.get(path)
+  if (!active?.isOpen) throw new Error(`串口 ${path} 未打开`)
+  await new Promise<void>((resolve, reject) => {
+    active.write(data, (error) => {
+      if (error) return reject(error)
+      active.drain((drainError) => (drainError ? reject(drainError) : resolve()))
+    })
+  })
+}
+
 function registerSerialHandlers(): void {
+  fileTransferManager = new FileTransferManager(writeRawPort, (progress) =>
+    emit('fileTransfer:progress', progress)
+  )
   ipcMain.handle('app:info', () => ({
     version: app.getVersion(),
     platform: process.platform,
@@ -365,6 +382,34 @@ function registerSerialHandlers(): void {
     shell.showItemInFolder(manager)
   })
   ipcMain.handle('virtualPorts:openDownload', () => Promise.resolve())
+  ipcMain.handle('fileTransfer:selectFile', async () => {
+    if (!mainWindow) throw new Error('应用窗口尚未就绪')
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: '选择要通过串口发送的文件',
+      properties: ['openFile']
+    })
+    if (result.canceled || !result.filePaths[0]) return null
+    const filePath = result.filePaths[0]
+    const info = await stat(filePath)
+    return { path: filePath, name: filePath.split(/[\\/]/).at(-1) || '未命名文件', size: info.size }
+  })
+  ipcMain.handle('fileTransfer:selectDirectory', async () => {
+    if (!mainWindow) throw new Error('应用窗口尚未就绪')
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: '选择串口接收文件的保存目录',
+      properties: ['openDirectory', 'createDirectory']
+    })
+    return result.canceled ? null : result.filePaths[0] || null
+  })
+  ipcMain.handle('fileTransfer:setReceiver', async (_event, port: string, directory?: string) => {
+    await fileTransferManager!.setReceiver(port, directory)
+  })
+  ipcMain.handle('fileTransfer:send', (_event, port: string, filePath: string, chunkSize: number) =>
+    fileTransferManager!.sendFile(port, filePath, chunkSize)
+  )
+  ipcMain.handle('fileTransfer:cancel', (_event, taskId: string) =>
+    fileTransferManager!.cancel(taskId)
+  )
   ipcMain.handle('session:start', async () => {
     if (!mainWindow) throw new Error('应用窗口尚未就绪')
     if (sessionStream) return { path: sessionFile }

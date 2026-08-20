@@ -31,6 +31,13 @@ const api = {
   openVirtualPortManager: () => ipcRenderer.invoke('virtualPorts:openManager'),
   installVirtualPortCertificate: () => ipcRenderer.invoke('virtualPorts:installCertificate'),
   openVirtualPortDownload: () => ipcRenderer.invoke('virtualPorts:openDownload'),
+  selectTransferFile: () => ipcRenderer.invoke('fileTransfer:selectFile'),
+  selectTransferDirectory: () => ipcRenderer.invoke('fileTransfer:selectDirectory'),
+  setFileReceiver: (port: string, directory?: string) =>
+    ipcRenderer.invoke('fileTransfer:setReceiver', port, directory),
+  startFileTransfer: (port: string, filePath: string, chunkSize: number) =>
+    ipcRenderer.invoke('fileTransfer:send', port, filePath, chunkSize),
+  cancelFileTransfer: (taskId: string) => ipcRenderer.invoke('fileTransfer:cancel', taskId),
   openPort: (options: unknown) => ipcRenderer.invoke('serial:open', options),
   closePort: (path: string) => ipcRenderer.invoke('serial:close', path),
   write: (path: string, base64: string) => ipcRenderer.invoke('serial:write', path, base64),
@@ -57,6 +64,12 @@ const api = {
     ): void => callback(error)
     ipcRenderer.on('serial:error', listener)
     return () => ipcRenderer.removeListener('serial:error', listener)
+  },
+  onFileTransferProgress: (callback: (progress: unknown) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, progress: unknown): void =>
+      callback(progress)
+    ipcRenderer.on('fileTransfer:progress', listener)
+    return () => ipcRenderer.removeListener('fileTransfer:progress', listener)
   }
 }
 

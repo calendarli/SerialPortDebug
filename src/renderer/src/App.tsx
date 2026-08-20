@@ -8,6 +8,7 @@ import { CommandsPanel } from './components/CommandsPanel'
 import { SendPanel } from './components/SendPanel'
 import { SerialConfigPanel } from './components/SerialConfigPanel'
 import { SerialPairPanel } from './components/SerialPairPanel'
+import { FileTransferPanel } from './components/FileTransferPanel'
 import { Sidebar } from './components/Sidebar'
 import { defaultSerialFraming, SerialFramer } from './serial-framer'
 import { ScriptFramer } from './scripts/script-framer'
@@ -467,7 +468,7 @@ function App(): React.JSX.Element {
   const [commandGroups, setCommandGroups] = useState<CommandGroup[]>(loadCommandGroups)
   const [scripts, setScripts] = useState<UserScript[]>(() => ensureInitialScripts(loadScripts()))
   const [sideTab, setSideTab] = useState<
-    'serial' | 'pairs' | 'commands' | 'rules' | 'scripts' | 'modbus' | 'about'
+    'serial' | 'pairs' | 'transfer' | 'commands' | 'rules' | 'scripts' | 'modbus' | 'about'
   >('serial')
   const [rxCommunicationCount, setRxCommunicationCount] = useState(0)
   const [txCommunicationCount, setTxCommunicationCount] = useState(0)
@@ -1468,6 +1469,8 @@ function App(): React.JSX.Element {
         />
         {sideTab === 'pairs' ? (
           <SerialPairPanel />
+        ) : sideTab === 'transfer' ? (
+          <FileTransferPanel ports={openedPortList} />
         ) : sideTab === 'scripts' ? (
           <section className="script-content">
             <Suspense fallback={<div className="script-loading">正在加载 Monaco 编辑器…</div>}>
