@@ -17,6 +17,7 @@ export function FileTransferPanel({ ports }: Props): React.JSX.Element {
   const [file, setFile] = useState<{ path: string; name: string; size: number } | null>(null)
   const [directory, setDirectory] = useState('')
   const [chunkSize, setChunkSize] = useState(1024)
+  const [protocol, setProtocol] = useState<'serialflow' | 'raw'>('serialflow')
   const [receiverEnabled, setReceiverEnabled] = useState(false)
   const [tasks, setTasks] = useState<Record<string, Progress>>({})
   const [message, setMessage] = useState('请选择已打开的串口开始文件传输')
@@ -86,7 +87,7 @@ export function FileTransferPanel({ ports }: Props): React.JSX.Element {
       if (!selectedSendPort) throw new Error('请先打开并选择发送串口')
       if (!file) throw new Error('请选择要发送的文件')
       setSendPort(selectedSendPort)
-      await window.api.startFileTransfer(selectedSendPort, file.path, chunkSize)
+      await window.api.startFileTransfer(selectedSendPort, file.path, chunkSize, protocol)
       setMessage('文件传输任务已启动')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error))
@@ -106,7 +107,17 @@ export function FileTransferPanel({ ports }: Props): React.JSX.Element {
       <div className="file-transfer-grid">
         <div className="serial-pair-card">
           <h2>发送文件</h2>
-          <p>接收端必须先启用文件接收。传输期间该串口不会显示普通交互数据。</p>
+          <p>可靠模式用于两个 SerialFlow 之间传输；原始模式可直接向不支持确认协议的下位机发送。</p>
+          <label>
+            传输协议
+            <select
+              value={protocol}
+              onChange={(event) => setProtocol(event.target.value as 'serialflow' | 'raw')}
+            >
+              <option value="serialflow">SerialFlow 可靠传输（需要接收端确认）</option>
+              <option value="raw">原始二进制（不等待回应）</option>
+            </select>
+          </label>
           <label>
             发送串口
             <select value={selectedSendPort} onChange={(event) => setSendPort(event.target.value)}>
@@ -139,6 +150,11 @@ export function FileTransferPanel({ ports }: Props): React.JSX.Element {
           >
             开始发送
           </button>
+          {protocol === 'raw' && (
+            <p className="file-transfer-raw-warning">
+              原始模式发送完成只表示数据已写入串口，无法确认下位机是否完整接收。
+            </p>
+          )}
         </div>
 
         <div className="serial-pair-card">
@@ -185,6 +201,7 @@ export function FileTransferPanel({ ports }: Props): React.JSX.Element {
               <div className="file-transfer-task-title">
                 <strong>
                   {task.direction === 'send' ? '发送' : '接收'} · {task.fileName}
+                  {task.direction === 'send' && ` · ${task.protocol === 'raw' ? '原始' : '可靠'}`}
                 </strong>
                 <span>
                   {task.port} · {task.message}

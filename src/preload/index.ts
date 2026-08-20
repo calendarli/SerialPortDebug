@@ -35,8 +35,12 @@ const api = {
   selectTransferDirectory: () => ipcRenderer.invoke('fileTransfer:selectDirectory'),
   setFileReceiver: (port: string, directory?: string) =>
     ipcRenderer.invoke('fileTransfer:setReceiver', port, directory),
-  startFileTransfer: (port: string, filePath: string, chunkSize: number) =>
-    ipcRenderer.invoke('fileTransfer:send', port, filePath, chunkSize),
+  startFileTransfer: (
+    port: string,
+    filePath: string,
+    chunkSize: number,
+    protocol: 'serialflow' | 'raw'
+  ) => ipcRenderer.invoke('fileTransfer:send', port, filePath, chunkSize, protocol),
   cancelFileTransfer: (taskId: string) => ipcRenderer.invoke('fileTransfer:cancel', taskId),
   openPort: (options: unknown) => ipcRenderer.invoke('serial:open', options),
   closePort: (path: string) => ipcRenderer.invoke('serial:close', path),

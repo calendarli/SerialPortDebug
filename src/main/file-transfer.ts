@@ -36,6 +36,7 @@ export type TransferProgress = {
   retries: number
   startedAt: number
   bytesPerSecond: number
+  protocol: 'serialflow' | 'raw'
 }
 
 type Frame = { type: number; sessionId: number; sequence: number; payload: Buffer }
@@ -173,6 +174,18 @@ export class FileTransferManager {
     return (
       this.receiveDirectories.has(port) ||
       [...this.senders.values()].some(
+        (task) =>
+          task.port === port &&
+          task.protocol === 'serialflow' &&
+          !['completed', 'error', 'cancelled'].includes(task.state)
+      )
+    )
+  }
+
+  private isPortBusy(port: string): boolean {
+    return (
+      this.receiveDirectories.has(port) ||
+      [...this.senders.values()].some(
         (task) => task.port === port && !['completed', 'error', 'cancelled'].includes(task.state)
       )
     )
@@ -196,9 +209,14 @@ export class FileTransferManager {
     return true
   }
 
-  async sendFile(port: string, filePath: string, chunkSize = 1024): Promise<string> {
+  async sendFile(
+    port: string,
+    filePath: string,
+    chunkSize = 1024,
+    protocol: 'serialflow' | 'raw' = 'serialflow'
+  ): Promise<string> {
     if (!port) throw new Error('请选择发送串口')
-    if (this.isReserved(port)) throw new Error(`${port} 正在进行其他文件传输任务`)
+    if (this.isPortBusy(port)) throw new Error(`${port} 正在进行其他文件传输任务`)
     const info = await stat(filePath)
     if (!info.isFile()) throw new Error('请选择有效文件')
     const normalizedChunkSize = Math.min(32 * 1024, Math.max(256, Math.floor(chunkSize)))
@@ -213,22 +231,54 @@ export class FileTransferManager {
       totalBytes: info.size,
       transferredBytes: 0,
       state: 'preparing',
-      message: '正在计算文件 SHA-256…',
+      message: protocol === 'raw' ? '正在准备原始二进制发送…' : '正在计算文件 SHA-256…',
       retries: 0,
       startedAt: Date.now(),
       bytesPerSecond: 0,
+      protocol,
       cancelled: false,
       sessionId
     }
     this.senders.set(taskId, task)
     this.publish(task)
-    void this.runSender(task, normalizedChunkSize).catch((error) => {
+    const runner =
+      protocol === 'raw'
+        ? this.runRawSender(task, normalizedChunkSize)
+        : this.runSender(task, normalizedChunkSize)
+    void runner.catch((error) => {
       if (task.cancelled) return
       task.state = 'error'
       task.message = errorMessage(error)
       this.publish(task)
     })
     return taskId
+  }
+
+  private async runRawSender(task: SenderTask, chunkSize: number): Promise<void> {
+    task.state = 'transferring'
+    task.message = '正在发送原始二进制数据…'
+    this.publish(task)
+    const handle = await open(task.filePath!, 'r')
+    let offset = 0
+    try {
+      while (offset < task.totalBytes) {
+        this.ensureActive(task)
+        const length = Math.min(chunkSize, task.totalBytes - offset)
+        const buffer = Buffer.allocUnsafe(length)
+        const { bytesRead } = await handle.read(buffer, 0, length, offset)
+        if (!bytesRead) throw new Error('读取文件时意外到达结尾')
+        await this.writePort(task.port, buffer.subarray(0, bytesRead))
+        offset += bytesRead
+        task.transferredBytes = offset
+        this.publish(task)
+      }
+    } finally {
+      await handle.close()
+    }
+    task.state = 'completed'
+    task.message = '原始数据已全部写入串口；下位机接收结果未知'
+    task.transferredBytes = task.totalBytes
+    this.publish(task)
   }
 
   async cancel(taskId: string): Promise<void> {
@@ -238,9 +288,10 @@ export class FileTransferManager {
       sender.state = 'cancelled'
       sender.message = '传输已取消'
       this.rejectWaiter(sender.sessionId, new Error('传输已取消'))
-      await this.writePort(sender.port, encodeFrame(FrameType.Cancel, sender.sessionId, 0)).catch(
-        () => undefined
-      )
+      if (sender.protocol === 'serialflow')
+        await this.writePort(sender.port, encodeFrame(FrameType.Cancel, sender.sessionId, 0)).catch(
+          () => undefined
+        )
       this.publish(sender)
       return
     }
@@ -466,6 +517,7 @@ export class FileTransferManager {
         retries: 0,
         startedAt: Date.now(),
         bytesPerSecond: 0,
+        protocol: 'serialflow',
         sessionId: frame.sessionId,
         chunkSize,
         sha256: metadata.sha256!,

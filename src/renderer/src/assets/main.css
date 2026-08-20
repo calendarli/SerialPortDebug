@@ -2036,6 +2036,13 @@ footer > span:first-child {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.file-transfer-raw-warning {
+  margin: 12px 0 0;
+  padding: 8px 10px;
+  border-radius: 7px;
+  background: #fff7ed;
+  color: #9a3412 !important;
+}
 .file-transfer-tasks {
   max-width: 980px;
 }

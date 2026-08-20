@@ -288,12 +288,9 @@ async function closeAllPorts(): Promise<void> {
 async function writeRawPort(path: string, data: Buffer): Promise<void> {
   const active = openPorts.get(path)
   if (!active?.isOpen) throw new Error(`串口 ${path} 未打开`)
-  await new Promise<void>((resolve, reject) => {
-    active.write(data, (error) => {
-      if (error) return reject(error)
-      active.drain((drainError) => (drainError ? reject(drainError) : resolve()))
-    })
-  })
+  await new Promise<void>((resolve, reject) =>
+    active.write(data, (error) => (error ? reject(error) : resolve()))
+  )
 }
 
 function registerSerialHandlers(): void {
@@ -404,8 +401,10 @@ function registerSerialHandlers(): void {
   ipcMain.handle('fileTransfer:setReceiver', async (_event, port: string, directory?: string) => {
     await fileTransferManager!.setReceiver(port, directory)
   })
-  ipcMain.handle('fileTransfer:send', (_event, port: string, filePath: string, chunkSize: number) =>
-    fileTransferManager!.sendFile(port, filePath, chunkSize)
+  ipcMain.handle(
+    'fileTransfer:send',
+    (_event, port: string, filePath: string, chunkSize: number, protocol: 'serialflow' | 'raw') =>
+      fileTransferManager!.sendFile(port, filePath, chunkSize, protocol)
   )
   ipcMain.handle('fileTransfer:cancel', (_event, taskId: string) =>
     fileTransferManager!.cancel(taskId)

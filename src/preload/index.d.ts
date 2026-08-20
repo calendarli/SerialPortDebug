@@ -26,6 +26,7 @@ type FileTransferProgress = {
   retries: number
   startedAt: number
   bytesPerSecond: number
+  protocol: 'serialflow' | 'raw'
 }
 
 declare global {
@@ -71,7 +72,12 @@ declare global {
       selectTransferFile(): Promise<{ path: string; name: string; size: number } | null>
       selectTransferDirectory(): Promise<string | null>
       setFileReceiver(port: string, directory?: string): Promise<void>
-      startFileTransfer(port: string, filePath: string, chunkSize: number): Promise<string>
+      startFileTransfer(
+        port: string,
+        filePath: string,
+        chunkSize: number,
+        protocol: 'serialflow' | 'raw'
+      ): Promise<string>
       cancelFileTransfer(taskId: string): Promise<void>
       openPort(options: SerialOptions): Promise<boolean>
       closePort(path: string): Promise<void>
