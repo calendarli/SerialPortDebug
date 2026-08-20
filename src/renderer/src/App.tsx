@@ -414,13 +414,15 @@ function App(): React.JSX.Element {
     [serialConfigs]
   )
   const targetPortOptions = useMemo(
-    () =>
-      serialConfigs
-        .filter((config) => Boolean(config.path))
-        .map((config, index) => ({
-          path: config.path,
-          name: config.name?.trim() || `串口组 ${index + 1}`
-        })),
+    () => {
+      const seen = new Set<string>()
+      return serialConfigs.flatMap((config, index) => {
+        const path = config.path.trim().toUpperCase()
+        if (!path || seen.has(path)) return []
+        seen.add(path)
+        return [{ path, name: config.name?.trim() || `串口组 ${index + 1}` }]
+      })
+    },
     [serialConfigs]
   )
   const plotPorts = useMemo(
@@ -649,7 +651,14 @@ function App(): React.JSX.Element {
 
   const refreshPorts = useCallback(async () => {
     try {
-      const list = await window.api.listPorts()
+      const rawList = await window.api.listPorts()
+      const seen = new Set<string>()
+      const list = rawList.filter((port) => {
+        const path = port.path.trim().toUpperCase()
+        if (!path || seen.has(path)) return false
+        seen.add(path)
+        return true
+      })
       setPorts(list)
       setSerialConfigs((current) =>
         current.map((config, index) =>

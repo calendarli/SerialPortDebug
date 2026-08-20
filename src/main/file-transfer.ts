@@ -345,7 +345,16 @@ export class FileTransferManager {
       this.ensureActive(task)
       try {
         const response = this.waitFor(task.sessionId, types, sequence, timeout)
-        await this.writePort(task.port, frame)
+        try {
+          await this.writePort(task.port, frame)
+        } catch (error) {
+          this.rejectWaiter(
+            task.sessionId,
+            error instanceof Error ? error : new Error(String(error))
+          )
+          await response.catch(() => undefined)
+          throw error
+        }
         return await response
       } catch (error) {
         lastError = error
