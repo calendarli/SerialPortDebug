@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' data:"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SerialFlow 使用帮助</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --primary: #2563eb;
+        --primary-soft: #eaf2ff;
+        --text: #1f2937;
+        --muted: #64748b;
+        --border: #dbe4ef;
+        --surface: #ffffff;
+        --soft: #f8fafc;
+        font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body { margin: 0; background: #f3f6fb; color: var(--text); }
+      .shell { min-height: 100vh; display: grid; grid-template-columns: 260px minmax(0, 1fr); }
+      aside {
+        position: sticky; top: 0; height: 100vh; overflow: auto; padding: 22px 16px;
+        border-right: 1px solid var(--border); background: #fff;
+      }
+      .brand { margin: 0 8px 18px; }
+      .brand strong { display: block; color: #163b7a; font-size: 22px; }
+      .brand span { color: var(--muted); font-size: 13px; }
+      .search { position: relative; margin-bottom: 16px; }
+      .search input {
+        width: 100%; height: 38px; padding: 0 34px 0 11px; border: 1px solid var(--border);
+        border-radius: 8px; outline: 0; font: inherit;
+      }
+      .search input:focus { border-color: #79a7f8; box-shadow: 0 0 0 3px #2563eb14; }
+      .search button { position: absolute; top: 5px; right: 5px; width: 28px; height: 28px; border: 0; background: transparent; color: var(--muted); }
+      nav { display: grid; gap: 4px; }
+      nav a { padding: 8px 10px; border-radius: 7px; color: #475569; text-decoration: none; font-size: 14px; }
+      nav a:hover, nav a.active { background: var(--primary-soft); color: var(--primary); }
+      main { width: min(1040px, 100%); padding: 36px 42px 80px; }
+      .hero { padding: 26px 28px; border: 1px solid #cfe0fb; border-radius: 16px; background: linear-gradient(135deg, #fff, #eef5ff); }
+      .hero h1 { margin: 0 0 8px; color: #153d80; font-size: 30px; }
+      .hero p { max-width: 760px; margin: 0; color: #52627a; line-height: 1.7; }
+      .quick-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 18px 0 34px; }
+      .quick-grid a { padding: 15px; border: 1px solid var(--border); border-radius: 11px; background: #fff; color: inherit; text-decoration: none; }
+      .quick-grid a:hover { border-color: #8db4f7; box-shadow: 0 5px 18px #2563eb12; }
+      .quick-grid strong { display: block; margin-bottom: 5px; color: #234b8d; }
+      .quick-grid span { color: var(--muted); font-size: 13px; line-height: 1.5; }
+      .manual-link { display: inline-flex; align-items: center; min-height: 38px; margin-top: 8px; padding: 0 14px; border: 1px solid #b8cff5; border-radius: 8px; background: var(--primary-soft); color: var(--primary); font-weight: 650; text-decoration: none; }
+      .manual-link:hover { border-color: #79a7f8; background: #dceaff; }
+      article { scroll-margin-top: 18px; margin: 0 0 28px; padding: 23px 25px; border: 1px solid var(--border); border-radius: 13px; background: var(--surface); }
+      article h2 { margin: 0 0 16px; color: #173f7d; font-size: 22px; }
+      article h3 { margin: 20px 0 8px; color: #334155; font-size: 17px; }
+      article p, article li { color: #475569; line-height: 1.72; }
+      article ul, article ol { margin: 7px 0; padding-left: 22px; }
+      .map { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 7px 14px; }
+      .map dt { color: #234b8d; font-weight: 650; }
+      .map dd { margin: 0; color: #52627a; line-height: 1.55; }
+      .steps { counter-reset: step; display: grid; gap: 10px; padding: 0; list-style: none; }
+      .steps li { position: relative; min-height: 32px; padding-left: 42px; }
+      .steps li::before { counter-increment: step; content: counter(step); position: absolute; left: 0; top: 0; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: var(--primary-soft); color: var(--primary); font-weight: 700; }
+      .tip, .warn { margin: 12px 0; padding: 11px 13px; border-left: 4px solid #60a5fa; border-radius: 5px; background: #eff6ff; color: #38557c; line-height: 1.65; }
+      .warn { border-left-color: #f59e0b; background: #fffbeb; color: #7c5316; }
+      code { padding: 2px 5px; border-radius: 4px; background: #eef2f7; color: #334155; font-family: Consolas, monospace; }
+      table { width: 100%; border-collapse: collapse; font-size: 14px; }
+      th, td { padding: 9px 10px; border: 1px solid var(--border); text-align: left; vertical-align: top; }
+      th { background: var(--soft); color: #334155; }
+      .empty-search { display: none; padding: 50px 20px; color: var(--muted); text-align: center; }
+      .footer { color: #94a3b8; font-size: 12px; text-align: center; }
+      @media (max-width: 760px) {
+        .shell { display: block; }
+        aside { position: static; width: auto; height: auto; border-right: 0; border-bottom: 1px solid var(--border); }
+        nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        main { padding: 24px 16px 50px; }
+        .quick-grid { grid-template-columns: 1fr; }
+        .map { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <aside>
+        <div class="brand"><strong>SerialFlow</strong><span>使用帮助与快速定位</span></div>
+        <div class="search">
+          <input id="search" type="search" placeholder="搜索功能或问题…" aria-label="搜索帮助" />
+          <button id="clear" title="清空搜索" aria-label="清空搜索">×</button>
+        </div>
+        <nav id="nav">
+          <a href="#layout">界面布局</a>
+          <a href="#start">快速开始</a>
+          <a href="#serial">串口配置</a>
+          <a href="#interaction">数据交互</a>
+          <a href="#plot">实时曲线</a>
+          <a href="#send">数据发送</a>
+          <a href="#commands">快捷指令</a>
+          <a href="#reply">自动回复</a>
+          <a href="#pairs">虚拟串口对</a>
+          <a href="#transfer">文件传输</a>
+          <a href="#scripts">脚本</a>
+          <a href="#programming">编程参数</a>
+          <a href="#modbus">Modbus RTU</a>
+          <a href="#project">工程导入导出</a>
+          <a href="#troubleshoot">故障排查</a>
+          <a href="#shortcuts">快捷操作</a>
+        </nav>
+      </aside>
+      <main>
+        <section class="hero">
+          <h1>SerialFlow 使用帮助</h1>
+          <p>从左侧目录选择功能，或在搜索框输入“打不开串口”“HEX”“曲线”等关键词。每个章节都说明入口位置、操作步骤和常见问题。</p>
+        </section>
+        <div class="quick-grid">
+          <a href="#start"><strong>第一次使用</strong><span>完成端口选择、参数配置、打开和收发测试</span></a>
+          <a href="#layout"><strong>功能在哪里</strong><span>按左侧导航、中央工作区和底部状态栏快速定位</span></a>
+          <a href="#troubleshoot"><strong>遇到连接问题</strong><span>排查端口占用、驱动、参数和设备断开</span></a>
+        </div>
+        <div id="empty" class="empty-search">没有找到相关帮助，请尝试更短的关键词。</div>
+
+        <article id="layout" data-title="界面布局 导航 功能在哪里">
+          <h2>界面布局</h2>
+          <dl class="map">
+            <dt>顶部状态栏</dt><dd>显示当前已打开的串口数量、端口号以及正在运行的脚本数量。</dd>
+            <dt>左侧图标栏</dt><dd>切换串口、串口对、指令、回复、脚本、文件、Modbus、帮助和关于。</dd>
+            <dt>左侧配置区</dt><dd>显示当前导航项的配置内容。拖动配置区右边缘可调整宽度，双击恢复默认宽度。</dd>
+            <dt>实时曲线</dt><dd>位于中央上方。可拖动底部把手改变高度；收起后为数据交互释放空间。</dd>
+            <dt>数据交互</dt><dd>集中显示每个端口的 RX/TX 数据，支持 HEX、时间戳、暂停、搜索和条件暂停。</dd>
+            <dt>发送区</dt><dd>位于中央下方，用于选择目标串口、编辑内容、切换 ASCII/HEX、CRC 和自动发送。</dd>
+            <dt>底部状态栏</dt><dd>显示操作结果、RX/TX 次数、缓存占用、数据频率及 IPC 批处理状态。</dd>
+          </dl>
+        </article>
+
+        <article id="start" data-title="快速开始 第一次使用 连接 收发">
+          <h2>快速开始</h2>
+          <ol class="steps">
+            <li>连接串口设备，打开左侧“串口”，点击刷新按钮。</li>
+            <li>从端口列表选择设备。绿色背景表示该端口已经打开，列表同时显示系统串口名称。</li>
+            <li>确认波特率、数据位、停止位和校验位与设备一致，然后点击“打开此串口”。</li>
+            <li>在底部发送区选择目标端口，输入内容，按设备协议选择 ASCII 或 HEX 后发送。</li>
+            <li>在“数据交互”查看 TX 和 RX；需要观察数值变化时勾选“接收数据绘制曲线”。</li>
+          </ol>
+          <div class="tip">建议首次连接使用设备文档给出的默认参数。常见配置是 115200、8 数据位、1 停止位、无校验。</div>
+        </article>
+
+        <article id="serial" data-title="串口配置 多串口 波特率 分帧 打开 关闭">
+          <h2>多串口配置</h2>
+          <h3>端口列表与状态</h3>
+          <p>点击刷新重新枚举设备。选项文字包含 COM 端口和系统串口名称；已打开端口用绿色背景表示。一个物理端口不能同时分配给多个配置。</p>
+          <h3>通信参数</h3>
+          <p>波特率、数据位、停止位和校验位必须与设备一致。端口打开后参数会锁定；如需修改，请先关闭该串口。</p>
+          <h3>接收分帧</h3>
+          <ul>
+            <li><strong>原始数据块：</strong>按系统收到的数据块直接处理，适合简单观察。</li>
+            <li><strong>分隔符：</strong>按换行符或自定义分隔符形成完整帧。</li>
+            <li><strong>固定长度：</strong>累计到指定字节数后形成一帧。</li>
+            <li><strong>帧头 + 帧尾：</strong>从指定 HEX 帧头截取到帧尾。</li>
+            <li><strong>空闲超时：</strong>线路静默指定时间后结束当前帧。</li>
+          </ul>
+          <div class="warn">分帧会影响显示、条件暂停、自动回复和曲线解析。协议有明确帧边界时，建议选择对应方式。</div>
+        </article>
+
+        <article id="interaction" data-title="数据交互 接收 HEX 时间戳 暂停 搜索 清空 缓存 条件暂停">
+          <h2>数据交互</h2>
+          <ul>
+            <li><strong>接收 HEX：</strong>以十六进制字节显示接收数据；关闭时按文本显示。</li>
+            <li><strong>时间戳：</strong>显示每条交互记录的接收或发送时间。</li>
+            <li><strong>暂停接收显示：</strong>停止向界面追加记录，不会关闭串口。</li>
+            <li><strong>缓存 / 条数：</strong>限制内存中的交互记录，达到限制后优先移除最旧记录；条数为 0 表示不限制条数。</li>
+            <li><strong>搜索：</strong>在数据视窗按 <code>Ctrl + F</code>，可按普通文本或正则表达式定位。</li>
+            <li><strong>清空：</strong>清除当前界面的交互记录，不影响串口连接。</li>
+          </ul>
+          <h3>条件暂停</h3>
+          <p>启用后选择 ASCII 或 HEX，输入完整匹配条件。当收到的数据帧满足条件时，软件自动暂停后续接收显示。正则模式适合匹配变化字段。</p>
+        </article>
+
+        <article id="plot" data-title="实时曲线 绘图 数值 配色 PID 暂停 Y轴 缩放">
+          <h2>实时曲线</h2>
+          <p>先在对应串口配置中勾选“接收数据绘制曲线”。支持 <code>PWM=10, PID=-2.5</code>、<code>PWM:10</code> 或 <code>10,20,30</code> 等文本数值格式。</p>
+          <ul>
+            <li>右侧工具区可回到实时、恢复 Y 自动范围、暂停绘图、清空曲线、调整配色和打开 PID 调参建议。</li>
+            <li>滚动或拖动 X 轴可查看历史时间区间；滚动或拖动 Y 轴可缩放和平移数值范围。</li>
+            <li>移动鼠标查看同一时刻各通道的插值数据；图例中的复选框可单独隐藏通道。</li>
+            <li>“收起/展开”会同步隐藏或显示右侧工具区。</li>
+          </ul>
+          <div class="warn">二进制 HEX 帧不能直接绘制。请先由设备输出文本数值，或使用脚本转换后再观察。</div>
+        </article>
+
+        <article id="send" data-title="发送 ASCII HEX 自动发送 CRC 目标端口">
+          <h2>数据发送</h2>
+          <p>多串口同时打开时，先选择目标端口。ASCII 模式发送文本；HEX 模式要求输入成对的十六进制字节，例如 <code>AA 01 0D 0A</code>。</p>
+          <ul>
+            <li>“追加 CRLF”会在文本末尾添加回车换行。</li>
+            <li>CRC 可按所选算法计算并追加到发送数据。</li>
+            <li>自动发送可设置间隔和次数；次数为 0 时表示持续发送，直到手动停止。</li>
+          </ul>
+        </article>
+
+        <article id="commands" data-title="快捷指令 指令组 参数 模板 CRC">
+          <h2>快捷指令</h2>
+          <p>将常用报文保存为指令并按组管理。指令可绑定目标串口、ASCII/HEX 模式、CRC，以及人工输入或程序计算的参数。发送前会根据当前参数生成最终报文。</p>
+          <div class="tip">对频繁使用的初始化、查询和控制命令分别建组，可以减少误发并提升现场调试速度。</div>
+        </article>
+
+        <article id="reply" data-title="自动回复 规则 条件 正则 参数 状态">
+          <h2>自动回复</h2>
+          <p>规则匹配接收帧后向指定串口回复。可选择 ASCII/HEX、普通匹配或正则表达式，并通过参数和程序生成回复内容。</p>
+          <ul>
+            <li>规则按启用状态运行；侧栏角标显示当前启用数量。</li>
+            <li>多串口环境下应明确设置目标端口，避免回复到错误设备。</li>
+            <li>修改分帧方式后应重新验证规则，因为匹配对象是分帧后的完整数据。</li>
+            <li>程序参数的语法和可用 API 可从规则编辑区打开“编程参数手册”查看。</li>
+          </ul>
+        </article>
+
+        <article id="pairs" data-title="虚拟串口对 创建 删除 驱动 UAC">
+          <h2>虚拟串口对</h2>
+          <p>用于创建两个互相连通的虚拟 COM 端口，适合联调两个串口程序。选择两个未占用端口号后创建；删除时选择现有端口对。</p>
+          <div class="warn">安装证书、创建和删除虚拟串口需要 Windows 管理员授权。操作后若系统尚未刷新设备列表，请刷新或重启应用。</div>
+        </article>
+
+        <article id="transfer" data-title="文件传输 发送文件 接收文件 协议 原始模式">
+          <h2>串口文件传输</h2>
+          <p>打开“文件”页后选择已打开的串口。可发送文件，也可指定目录等待接收。SerialFlow 协议提供分块和进度信息；原始模式直接发送文件字节，需由对端协议保证完整性。</p>
+        </article>
+
+        <article id="scripts" data-title="脚本 JavaScript 自动化 端口 运行 停止">
+          <h2>脚本</h2>
+          <p>使用内置编辑器编写自动化逻辑，对串口数据进行处理或执行周期任务。启用脚本会显示在顶部状态栏；修改关键通信流程后应先在低风险设备上验证。</p>
+        </article>
+
+        <article id="programming" data-title="编程参数手册 参数程序 JavaScript API 示例">
+          <h2>编程参数手册</h2>
+          <p>快捷指令和自动回复中的程序参数支持使用 JavaScript 生成动态内容。独立的编程参数手册包含可用变量、API、返回值要求、安全限制及完整示例。</p>
+          <a class="manual-link" href="programming-manual.html" target="_blank" rel="noopener">打开编程参数手册</a>
+        </article>
+
+        <article id="modbus" data-title="Modbus RTU 主站 从站 功能码 寄存器 CRC">
+          <h2>Modbus RTU</h2>
+          <p>选择已打开串口后，按站号、功能码、起始地址和数量构造请求。软件负责 RTU 报文和 CRC，收到响应后解析寄存器或线圈数据。</p>
+          <div class="tip">Modbus 地址通常同时存在十进制、十六进制和 4xxxx 文档表示法。遇到偏移一位时，请确认设备文档使用的是协议地址还是寄存器编号。</div>
+        </article>
+
+        <article id="project" data-title="工程 导入 导出 配置 备份">
+          <h2>工程导入与导出</h2>
+          <p>串口配置页顶部的“导出”可保存当前串口配置、规则、指令和相关设置；“导入”用于恢复。导入后请检查实际 COM 端口号，因为设备在另一台电脑上可能被系统分配不同端口。</p>
+        </article>
+
+        <article id="troubleshoot" data-title="故障排查 打不开 没数据 乱码 曲线没有 端口占用 驱动">
+          <h2>故障排查</h2>
+          <table>
+            <thead><tr><th>现象</th><th>优先检查</th></tr></thead>
+            <tbody>
+              <tr><td>找不到串口</td><td>重新插拔设备并刷新；检查 Windows 设备管理器、USB 线、驱动和设备供电。</td></tr>
+              <tr><td>串口无法打开</td><td>关闭其他串口工具或烧录软件；确认端口未被占用；尝试设备默认的 115200/8/N/1。</td></tr>
+              <tr><td>能发送但收不到</td><td>检查 TX/RX 是否交叉、GND 是否共地、目标端口是否正确、设备是否需要先发送唤醒命令。</td></tr>
+              <tr><td>文本乱码</td><td>确认波特率和字符编码；若数据本身是二进制，请启用“接收 HEX”。</td></tr>
+              <tr><td>自动回复不触发</td><td>检查规则是否启用、ASCII/HEX 模式、分帧结果、正则表达式及目标串口。</td></tr>
+              <tr><td>曲线没有数据</td><td>确认串口已勾选绘图、接收的是文本数值、字段格式受支持，并检查通道是否在图例中停用。</td></tr>
+              <tr><td>界面数据越来越多</td><td>降低缓存 MB 或最大条数；暂停显示只停止追加显示，不会关闭串口。</td></tr>
+            </tbody>
+          </table>
+        </article>
+
+        <article id="shortcuts" data-title="快捷操作 快捷键 搜索 缩放 调整">
+          <h2>快捷操作</h2>
+          <ul>
+            <li><code>Ctrl + F</code>：在数据交互区域打开搜索。</li>
+            <li><code>Ctrl + 鼠标滚轮</code>：在数据视窗中调整字号。</li>
+            <li>拖动实时曲线底部把手：调整曲线区域高度；双击恢复默认高度。</li>
+            <li>拖动发送区顶部边缘：调整发送区域高度；双击恢复默认高度。</li>
+            <li>拖动左侧配置区右边缘：调整侧栏宽度；双击恢复默认宽度。</li>
+          </ul>
+        </article>
+        <div class="footer">SerialFlow 离线使用帮助</div>
+      </main>
+    </div>
+    <script>
+      const input = document.getElementById('search')
+      const clear = document.getElementById('clear')
+      const articles = [...document.querySelectorAll('article')]
+      const navLinks = [...document.querySelectorAll('nav a')]
+      const empty = document.getElementById('empty')
+
+      function normalize(value) {
+        return value.toLocaleLowerCase().replace(/\s+/g, '')
+      }
+      function search() {
+        const keyword = normalize(input.value)
+        let visible = 0
+        for (const article of articles) {
+          const matched = !keyword || normalize(`${article.dataset.title || ''}${article.textContent}`).includes(keyword)
+          article.hidden = !matched
+          visible += matched ? 1 : 0
+        }
+        for (const link of navLinks) {
+          const target = document.querySelector(link.getAttribute('href'))
+          link.hidden = Boolean(keyword && target && target.hidden)
+        }
+        empty.style.display = visible ? 'none' : 'block'
+      }
+      input.addEventListener('input', search)
+      clear.addEventListener('click', () => { input.value = ''; search(); input.focus() })
+      window.addEventListener('hashchange', () => {
+        for (const link of navLinks) link.classList.toggle('active', link.hash === location.hash)
+      })
+      if (location.hash) window.dispatchEvent(new HashChangeEvent('hashchange'))
+    </script>
+  </body>
+</html>

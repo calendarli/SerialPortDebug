@@ -831,7 +831,7 @@ footer > span:first-child {
   border-radius: 0 3px 3px 0;
   background: var(--primary);
 }
-.resizable-sidebar .side-tabs .about-tab {
+.resizable-sidebar .side-tabs .help-tab {
   margin-top: auto;
 }
 .resizable-sidebar .side-tabs .tab-icon {

@@ -513,8 +513,9 @@ function createWindow(): void {
     try {
       const target = new URL(url)
       const isProgrammingManual = target.pathname.endsWith('/programming-manual.html')
+      const isHelpManual = target.pathname.endsWith('/help.html')
       const isLocalManual =
-        isProgrammingManual &&
+        (isProgrammingManual || isHelpManual) &&
         (target.protocol === 'file:' ||
           (is.dev &&
             Boolean(process.env['ELECTRON_RENDERER_URL']) &&
@@ -528,7 +529,7 @@ function createWindow(): void {
             minWidth: 720,
             minHeight: 520,
             autoHideMenuBar: true,
-            title: 'SerialFlow 编程参数手册',
+            title: isHelpManual ? 'SerialFlow 使用帮助' : 'SerialFlow 编程参数手册',
             webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false }
           }
         }

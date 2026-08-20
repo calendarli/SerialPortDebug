@@ -134,6 +134,19 @@ export function Sidebar(props: Props): React.JSX.Element {
           <span>Modbus</span>
         </button>
         <button
+          title="帮助"
+          className="help-tab"
+          onClick={() =>
+            window.open(
+              new URL('help.html', window.location.href).toString(),
+              'serialflow-help'
+            )
+          }
+        >
+          <span className="tab-icon">?</span>
+          <span>帮助</span>
+        </button>
+        <button
           title="关于"
           className={`about-tab ${props.activeTab === 'about' ? 'active' : ''}`}
           onClick={() => props.onTabChange('about')}
