@@ -16,6 +16,8 @@ type Props = {
     crcMode?: CrcMode | null,
     targetPort?: string
   ) => Promise<boolean>
+  onImport: () => Promise<boolean>
+  onExport: () => void
 }
 type Draft = {
   name: string
@@ -658,6 +660,17 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
       return next
     })
   }
+  const importCommands = async (): Promise<void> => {
+    if (!(await props.onImport())) return
+    for (const id of activeGroupLoopIds)
+      groupLoopTokensRef.current.set(id, (groupLoopTokensRef.current.get(id) || 0) + 1)
+    autoSendCountsRef.current.clear()
+    setActiveAutoSendIds(new Set())
+    setActiveGroupLoopIds(new Set())
+    setCollapsed(new Set())
+    setMenu(null)
+    setError('')
+  }
   const toggleGroupLoop = (group: CommandGroup): void => {
     if (activeGroupLoopIds.has(group.id)) return stopGroupLoop(group.id)
     if (!props.connected) return setError('请先打开串口')
@@ -865,7 +878,11 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
           <strong>快捷指令</strong>
           <small>右键新建组或指令</small>
         </div>
-        <span>{props.commands.length} 条</span>
+        <div className="side-section-actions">
+          <button onClick={() => void importCommands()}>导入</button>
+          <button onClick={props.onExport}>导出</button>
+          <span className="side-section-count">{props.commands.length} 条</span>
+        </div>
       </div>
       <div className="command-list">
         {renderLevel(null)}

@@ -45,6 +45,10 @@ declare global {
       getAppInfo(): Promise<{ version: string; platform: string; arch: string }>
       saveProject(project: unknown): Promise<string | null>
       openProject(): Promise<{ path: string; content: string } | null>
+      saveConfig(kind: 'quick-commands' | 'auto-replies', config: unknown): Promise<string | null>
+      openConfig(
+        kind: 'quick-commands' | 'auto-replies'
+      ): Promise<{ path: string; content: string } | null>
       openModbusMap(): Promise<{ path: string; name: string; base64: string } | null>
       saveModbusMap(config: unknown): Promise<string | null>
       listPorts(): Promise<SerialPortInfo[]>

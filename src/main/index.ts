@@ -393,6 +393,42 @@ function registerSerialHandlers(): void {
     if (result.canceled || !result.filePaths[0]) return null
     return { path: result.filePaths[0], content: await readFile(result.filePaths[0], 'utf8') }
   })
+  const configDialogOptions = (kind: unknown): { title: string; defaultPath: string } => {
+    if (kind === 'quick-commands')
+      return {
+        title: '快捷指令',
+        defaultPath: 'SerialFlow-quick-commands.json'
+      }
+    if (kind === 'auto-replies')
+      return {
+        title: '自动回复规则',
+        defaultPath: 'SerialFlow-auto-reply-rules.json'
+      }
+    throw new Error('不支持的配置类型')
+  }
+  ipcMain.handle('config:save', async (_event, kind: unknown, config: unknown) => {
+    if (!mainWindow) throw new Error('应用窗口尚未就绪')
+    const options = configDialogOptions(kind)
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: `导出${options.title}`,
+      defaultPath: options.defaultPath,
+      filters: [{ name: `SerialFlow ${options.title}`, extensions: ['json'] }]
+    })
+    if (result.canceled || !result.filePath) return null
+    await writeFile(result.filePath, JSON.stringify(config, null, 2), 'utf8')
+    return result.filePath
+  })
+  ipcMain.handle('config:open', async (_event, kind: unknown) => {
+    if (!mainWindow) throw new Error('应用窗口尚未就绪')
+    const options = configDialogOptions(kind)
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: `导入${options.title}`,
+      properties: ['openFile'],
+      filters: [{ name: `SerialFlow ${options.title}`, extensions: ['json'] }]
+    })
+    if (result.canceled || !result.filePaths[0]) return null
+    return { path: result.filePaths[0], content: await readFile(result.filePaths[0], 'utf8') }
+  })
   ipcMain.handle('modbus:openMap', async () => {
     if (!mainWindow) throw new Error('应用窗口尚未就绪')
     const result = await dialog.showOpenDialog(mainWindow, {

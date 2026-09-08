@@ -655,12 +655,33 @@ footer > span:first-child {
   color: var(--muted);
   font-size: 16px;
 }
-.side-section-head > span {
+.side-section-count {
   padding: 3px 7px;
   border-radius: 10px;
   background: #ecfdf5;
   color: #059669;
   font-size: 15px;
+}
+.side-section-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.side-section-actions > button {
+  min-height: 27px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #fff;
+  color: #334155;
+  font-size: 14px;
+}
+.side-section-actions > button:hover {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #2563eb;
 }
 .side-rule-list {
   display: flex;

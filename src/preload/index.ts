@@ -16,6 +16,9 @@ const api = {
   getAppInfo: () => ipcRenderer.invoke('app:info'),
   saveProject: (project: unknown) => ipcRenderer.invoke('project:save', project),
   openProject: () => ipcRenderer.invoke('project:open'),
+  saveConfig: (kind: 'quick-commands' | 'auto-replies', config: unknown) =>
+    ipcRenderer.invoke('config:save', kind, config),
+  openConfig: (kind: 'quick-commands' | 'auto-replies') => ipcRenderer.invoke('config:open', kind),
   openModbusMap: () => ipcRenderer.invoke('modbus:openMap'),
   saveModbusMap: (config: unknown) => ipcRenderer.invoke('modbus:saveMap', config),
   listPorts: () => ipcRenderer.invoke('serial:list'),

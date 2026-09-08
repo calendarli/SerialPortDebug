@@ -10,6 +10,12 @@ import { SerialConfigPanel } from './components/SerialConfigPanel'
 import { SerialPairPanel } from './components/SerialPairPanel'
 import { FileTransferPanel } from './components/FileTransferPanel'
 import { Sidebar } from './components/Sidebar'
+import {
+  createAutoReplyTransfer,
+  createQuickCommandsTransfer,
+  parseAutoReplyTransfer,
+  parseQuickCommandsTransfer
+} from './config-transfer'
 import { defaultSerialFraming, SerialFramer } from './serial-framer'
 import { ScriptFramer } from './scripts/script-framer'
 import { autoReplyProgramRuntime } from './scripts/auto-reply-program'
@@ -1284,6 +1290,68 @@ function App(): React.JSX.Element {
     setInteractionFontSize(next)
     localStorage.setItem(interactionFontSizeKey, String(next))
   }
+  const exportQuickCommands = async (): Promise<void> => {
+    try {
+      const path = await window.api.saveConfig(
+        'quick-commands',
+        createQuickCommandsTransfer(commandGroups, commands)
+      )
+      if (path) setMessage(`快捷指令已导出：${path}`)
+    } catch (error) {
+      showError(error, '导出快捷指令失败')
+    }
+  }
+  const importQuickCommands = async (): Promise<boolean> => {
+    try {
+      const selected = await window.api.openConfig('quick-commands')
+      if (!selected) return false
+      const imported = parseQuickCommandsTransfer(selected.content)
+      if (
+        (commands.length > 0 || commandGroups.length > 0) &&
+        !window.confirm('导入将替换当前全部快捷指令和分组，是否继续？')
+      )
+        return false
+      setCommands(imported.commands)
+      setCommandGroups(imported.groups)
+      setMessage(
+        `快捷指令已导入：${imported.commands.length} 条指令，${imported.groups.length} 个分组`
+      )
+      return true
+    } catch (error) {
+      showError(error, '导入快捷指令失败')
+      return false
+    }
+  }
+  const exportAutoReplies = async (): Promise<void> => {
+    try {
+      const path = await window.api.saveConfig(
+        'auto-replies',
+        createAutoReplyTransfer(autoReplyGroups, rules)
+      )
+      if (path) setMessage(`自动回复规则已导出：${path}`)
+    } catch (error) {
+      showError(error, '导出自动回复规则失败')
+    }
+  }
+  const importAutoReplies = async (): Promise<boolean> => {
+    try {
+      const selected = await window.api.openConfig('auto-replies')
+      if (!selected) return false
+      const imported = parseAutoReplyTransfer(selected.content)
+      if (!window.confirm('导入将替换当前全部自动回复规则和分组，并重置运行状态，是否继续？'))
+        return false
+      rules.forEach((rule) => resetAutoReplyState(rule.id, false))
+      setRules(imported.rules)
+      setAutoReplyGroups(imported.groups)
+      setMessage(
+        `自动回复规则已导入：${imported.rules.length} 条规则，${imported.groups.length} 个分组`
+      )
+      return true
+    } catch (error) {
+      showError(error, '导入自动回复规则失败')
+      return false
+    }
+  }
   const exportProject = async (): Promise<void> => {
     try {
       const path = await window.api.saveProject({
@@ -1418,6 +1486,8 @@ function App(): React.JSX.Element {
               connected={connected}
               targetPorts={targetPortOptions}
               onSend={sendCommandData}
+              onImport={importQuickCommands}
+              onExport={() => void exportQuickCommands()}
             />
           }
           rulesContent={
@@ -1428,6 +1498,8 @@ function App(): React.JSX.Element {
               setGroups={setAutoReplyGroups}
               targetPorts={targetPortOptions}
               onResetState={resetAutoReplyState}
+              onImport={importAutoReplies}
+              onExport={() => void exportAutoReplies()}
             />
           }
           aboutContent={<AboutPanel />}

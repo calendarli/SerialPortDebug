@@ -9,6 +9,8 @@ type Props = {
   setGroups: (groups: AutoReplyGroup[]) => void
   targetPorts: TargetPortOption[]
   onResetState: (ruleId: number, notify?: boolean) => void
+  onImport: () => Promise<boolean>
+  onExport: () => void
 }
 type DraftParameter = { id: string }
 const ruleModalSizeKey = 'serialflow.autoReplyModalSize'
@@ -78,7 +80,9 @@ export function AutoReplyPanel({
   groups,
   setGroups,
   targetPorts,
-  onResetState
+  onResetState,
+  onImport,
+  onExport
 }: Props): React.JSX.Element {
   const [creating, setCreating] = useState(false)
   const [editingRuleId, setEditingRuleId] = useState<number | null>(null)
@@ -348,16 +352,22 @@ export function AutoReplyPanel({
           <strong>自动回复规则</strong>
           <small>右键新建或删除规则</small>
         </div>
-        <button
-          onClick={() => {
-            const name = window.prompt('自动回复分组名称')?.trim()
-            if (!name) return
-            setGroups([...groups, { id: Date.now(), name, globals: {} }])
-          }}
-        >
-          ＋ 分组
-        </button>
-        <span>{rules.filter((rule) => rule.enabled).length} 启用</span>
+        <div className="side-section-actions">
+          <button
+            onClick={() => {
+              const name = window.prompt('自动回复分组名称')?.trim()
+              if (!name) return
+              setGroups([...groups, { id: Date.now(), name, globals: {} }])
+            }}
+          >
+            ＋ 分组
+          </button>
+          <button onClick={() => void onImport()}>导入</button>
+          <button onClick={onExport}>导出</button>
+          <span className="side-section-count">
+            {rules.filter((rule) => rule.enabled).length} 启用
+          </span>
+        </div>
       </div>
       <div className="auto-reply-group-list">
         {groups.map((group) => (
