@@ -24,7 +24,6 @@
     "@electron-toolkit/utils": "^4.0.0",
     "@tanstack/react-virtual": "^3.14.9",
     "electron-updater": "^6.3.9",
-    "monaco-editor": "^0.56.0",
     "quickjs-emscripten": "^0.32.0",
     "serialport": "^13.0.0"
   },

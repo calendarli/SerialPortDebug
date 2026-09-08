@@ -77,7 +77,8 @@ declare global {
         port: string,
         filePath: string,
         chunkSize: number,
-        protocol: 'serialflow' | 'raw'
+        protocol: 'serialflow' | 'raw',
+        chunkDelay?: number
       ): Promise<string>
       cancelFileTransfer(taskId: string): Promise<void>
       openPort(options: SerialOptions): Promise<boolean>

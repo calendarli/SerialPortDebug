@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
-type Tab = 'serial' | 'pairs' | 'transfer' | 'commands' | 'rules' | 'scripts' | 'modbus' | 'about'
+type Tab = 'serial' | 'pairs' | 'commands' | 'rules' | 'modbus' | 'about'
 type Props = {
   activeTab: Tab
   commandCount: number
   enabledRuleCount: number
-  enabledScriptCount: number
   onTabChange: (tab: Tab) => void
   serialContent: ReactNode
   commandsContent: ReactNode
@@ -27,7 +26,7 @@ function initialWidth(): number {
 }
 
 export function Sidebar(props: Props): React.JSX.Element {
-  const fullPage = ['scripts', 'modbus', 'pairs', 'transfer'].includes(props.activeTab)
+  const fullPage = ['modbus', 'pairs'].includes(props.activeTab)
   const [width, setWidth] = useState(initialWidth)
   const [resizing, setResizing] = useState(false)
   const dragStart = useRef({ x: 0, width: defaultWidth })
@@ -70,7 +69,7 @@ export function Sidebar(props: Props): React.JSX.Element {
 
   return (
     <aside
-      className={`config-panel resizable-sidebar ${fullPage ? 'script-tab-only' : ''} ${resizing ? 'resizing' : ''}`}
+      className={`config-panel resizable-sidebar ${fullPage ? 'full-page-tab-only' : ''} ${resizing ? 'resizing' : ''}`}
       style={{ width: fullPage ? 52 : width }}
     >
       <nav className="side-tabs" aria-label="侧栏导航">
@@ -107,23 +106,6 @@ export function Sidebar(props: Props): React.JSX.Element {
           <span className="tab-icon">⌘</span>
           <span>回复</span>
           {props.enabledRuleCount > 0 && <b>{props.enabledRuleCount}</b>}
-        </button>
-        <button
-          title="脚本"
-          className={props.activeTab === 'scripts' ? 'active' : ''}
-          onClick={() => props.onTabChange('scripts')}
-        >
-          <span className="tab-icon">{'{ }'}</span>
-          <span>脚本</span>
-          {props.enabledScriptCount > 0 && <b>{props.enabledScriptCount}</b>}
-        </button>
-        <button
-          title="串口文件传输"
-          className={props.activeTab === 'transfer' ? 'active' : ''}
-          onClick={() => props.onTabChange('transfer')}
-        >
-          <span className="tab-icon">⇄</span>
-          <span>文件</span>
         </button>
         <button
           title="Modbus RTU"

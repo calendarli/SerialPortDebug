@@ -366,8 +366,14 @@ function registerSerialHandlers(): void {
   })
   ipcMain.handle(
     'fileTransfer:send',
-    (_event, port: string, filePath: string, chunkSize: number, protocol: 'serialflow' | 'raw') =>
-      fileTransferManager!.sendFile(port, filePath, chunkSize, protocol)
+    (
+      _event,
+      port: string,
+      filePath: string,
+      chunkSize: number,
+      protocol: 'serialflow' | 'raw',
+      chunkDelay?: number
+    ) => fileTransferManager!.sendFile(port, filePath, chunkSize, protocol, chunkDelay)
   )
   ipcMain.handle('fileTransfer:cancel', (_event, taskId: string) =>
     fileTransferManager!.cancel(taskId)

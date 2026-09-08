@@ -38,8 +38,9 @@ const api = {
     port: string,
     filePath: string,
     chunkSize: number,
-    protocol: 'serialflow' | 'raw'
-  ) => ipcRenderer.invoke('fileTransfer:send', port, filePath, chunkSize, protocol),
+    protocol: 'serialflow' | 'raw',
+    chunkDelay?: number
+  ) => ipcRenderer.invoke('fileTransfer:send', port, filePath, chunkSize, protocol, chunkDelay),
   cancelFileTransfer: (taskId: string) => ipcRenderer.invoke('fileTransfer:cancel', taskId),
   openPort: (options: unknown) => ipcRenderer.invoke('serial:open', options),
   closePort: (path: string) => ipcRenderer.invoke('serial:close', path),

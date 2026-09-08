@@ -90,7 +90,7 @@ export type AutoReplyGroup = {
 
 export type InteractionEntry = {
   id: number
-  direction: 'rx' | 'tx' | 'script'
+  direction: 'rx' | 'tx'
   text: string
   rawHex?: string
   plotText?: string

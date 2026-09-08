@@ -213,13 +213,15 @@ export class FileTransferManager {
     port: string,
     filePath: string,
     chunkSize = 1024,
-    protocol: 'serialflow' | 'raw' = 'serialflow'
+    protocol: 'serialflow' | 'raw' = 'serialflow',
+    chunkDelay = 0
   ): Promise<string> {
     if (!port) throw new Error('请选择发送串口')
     if (this.isPortBusy(port)) throw new Error(`${port} 正在进行其他文件传输任务`)
     const info = await stat(filePath)
     if (!info.isFile()) throw new Error('请选择有效文件')
     const normalizedChunkSize = Math.min(32 * 1024, Math.max(256, Math.floor(chunkSize)))
+    const normalizedChunkDelay = Math.min(60000, Math.max(0, Math.floor(chunkDelay)))
     const sessionId = randomBytes(4).readUInt32LE(0)
     const taskId = `send-${sessionId}`
     const task: SenderTask = {
@@ -243,7 +245,7 @@ export class FileTransferManager {
     this.publish(task)
     const runner =
       protocol === 'raw'
-        ? this.runRawSender(task, normalizedChunkSize)
+        ? this.runRawSender(task, normalizedChunkSize, normalizedChunkDelay)
         : this.runSender(task, normalizedChunkSize)
     void runner.catch((error) => {
       if (task.cancelled) return
@@ -254,7 +256,11 @@ export class FileTransferManager {
     return taskId
   }
 
-  private async runRawSender(task: SenderTask, chunkSize: number): Promise<void> {
+  private async runRawSender(
+    task: SenderTask,
+    chunkSize: number,
+    chunkDelay: number
+  ): Promise<void> {
     task.state = 'transferring'
     task.message = '正在发送原始二进制数据…'
     this.publish(task)
@@ -271,6 +277,8 @@ export class FileTransferManager {
         offset += bytesRead
         task.transferredBytes = offset
         this.publish(task)
+        if (chunkDelay > 0 && offset < task.totalBytes)
+          await new Promise((resolve) => setTimeout(resolve, chunkDelay))
       }
     } finally {
       await handle.close()

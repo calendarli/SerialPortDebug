@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ReceivePanel } from './components/ReceivePanel'
 import { PlotPanel } from './components/PlotPanel'
 import { ModbusPanel } from './components/ModbusPanel'
@@ -8,7 +8,6 @@ import { CommandsPanel } from './components/CommandsPanel'
 import { SendPanel } from './components/SendPanel'
 import { SerialConfigPanel } from './components/SerialConfigPanel'
 import { SerialPairPanel } from './components/SerialPairPanel'
-import { FileTransferPanel } from './components/FileTransferPanel'
 import { Sidebar } from './components/Sidebar'
 import {
   createAutoReplyTransfer,
@@ -17,18 +16,16 @@ import {
   parseQuickCommandsTransfer
 } from './config-transfer'
 import { defaultSerialFraming, SerialFramer } from './serial-framer'
-import { ScriptFramer } from './scripts/script-framer'
 import { autoReplyProgramRuntime } from './scripts/auto-reply-program'
 import { fillGlobalPlaceholders, normalizeGroupGlobals } from './scripts/group-globals'
 import {
-  bytesToPayload,
-  payloadToBytes,
-  runScriptPipeline,
-  type ScriptDisplay
-} from './scripts/script-pipeline'
-import { ensureInitialScripts, loadScripts, saveScripts } from './scripts/script-storage'
-import type { SavedScript as UserScript } from './scripts/script-types'
-import { appendCrc, bytesToBase64, bytesToHex, convertSerialText, formatTime } from './serial-utils'
+  appendCrc,
+  bytesToBase64,
+  bytesToHex,
+  convertSerialText,
+  encodeSerialData,
+  formatTime
+} from './serial-utils'
 import type {
   CommandGroup,
   AutoReplyGroup,
@@ -43,10 +40,6 @@ import type {
   SerialFraming,
   StopBits
 } from './types'
-
-const ScriptPanel = lazy(() =>
-  import('./scripts/ScriptPanel').then((module) => ({ default: module.ScriptPanel }))
-)
 
 const defaultRules: Rule[] = [
   {
@@ -415,10 +408,6 @@ function App(): React.JSX.Element {
   const [openedPorts, setOpenedPorts] = useState<Set<string>>(new Set())
   const [sendPort, setSendPort] = useState('')
   const connected = openedPorts.size > 0
-  const configuredPorts = useMemo(
-    () => [...new Set(serialConfigs.map((config) => config.path).filter(Boolean))],
-    [serialConfigs]
-  )
   const targetPortOptions = useMemo(
     () => {
       const seen = new Set<string>()
@@ -459,7 +448,7 @@ function App(): React.JSX.Element {
   }>({ entries: [], bytes: 0 })
   const [sendText, setSendText] = useState('')
   const [sendHex, setSendHex] = useState(false)
-  const [appendCrlf, setAppendCrlf] = useState(false)
+  const [sendLineEnding, setSendLineEnding] = useState<'' | '\n' | '\r' | '\n\r' | '\r\n'>('')
   const [sendCrcEnabled, setSendCrcEnabled] = useState(() =>
     loadBooleanSetting(sendCrcEnabledKey, false)
   )
@@ -472,16 +461,13 @@ function App(): React.JSX.Element {
   const [autoReplyGroups, setAutoReplyGroups] = useState<AutoReplyGroup[]>(loadAutoReplyGroups)
   const [commands, setCommands] = useState<SavedCommand[]>(loadCommands)
   const [commandGroups, setCommandGroups] = useState<CommandGroup[]>(loadCommandGroups)
-  const [scripts, setScripts] = useState<UserScript[]>(() => ensureInitialScripts(loadScripts()))
   const [sideTab, setSideTab] = useState<
-    'serial' | 'pairs' | 'transfer' | 'commands' | 'rules' | 'scripts' | 'modbus' | 'about'
+    'serial' | 'pairs' | 'commands' | 'rules' | 'modbus' | 'about'
   >('serial')
   const [rxCommunicationCount, setRxCommunicationCount] = useState(0)
   const [txCommunicationCount, setTxCommunicationCount] = useState(0)
   const [rxFrequency, setRxFrequency] = useState(0)
   const [txFrequency, setTxFrequency] = useState(0)
-  const [ipcBatchFrequency, setIpcBatchFrequency] = useState(0)
-  const [ipcChunksPerBatch, setIpcChunksPerBatch] = useState(0)
   const [message, setMessage] = useState('就绪')
   const [errorDialog, setErrorDialog] = useState<string | null>(null)
   const [sendPanelHeight, setSendPanelHeight] = useState(loadSendPanelHeight)
@@ -512,22 +498,15 @@ function App(): React.JSX.Element {
   }>({ entries: [], rxEvents: 0, txEvents: 0 })
   const trafficEventsRef = useRef({ rx: 0, tx: 0 })
   const frequencySampleRef = useRef({ rx: 0, tx: 0, time: 0 })
-  const ipcTrafficRef = useRef({ batches: 0, chunks: 0 })
-  const ipcSampleRef = useRef({ batches: 0, chunks: 0 })
   const interactionSettingsRef = useRef({
     maxBytes: interactionCacheMb * 1024 * 1024,
     maxEntries: interactionCacheEntries,
     timestamp
   })
   const autoSendCompletedRef = useRef(0)
-  const scriptsRef = useRef(scripts)
-  const scriptFramerRef = useRef(new ScriptFramer())
   const serialFramerRef = useRef(new SerialFramer())
-  const scriptReceiveQueuesRef = useRef(new Map<string, Promise<void>>())
-  const scriptErrorCountsRef = useRef(new Map<string, number>())
   const autoReplyErrorCountsRef = useRef(new Map<number, number>())
   const autoReplyGroupsRef = useRef(autoReplyGroups)
-  const scriptSendIndexRef = useRef(0)
 
   useEffect(() => {
     interactionSettingsRef.current = {
@@ -580,7 +559,7 @@ function App(): React.JSX.Element {
 
   const queueInteraction = useCallback(
     (
-      direction: 'rx' | 'tx' | 'script',
+      direction: 'rx' | 'tx',
       port: string,
       text: string,
       bytes: number,
@@ -613,16 +592,6 @@ function App(): React.JSX.Element {
         pendingFrameRef.current = window.requestAnimationFrame(flushInteractions)
     },
     [flushInteractions]
-  )
-
-  const queueScriptDisplays = useCallback(
-    (port: string, displays: ScriptDisplay[]): void => {
-      for (const display of displays) {
-        const tags = display.tags.length ? ` [${display.tags.join(', ')}]` : ''
-        queueInteraction('script', port, `${display.scriptName}${tags} · ${display.text}`, 0)
-      }
-    },
-    [queueInteraction]
   )
 
   const compiledRules = useMemo(
@@ -694,19 +663,12 @@ function App(): React.JSX.Element {
       try {
         const source = override?.text ?? sendText
         const effectiveHex = override?.hex ?? sendHex
-        const scripted = await runScriptPipeline(
-          scriptsRef.current,
-          'send',
-          targetPort,
-          { value: source, encoding: effectiveHex ? 'hex' : 'ascii' },
-          ++scriptSendIndexRef.current
-        )
-        let bytes = payloadToBytes(scripted.payload)
-        queueScriptDisplays(targetPort, scripted.displays)
-        if (!override && appendCrlf) {
-          const merged = new Uint8Array(bytes.length + 2)
+        let bytes = encodeSerialData(source, effectiveHex)
+        if (!override && sendLineEnding) {
+          const suffix = new TextEncoder().encode(sendLineEnding)
+          const merged = new Uint8Array(bytes.length + suffix.length)
           merged.set(bytes)
-          merged.set(new Uint8Array([13, 10]), bytes.length)
+          merged.set(suffix, bytes.length)
           bytes = merged
         }
         const crcMode = override ? override.crcMode : sendCrcEnabled ? sendCrcMode : null
@@ -719,7 +681,7 @@ function App(): React.JSX.Element {
         queueInteraction(
           'tx',
           targetPort,
-          scripted.payload.encoding !== 'ascii' || crcMode
+          effectiveHex || crcMode
             ? bytesToHex(bytes)
             : new TextDecoder().decode(bytes),
           bytes.length
@@ -732,10 +694,9 @@ function App(): React.JSX.Element {
       }
     },
     [
-      appendCrlf,
+      sendLineEnding,
       openedPorts,
       queueInteraction,
-      queueScriptDisplays,
       sendPort,
       sendCrcEnabled,
       sendCrcMode,
@@ -755,39 +716,6 @@ function App(): React.JSX.Element {
     []
   )
 
-  const enqueueReceivedScript = useCallback(
-    (script: UserScript, port: string, frame: Uint8Array): void => {
-      const key = `${script.id}:${port}`
-      const previous = scriptReceiveQueuesRef.current.get(key) || Promise.resolve()
-      const task = previous
-        .catch(() => undefined)
-        .then(async () => {
-          const input = bytesToPayload(frame, script.encoding)
-          const result = await runScriptPipeline([script], 'received', port, input, 0)
-          queueScriptDisplays(port, result.displays)
-          scriptErrorCountsRef.current.delete(script.id)
-        })
-        .catch((cause) => {
-          const count = (scriptErrorCountsRef.current.get(script.id) || 0) + 1
-          scriptErrorCountsRef.current.set(script.id, count)
-          if (count === 1) showError(cause, `脚本“${script.name}”接收处理失败`)
-          if (count >= 3) {
-            setScripts((current) =>
-              current.map((item) => (item.id === script.id ? { ...item, enabled: false } : item))
-            )
-            scriptFramerRef.current.clear(script.id)
-            setMessage(`脚本“${script.name}”连续失败 3 次，已自动停止`)
-          }
-        })
-      scriptReceiveQueuesRef.current.set(key, task)
-      void task.finally(() => {
-        if (scriptReceiveQueuesRef.current.get(key) === task)
-          scriptReceiveQueuesRef.current.delete(key)
-      })
-    },
-    [queueScriptDisplays, showError]
-  )
-
   useEffect(() => {
     const timer = window.setTimeout(() => void refreshPorts(), 0)
     return () => window.clearTimeout(timer)
@@ -802,14 +730,6 @@ function App(): React.JSX.Element {
       const current = trafficEventsRef.current
       setRxFrequency((current.rx - previous.rx) / elapsedSeconds)
       setTxFrequency((current.tx - previous.tx) / elapsedSeconds)
-      const ipcCurrent = ipcTrafficRef.current
-      const ipcPrevious = ipcSampleRef.current
-      const batchDelta = ipcCurrent.batches - ipcPrevious.batches
-      setIpcBatchFrequency(batchDelta / elapsedSeconds)
-      setIpcChunksPerBatch(
-        batchDelta > 0 ? (ipcCurrent.chunks - ipcPrevious.chunks) / batchDelta : 0
-      )
-      ipcSampleRef.current = { ...ipcCurrent }
       frequencySampleRef.current = { rx: current.rx, tx: current.tx, time: now }
     }, 1000)
     return () => window.clearInterval(timer)
@@ -933,39 +853,15 @@ function App(): React.JSX.Element {
         }
       }
       const rendered = rxHex ? `${bytesToHex(bytes)} ` : text
-      const replaceRawDisplay = scriptsRef.current.some(
-        (script) =>
-          script.enabled &&
-          script.compiledCode &&
-          script.displayMode === 'replace' &&
-          (script.direction === 'all' || script.direction === 'received') &&
-          (!script.ports.length || script.ports.includes(sourcePort))
-      )
       queueInteraction(
         'rx',
         sourcePort,
         rendered,
         bytes.length,
-        !paused && !replaceRawDisplay,
+        !paused,
         text,
         bytesToHex(bytes)
       )
-      for (const script of scriptsRef.current) {
-        if (
-          !script.enabled ||
-          !script.compiledCode ||
-          (script.direction !== 'all' && script.direction !== 'received') ||
-          (script.ports.length && !script.ports.includes(sourcePort))
-        )
-          continue
-        try {
-          scriptFramerRef.current.push(script, sourcePort, bytes, (frame) =>
-            enqueueReceivedScript(script, sourcePort, frame)
-          )
-        } catch (cause) {
-          showError(cause, `脚本“${script.name}”分帧失败`)
-        }
-      }
       if (shouldAutoPause) {
         pauseLineBuffers.current.set(sourcePort, '')
         pauseHexBuffers.current.set(sourcePort, '')
@@ -974,8 +870,6 @@ function App(): React.JSX.Element {
       }
     }
     const offData = window.api.onData(({ path: sourcePort, chunks }) => {
-      ipcTrafficRef.current.batches += 1
-      ipcTrafficRef.current.chunks += chunks.length
       const framing =
         serialConfigs.find((config) => config.path === sourcePort)?.framing || defaultSerialFraming
       for (const chunk of chunks) {
@@ -1015,7 +909,6 @@ function App(): React.JSX.Element {
     autoPauseHex,
     autoPausePattern,
     compiledRules,
-    enqueueReceivedScript,
     paused,
     queueInteraction,
     rxHex,
@@ -1105,11 +998,6 @@ function App(): React.JSX.Element {
   useEffect(() => {
     localStorage.setItem('serialflow.commandGroups', JSON.stringify(commandGroups))
   }, [commandGroups])
-
-  useEffect(() => {
-    scriptsRef.current = scripts
-    saveScripts(scripts)
-  }, [scripts])
 
   useEffect(() => {
     localStorage.setItem(sendIntervalKey, String(interval))
@@ -1243,10 +1131,6 @@ function App(): React.JSX.Element {
     setTxCommunicationCount(0)
     setRxFrequency(0)
     setTxFrequency(0)
-    ipcTrafficRef.current = { batches: 0, chunks: 0 }
-    ipcSampleRef.current = { batches: 0, chunks: 0 }
-    setIpcBatchFrequency(0)
-    setIpcChunksPerBatch(0)
   }
   const resetAutoReplyState = useCallback((ruleId: number, notify = true): void => {
     const target = rules.find((rule) => rule.id === ruleId)
@@ -1363,7 +1247,6 @@ function App(): React.JSX.Element {
         autoReplyGroups,
         commands,
         commandGroups,
-        scripts,
         settings: {
           rxHex,
           timestamp,
@@ -1416,8 +1299,6 @@ function App(): React.JSX.Element {
             globals: normalizeGroupGlobals(group.globals)
           }))
         )
-      if (Array.isArray(project.scripts))
-        setScripts(ensureInitialScripts(project.scripts as UserScript[]))
       const settings = project.settings as Record<string, unknown> | undefined
       if (settings) {
         if (typeof settings.rxHex === 'boolean') setRxHex(settings.rxHex)
@@ -1447,10 +1328,8 @@ function App(): React.JSX.Element {
         <div className={`status ${connected ? 'online' : ''}`}>
           <i />
           {connected
-            ? `已打开 ${openedPorts.size} 个串口：${[...openedPorts].join('、')}${scripts.some((script) => script.enabled) ? ` · 脚本 ${scripts.filter((script) => script.enabled).length}` : ''}`
-            : scripts.some((script) => script.enabled)
-              ? `未连接 · 脚本 ${scripts.filter((script) => script.enabled).length}`
-              : '未连接'}
+            ? `已打开 ${openedPorts.size} 个串口：${[...openedPorts].join('、')}`
+            : '未连接'}
         </div>
       </header>
       <section className="workspace">
@@ -1459,7 +1338,6 @@ function App(): React.JSX.Element {
           onTabChange={setSideTab}
           commandCount={commands.length}
           enabledRuleCount={rules.filter((rule) => rule.enabled).length}
-          enabledScriptCount={scripts.filter((script) => script.enabled).length}
           serialContent={
             <SerialConfigPanel
               ports={ports}
@@ -1506,14 +1384,6 @@ function App(): React.JSX.Element {
         />
         {sideTab === 'pairs' ? (
           <SerialPairPanel />
-        ) : sideTab === 'transfer' ? (
-          <FileTransferPanel ports={openedPortList} />
-        ) : sideTab === 'scripts' ? (
-          <section className="script-content">
-            <Suspense fallback={<div className="script-loading">正在加载 Monaco 编辑器…</div>}>
-              <ScriptPanel scripts={scripts} setScripts={setScripts} ports={configuredPorts} />
-            </Suspense>
-          </section>
         ) : sideTab === 'modbus' ? (
           <ModbusPanel
             ports={openedPortList}
@@ -1522,7 +1392,7 @@ function App(): React.JSX.Element {
           />
         ) : (
           <section
-            className="content"
+            className="content interaction-content"
             style={{ gridTemplateRows: `minmax(200px, 1fr) ${sendPanelHeight}px` }}
           >
             <div className="interaction-stack">
@@ -1555,7 +1425,7 @@ function App(): React.JSX.Element {
             <SendPanel
               text={sendText}
               hex={sendHex}
-              appendCrlf={appendCrlf}
+              lineEnding={sendLineEnding}
               autoSend={autoSend}
               autoSendRunning={autoSendRunning}
               interval={interval}
@@ -1566,7 +1436,7 @@ function App(): React.JSX.Element {
               targetPort={sendPort}
               onTextChange={setSendText}
               onHexChange={changeSendMode}
-              onAppendCrlfChange={setAppendCrlf}
+              onLineEndingChange={setSendLineEnding}
               onAutoSendChange={changeAutoSend}
               onIntervalChange={setIntervalValue}
               onAutoSendCountChange={setAutoSendCount}
@@ -1625,8 +1495,6 @@ function App(): React.JSX.Element {
           {formatCacheBytes(interactionCache.bytes)} / {interactionCacheMb} MB · 频率{' '}
           <span className="rx">RX {formatFrequency(rxFrequency)} Hz</span> /{' '}
           <span className="tx">TX {formatFrequency(txFrequency)} Hz</span>
-          {' · '}IPC {formatFrequency(ipcBatchFrequency)} 批/s ·{' '}
-          {ipcChunksPerBatch ? ipcChunksPerBatch.toFixed(1) : '0'} 块/批
         </div>
       </footer>
     </main>
