@@ -797,11 +797,11 @@ footer > span:first-child {
 .resizable-sidebar {
   position: relative;
   display: grid;
-  grid-template-columns: 52px 260px;
+  grid-template-columns: 52px minmax(330px, 1fr);
   padding: 0;
   overflow: hidden;
   min-width: 52px;
-  max-width: 312px;
+  max-width: none;
 }
 .resizable-sidebar.collapsed {
   grid-template-columns: 52px;
@@ -1542,6 +1542,42 @@ footer > span:first-child {
   stroke-width: 1.2;
   vector-effect: non-scaling-stroke;
 }
+.plot-ruler-tick {
+  stroke: #334155;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+.plot-ruler-tick.major {
+  stroke: #0f172a;
+  stroke-width: 2;
+}
+.plot-axis-cursor {
+  stroke: #111827;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+.plot-axis-cursor-label {
+  position: absolute;
+  z-index: 2;
+  padding: 3px 7px;
+  border: 1px solid #d7dce2;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 3px 10px #0f172a1f;
+  color: #1f2937;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.plot-axis-cursor-label.x {
+  bottom: 1px;
+  transform: translateX(-50%);
+}
+.plot-axis-cursor-label.y {
+  transform: translateY(-50%);
+}
 .plot-series-line {
   filter: drop-shadow(0 1px 1px #0f172a20);
 }
@@ -1607,6 +1643,66 @@ footer > span:first-child {
 }
 .plot-html-tooltip strong {
   color: #f8fafc;
+}
+.plot-html-tooltip small {
+  color: #dbeafe;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0.15px;
+  white-space: nowrap;
+}
+
+/* Serial traffic is a compact table, not a stack of cards. */
+.terminal.interaction-view {
+  padding: 0;
+  background: #fff;
+}
+.interaction-view .interaction-virtual-row {
+  height: 1.55em;
+  padding: 0;
+}
+.interaction-view .interaction-entry,
+.interaction-view .interaction-entry.rx,
+.interaction-view .interaction-entry.tx {
+  grid-template-columns: 15.4em minmax(0, 1fr);
+  gap: 0;
+  min-height: 1.55em;
+  height: 100%;
+  margin: 0;
+  overflow: visible;
+  border: 0;
+  border-bottom: 1px solid #e5edf5;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transition: background-color 0.1s ease;
+}
+.interaction-view .interaction-meta,
+.interaction-view .rx .interaction-meta,
+.interaction-view .tx .interaction-meta {
+  gap: 0.4em;
+  padding: 0.12em 0.45em;
+  border-color: #e5edf5;
+  background: transparent;
+}
+.interaction-view .interaction-entry pre {
+  padding: 0.12em 0.55em;
+  overflow: hidden;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: pre;
+}
+.interaction-view .interaction-entry.rx:hover,
+.interaction-view .interaction-entry.tx:hover {
+  transform: none;
+  border-color: #d7e5f2;
+  background: #f5f9fd;
+  box-shadow: none;
+}
+.interaction-view .interaction-entry.rx:hover .interaction-meta,
+.interaction-view .interaction-entry.tx:hover .interaction-meta {
+  background: transparent;
 }
 .plot-html-tooltip span {
   overflow: hidden;

@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useState } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { InteractionEntry } from '../types'
 
@@ -69,19 +69,22 @@ export function ReceivePanel(props: Props): React.JSX.Element {
   const [direction, setDirection] = useState<SearchDirection>(null)
   const [matchedEntryId, setMatchedEntryId] = useState<number | null>(null)
   const [searchMessage, setSearchMessage] = useState('')
+  const followTailRef = useRef(true)
   const virtualizer = useVirtualizer({
     count: props.entries.length,
     getScrollElement: () => scrollElement,
     getItemKey: (index) => props.entries[index].id,
-    estimateSize: () => Math.max(24, Math.ceil(props.fontSize * 2.25)),
+    estimateSize: () => Math.max(20, Math.ceil(props.fontSize * 1.55)),
     overscan: 14
   })
   const lastEntryId = props.entries[props.entries.length - 1]?.id
 
-  useEffect(() => {
-    virtualizer.measure()
-    if (props.entries.length) virtualizer.scrollToIndex(props.entries.length - 1, { align: 'end' })
-  }, [lastEntryId, props.entries.length, props.fontSize, virtualizer])
+  useEffect(() => virtualizer.measure(), [props.fontSize, virtualizer])
+
+  useLayoutEffect(() => {
+    if (!scrollElement || !props.entries.length || !followTailRef.current) return
+    scrollElement.scrollTop = scrollElement.scrollHeight
+  }, [lastEntryId, props.entries.length, scrollElement])
 
   useEffect(() => {
     const closeMenu = (): void => setMenu(null)
@@ -387,6 +390,10 @@ export function ReceivePanel(props: Props): React.JSX.Element {
         ref={setScrollElement}
         tabIndex={0}
         onWheel={handleWheel}
+        onScroll={(event) => {
+          const target = event.currentTarget
+          followTailRef.current = target.scrollHeight - target.scrollTop - target.clientHeight < 32
+        }}
         onKeyDown={handleKeyDown}
         onContextMenu={(event) => openContextMenu(event, null)}
         style={{ '--interaction-font-size': `${props.fontSize}px` } as React.CSSProperties}
@@ -400,7 +407,6 @@ export function ReceivePanel(props: Props): React.JSX.Element {
                   className="interaction-virtual-row"
                   key={item.key}
                   data-index={item.index}
-                  ref={virtualizer.measureElement}
                   style={{ transform: `translateY(${item.start}px)` }}
                 >
                   <InteractionRow

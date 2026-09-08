@@ -18,7 +18,7 @@ const tabPageWidth = 260
 const defaultWidth = tabRailWidth + tabPageWidth
 
 function clampWidth(value: number): number {
-  return Math.min(Math.max(value, tabRailWidth), defaultWidth)
+  return Math.max(value, tabRailWidth)
 }
 
 function initialWidth(): number {
@@ -64,14 +64,13 @@ export function Sidebar(props: Props): React.JSX.Element {
     const nextWidth = clampWidth(dragStart.current.width + event.clientX - dragStart.current.x)
     widthRef.current = nextWidth
     setWidth(nextWidth)
-    const nextCollapsed = nextWidth <= tabRailWidth
-    setCollapsed(nextCollapsed)
-    localStorage.setItem(collapsedStorageKey, String(nextCollapsed))
+    setCollapsed(nextWidth <= tabRailWidth)
   }
   const finishResize = (event: React.PointerEvent<HTMLDivElement>): void => {
     if (!resizing) return
     event.currentTarget.releasePointerCapture(event.pointerId)
     localStorage.setItem(storageKey, String(widthRef.current))
+    localStorage.setItem(collapsedStorageKey, String(widthRef.current <= tabRailWidth))
     setResizing(false)
   }
   const resetWidth = (): void => {

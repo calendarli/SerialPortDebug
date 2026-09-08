@@ -8,6 +8,9 @@ type PlotColors = { background: string; grid: string; series: string[] }
 type YRange = { min: number; max: number }
 type HoverValue = { name: string; color: string; value: number; y: number }
 type HoverState = { x: number; timestamp: number; pointOffset: number; values: HoverValue[] }
+type AxisCursor =
+  | { axis: 'x'; x: number; pointOffset: number }
+  | { axis: 'y'; y: number; value: number }
 type SeriesPoint = { index: number; timestamp: number; value: number }
 type XRangeDrag = {
   mode: 'start' | 'pan' | 'end'
@@ -55,6 +58,7 @@ const xWindowKey = 'serialflow.plotXWindowPoints'
 const disabledChannelsKey = 'serialflow.plotDisabledChannels'
 const pidSettingsKey = 'serialflow.plotPidSettings'
 const defaultPlotHeight = 260
+const maxPlotPoints = 100000
 const plotLeft = 28
 const plotRight = 910
 const plotTop = 20
@@ -64,6 +68,28 @@ const plotHeight = plotBottom - plotTop
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
+}
+
+function firstIndexAfterId<T extends { id: number }>(items: T[], id: number): number {
+  let low = 0
+  let high = items.length
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2)
+    if (items[middle].id <= id) low = middle + 1
+    else high = middle
+  }
+  return low
+}
+
+function firstIndexAtOrAfterId<T extends { id: number }>(items: T[], id: number): number {
+  let low = 0
+  let high = items.length
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2)
+    if (items[middle].id < id) low = middle + 1
+    else high = middle
+  }
+  return low
 }
 
 function isColor(value: unknown): value is string {
@@ -242,13 +268,15 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
   const [plotColors, setPlotColors] = useState(loadPlotColors)
   const [resizing, setResizing] = useState(false)
   const [pointLimit, setPointLimit] = useState(() =>
-    Math.max(100, Number(localStorage.getItem('serialflow.plotPointLimit')) || 1000)
+    clamp(Number(localStorage.getItem('serialflow.plotPointLimit')) || 1000, 100, maxPlotPoints)
   )
   const [startId, setStartId] = useState(0)
   const [xWindowPoints, setXWindowPoints] = useState(() => loadXWindow(pointLimit))
   const [viewEndIndex, setViewEndIndex] = useState<number | null>(null)
   const [manualYRange, setManualYRange] = useState<YRange | null>(null)
   const [hover, setHover] = useState<HoverState | null>(null)
+  const [hoveredAxis, setHoveredAxis] = useState<'x' | 'y' | null>(null)
+  const [axisCursor, setAxisCursor] = useState<AxisCursor | null>(null)
   const [timelineDragging, setTimelineDragging] = useState(false)
   const [disabledChannels, setDisabledChannels] = useState(loadDisabledChannels)
   const [pidSettings, setPidSettings] = useState(loadPidSettings)
@@ -257,14 +285,18 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
   const resizeStart = useRef({ y: 0, height: defaultPlotHeight, max: 520 })
   const plotCanvasRef = useRef<HTMLDivElement | null>(null)
   const curveCanvasRef = useRef<HTMLCanvasElement | null>(null)
-  const lastDrawEndRef = useRef(0)
-  const lastDrawRangeRef = useRef<YRange | null>(null)
+  const plotWorkerRef = useRef<Worker | null>(null)
+  const workerRenderingRef = useRef(false)
+  const transferredCanvasRef = useRef<HTMLCanvasElement | null>(null)
+  const workerSyncRef = useRef({ key: '', lastId: 0 })
   const sampleCacheRef = useRef<{
     key: string
     lastEntryId: number
     samples: Sample[]
   }>({ key: '', lastEntryId: 0, samples: [] })
   const hoverFrameRef = useRef(0)
+  const axisCursorFrameRef = useRef(0)
+  const lastLiveHoverUpdateRef = useRef(0)
   const colorButtonRef = useRef<HTMLButtonElement | null>(null)
   const pidButtonRef = useRef<HTMLButtonElement | null>(null)
   const latestHeight = useRef(height)
@@ -291,16 +323,17 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
     const latestEntryId = source.at(-1)?.id || 0
     const reset = cache.key !== key || latestEntryId < cache.lastEntryId
     const lastEntryId = reset ? 0 : cache.lastEntryId
+    const additionStart = firstIndexAfterId(source, Math.max(startId, lastEntryId))
     const additions = source
-      .filter(
-        (entry) => entry.id > Math.max(startId, lastEntryId) && enabledPortSet.has(entry.port)
-      )
+      .slice(additionStart)
+      .filter((entry) => enabledPortSet.has(entry.port))
       .map((entry) => parseSample(entry, enabledPorts.length > 1))
       .filter((item): item is Sample => Boolean(item))
     const oldestEntryId = source[0]?.id || 0
+    const retainedThreshold = Math.max(oldestEntryId, startId + 1)
     const retained = reset
       ? []
-      : cache.samples.filter((sample) => sample.id >= oldestEntryId && sample.id > startId)
+      : cache.samples.slice(firstIndexAtOrAfterId(cache.samples, retainedThreshold))
     const samples = [...retained, ...additions].slice(-pointLimit)
     sampleCacheRef.current = { key, lastEntryId: latestEntryId, samples }
     return samples
@@ -387,7 +420,9 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
           max: values.length ? Math.max(...values) : 0,
           latest: values.at(-1) ?? 0,
           hoverPoints: drawablePoints,
-          renderPoints: downsampleMinMax(drawablePoints, Math.max(100, Math.floor(canvasWidth)))
+          renderPoints: workerRenderingRef.current
+            ? []
+            : downsampleMinMax(drawablePoints, Math.max(100, Math.floor(canvasWidth)))
         }
       }),
     [
@@ -415,79 +450,118 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
   const timelineHandlesOverlap = timelineEndPercent - timelineStartPercent < 2.5
 
   useEffect(() => {
+    const target = curveCanvasRef.current
+    if (!target || transferredCanvasRef.current === target) return
+    if (typeof target.transferControlToOffscreen !== 'function') return
+    const worker =
+      plotWorkerRef.current ||
+      new Worker(new URL('../workers/plot.worker.ts', import.meta.url), { type: 'module' })
+    plotWorkerRef.current = worker
+    const offscreen = target.transferControlToOffscreen()
+    worker.postMessage({ type: 'init', canvas: offscreen }, [offscreen])
+    transferredCanvasRef.current = target
+    workerRenderingRef.current = true
+  }, [collapsed, series.length])
+
+  useEffect(() => {
+    const worker = plotWorkerRef.current
+    if (!workerRenderingRef.current || !worker) return
+    const syncKey = `${paused ? 'paused' : 'live'}\u0000${startId}\u0000${enabledPorts.join('\u0000')}`
+    const previous = workerSyncRef.current
+    const lastId = allSamples.at(-1)?.id || 0
+    const reset = previous.key !== syncKey || lastId < previous.lastId || !allSamples.length
+    const additionStart = reset ? 0 : firstIndexAfterId(allSamples, previous.lastId)
+    worker.postMessage({
+      type: 'data',
+      reset,
+      samples: allSamples.slice(additionStart).map((sample) => ({
+        id: sample.id,
+        values: sample.values
+      })),
+      pointLimit,
+      pruneBeforeId: allSamples[0]?.id || 0
+    })
+    workerSyncRef.current = { key: syncKey, lastId }
+  }, [allSamples, enabledPorts, paused, pointLimit, startId])
+
+  useEffect(() => {
+    const worker = plotWorkerRef.current
+    const host = plotCanvasRef.current
+    if (!workerRenderingRef.current || !worker || !host || collapsed || !series.length) return
+    const rect = host.getBoundingClientRect()
+    worker.postMessage({
+      type: 'render',
+      width: rect.width,
+      height: rect.height,
+      dpr: Math.min(window.devicePixelRatio || 1, 2),
+      xWindowPoints,
+      endOffset: endIndex - liveEndIndex,
+      yMin: yRange.min,
+      yMax: yRange.max,
+      channels: series.map((item) => ({ name: item.name, color: item.color }))
+    })
+  }, [collapsed, endIndex, height, liveEndIndex, series, xWindowPoints, yRange])
+
+  useEffect(() => {
     const canvas = curveCanvasRef.current
     const host = plotCanvasRef.current
-    if (!canvas || !host || collapsed || !series.length) return
+    if (workerRenderingRef.current || !canvas || !host || collapsed || !series.length) return
     const rect = host.getBoundingClientRect()
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
-    canvas.width = Math.max(1, Math.round(rect.width * dpr))
-    canvas.height = Math.max(1, Math.round(rect.height * dpr))
+    const targetWidth = Math.max(1, Math.round(rect.width * dpr))
+    const targetHeight = Math.max(1, Math.round(rect.height * dpr))
+    if (canvas.width !== targetWidth) canvas.width = targetWidth
+    if (canvas.height !== targetHeight) canvas.height = targetHeight
     const context = canvas.getContext('2d')
     if (!context) return
-    const previousEnd = lastDrawEndRef.current || endIndex
-    const previousRange = lastDrawRangeRef.current || yRange
-    const duration = viewEndIndex === null ? 120 : 0
-    const animationStart = performance.now()
-    let frame = 0
-    const draw = (now: number): void => {
-      const progress = duration ? Math.min(1, (now - animationStart) / duration) : 1
-      const eased = 1 - (1 - progress) ** 3
-      const drawEnd = previousEnd + (endIndex - previousEnd) * eased
-      const drawRange = manualYRange
-        ? manualYRange
-        : {
-            min: previousRange.min + (yRange.min - previousRange.min) * eased,
-            max: previousRange.max + (yRange.max - previousRange.max) * eased
-          }
-      const drawSpan = Math.max(Number.EPSILON, drawRange.max - drawRange.min)
-      context.setTransform(dpr * (rect.width / 1000), 0, 0, dpr * (rect.height / 420), 0, 0)
-      context.clearRect(0, 0, 1000, 420)
-      context.save()
+    const drawSpan = Math.max(Number.EPSILON, yRange.max - yRange.min)
+    context.setTransform(dpr * (rect.width / 1000), 0, 0, dpr * (rect.height / 420), 0, 0)
+    context.clearRect(0, 0, 1000, 420)
+    context.save()
+    context.beginPath()
+    context.rect(plotLeft, plotTop, plotWidth, plotHeight)
+    context.clip()
+    context.lineWidth = 2.5 * (1000 / Math.max(rect.width, 1))
+    context.lineJoin = 'round'
+    context.lineCap = 'round'
+    for (const item of series) {
+      if (!item.renderPoints.length) continue
       context.beginPath()
-      context.rect(plotLeft, plotTop, plotWidth, plotHeight)
-      context.clip()
-      context.lineWidth = 2.5 * (1000 / Math.max(rect.width, 1))
-      context.lineJoin = 'round'
-      context.lineCap = 'round'
-      for (const item of series) {
-        if (!item.renderPoints.length) continue
-        context.beginPath()
-        let drawing = false
-        let previousY = 0
-        item.renderPoints.forEach((point) => {
-          const x =
-            plotLeft + ((point.index - (drawEnd - xWindowPoints + 1)) / Math.max(1, xWindowPoints - 1)) * plotWidth
-          const y = plotBottom - ((point.value - drawRange.min) / drawSpan) * plotHeight
-          if (!drawing) context.moveTo(x, y)
-          else {
-            context.lineTo(x, previousY)
-            context.lineTo(x, y)
-          }
-          previousY = y
-          drawing = true
-        })
-        context.strokeStyle = item.color
-        context.stroke()
-      }
-      context.restore()
-      lastDrawEndRef.current = drawEnd
-      lastDrawRangeRef.current = drawRange
-      if (progress < 1) frame = window.requestAnimationFrame(draw)
+      let drawing = false
+      let previousY = 0
+      item.renderPoints.forEach((point) => {
+        const x =
+          plotLeft +
+          ((point.index - (endIndex - xWindowPoints + 1)) / Math.max(1, xWindowPoints - 1)) *
+            plotWidth
+        const y = plotBottom - ((point.value - yRange.min) / drawSpan) * plotHeight
+        if (!drawing) context.moveTo(x, y)
+        else {
+          context.lineTo(x, previousY)
+          context.lineTo(x, y)
+        }
+        previousY = y
+        drawing = true
+      })
+      context.strokeStyle = item.color
+      context.stroke()
     }
-    frame = window.requestAnimationFrame(draw)
-    return () => window.cancelAnimationFrame(frame)
-  }, [collapsed, endIndex, manualYRange, series, viewEndIndex, xWindowPoints, yRange])
+    context.restore()
+  }, [collapsed, endIndex, height, series, xWindowPoints, yRange])
   const xTickCount = clamp(Math.floor(canvasWidth / 135) + 1, 6, 16)
   const xTicks = useMemo(
-    () =>
-      Array.from({ length: xTickCount }, (_, index) => {
-        const ratio = index / (xTickCount - 1)
+    () => {
+      const count = Math.min(xTickCount, xWindowPoints)
+      if (count <= 1) return [{ x: plotRight, pointOffset: endIndex - liveEndIndex }]
+      return Array.from({ length: count }, (_, index) => {
+        const ratio = index / (count - 1)
         return {
           x: plotLeft + ratio * plotWidth,
           pointOffset: Math.round(viewStartIndex + ratio * Math.max(0, xWindowPoints - 1)) - liveEndIndex
         }
-      }),
-    [liveEndIndex, viewStartIndex, xTickCount, xWindowPoints]
+      })
+    },
+    [endIndex, liveEndIndex, viewStartIndex, xTickCount, xWindowPoints]
   )
   const yTicks = useMemo(
     () =>
@@ -783,16 +857,36 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
   }
   const handleXWheel = (event: React.WheelEvent<SVGRectElement>): void => {
     event.preventDefault()
+    const rect = event.currentTarget.ownerSVGElement?.getBoundingClientRect()
+    if (!rect) return
+    const pointerX = clamp(((event.clientX - rect.left) / rect.width) * 1000, plotLeft, plotRight)
+    const ratio = (pointerX - plotLeft) / plotWidth
+    const centerIndex = viewStartIndex + ratio * Math.max(0, xWindowPoints - 1)
     const next = Math.round(clamp(xWindowPoints * (event.deltaY > 0 ? 1.25 : 0.8), 1, pointLimit))
+    const nextEnd = Math.round(
+      clamp(centerIndex + (1 - ratio) * Math.max(0, next - 1), 0, liveEndIndex)
+    )
     setXWindowPoints(next)
+    setViewEndIndex(nextEnd >= liveEndIndex ? null : nextEnd)
+    setAxisCursor({
+      axis: 'x',
+      x: pointerX,
+      pointOffset: Math.round(centerIndex - liveEndIndex)
+    })
     localStorage.setItem(xWindowKey, String(next))
   }
   const handleYWheel = (event: React.WheelEvent<SVGRectElement>): void => {
     event.preventDefault()
     const factor = event.deltaY > 0 ? 1.2 : 0.8
-    const center = (yRange.min + yRange.max) / 2
-    const half = (ySpan * factor) / 2
-    setManualYRange({ min: center - half, max: center + half })
+    const rect = event.currentTarget.ownerSVGElement?.getBoundingClientRect()
+    if (!rect) return
+    const pointerY = clamp(((event.clientY - rect.top) / rect.height) * 420, plotTop, plotBottom)
+    const center = yRange.max - ((pointerY - plotTop) / plotHeight) * ySpan
+    setManualYRange({
+      min: center - (center - yRange.min) * factor,
+      max: center + (yRange.max - center) * factor
+    })
+    setAxisCursor({ axis: 'y', y: pointerY, value: center })
   }
   const beginXDrag = (event: React.PointerEvent<SVGRectElement>): void => {
     event.preventDefault()
@@ -834,6 +928,32 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
     event.currentTarget.releasePointerCapture(event.pointerId)
     yDrag.current = null
   }
+  const moveXAxisCursor = (event: React.PointerEvent<SVGRectElement>): void => {
+    const rect = event.currentTarget.ownerSVGElement?.getBoundingClientRect()
+    if (rect) {
+      const x = clamp(((event.clientX - rect.left) / rect.width) * 1000, plotLeft, plotRight)
+      const pointOffset = Math.round(
+        viewStartIndex + ((x - plotLeft) / plotWidth) * Math.max(0, xWindowPoints - 1) - liveEndIndex
+      )
+      window.cancelAnimationFrame(axisCursorFrameRef.current)
+      axisCursorFrameRef.current = window.requestAnimationFrame(() =>
+        setAxisCursor({ axis: 'x', x, pointOffset })
+      )
+    }
+    moveXDrag(event)
+  }
+  const moveYAxisCursor = (event: React.PointerEvent<SVGRectElement>): void => {
+    const rect = event.currentTarget.ownerSVGElement?.getBoundingClientRect()
+    if (rect) {
+      const y = clamp(((event.clientY - rect.top) / rect.height) * 420, plotTop, plotBottom)
+      const value = yRange.max - ((y - plotTop) / plotHeight) * ySpan
+      window.cancelAnimationFrame(axisCursorFrameRef.current)
+      axisCursorFrameRef.current = window.requestAnimationFrame(() =>
+        setAxisCursor({ axis: 'y', y, value })
+      )
+    }
+    moveYDrag(event)
+  }
   const handlePlotHover = (event: React.PointerEvent<SVGRectElement>): void => {
     const rect = event.currentTarget.ownerSVGElement?.getBoundingClientRect()
     if (!rect || !series.length || !visibleSamples.length) return setHover(null)
@@ -858,6 +978,9 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
     })
   }
   useEffect(() => {
+    const now = performance.now()
+    if (now - lastLiveHoverUpdateRef.current < 32) return
+    lastLiveHoverUpdateRef.current = now
     setHover((current) => {
       if (!current || !series.length || !visibleSamples.length) return current
       const pointerIndex = clamp(
@@ -931,6 +1054,16 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
     setHover(null)
   }
 
+  useEffect(
+    () => () => {
+      window.cancelAnimationFrame(hoverFrameRef.current)
+      window.cancelAnimationFrame(axisCursorFrameRef.current)
+      plotWorkerRef.current?.terminate()
+      plotWorkerRef.current = null
+    },
+    []
+  )
+
   return (
     <section
       className={`plot-panel ${embedded ? 'embedded' : ''} ${collapsed ? 'collapsed' : ''}`}
@@ -949,10 +1082,13 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
           <input
             type="number"
             min="100"
-            max="20000"
+            max={maxPlotPoints}
             value={pointLimit}
             onChange={(event) => {
-              const value = Math.min(20000, Math.max(100, Number(event.target.value) || 1000))
+              const value = Math.min(
+                maxPlotPoints,
+                Math.max(100, Number(event.target.value) || 1000)
+              )
               setPointLimit(value)
               setXWindowPoints((current) => {
                 const next = current >= pointLimit ? value : Math.min(current, value)
@@ -1409,6 +1545,54 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
                   y2={plotBottom}
                   className="plot-axis"
                 />
+                {hoveredAxis === 'x' &&
+                  Array.from({ length: 51 }, (_, index) => {
+                    const major = index % 5 === 0
+                    const x = plotLeft + (index / 50) * plotWidth
+                    return (
+                      <line
+                        key={`x-ruler-${index}`}
+                        x1={x}
+                        y1={plotBottom}
+                        x2={x}
+                        y2={plotBottom + (major ? 17 : 9)}
+                        className={`plot-ruler-tick ${major ? 'major' : ''}`}
+                      />
+                    )
+                  })}
+                {hoveredAxis === 'y' &&
+                  Array.from({ length: 41 }, (_, index) => {
+                    const major = index % 4 === 0
+                    const y = plotTop + (index / 40) * plotHeight
+                    return (
+                      <line
+                        key={`y-ruler-${index}`}
+                        x1={plotRight}
+                        y1={y}
+                        x2={plotRight + (major ? 17 : 9)}
+                        y2={y}
+                        className={`plot-ruler-tick ${major ? 'major' : ''}`}
+                      />
+                    )
+                  })}
+                {axisCursor?.axis === 'x' && (
+                  <line
+                    x1={axisCursor.x}
+                    y1={plotTop}
+                    x2={axisCursor.x}
+                    y2={plotBottom}
+                    className="plot-axis-cursor"
+                  />
+                )}
+                {axisCursor?.axis === 'y' && (
+                  <line
+                    x1={plotLeft}
+                    y1={axisCursor.y}
+                    x2={plotRight}
+                    y2={axisCursor.y}
+                    className="plot-axis-cursor"
+                  />
+                )}
                 {hover && (
                   <g className="plot-crosshair" pointerEvents="none">
                     <line x1={hover.x} y1={plotTop} x2={hover.x} y2={plotBottom} />
@@ -1431,9 +1615,15 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
                   height="50"
                   fill="transparent"
                   className="plot-x-axis-hit"
+                  onPointerEnter={() => setHoveredAxis('x')}
+                  onPointerLeave={() => {
+                    window.cancelAnimationFrame(axisCursorFrameRef.current)
+                    setHoveredAxis(null)
+                    setAxisCursor(null)
+                  }}
                   onWheel={handleXWheel}
                   onPointerDown={beginXDrag}
-                  onPointerMove={moveXDrag}
+                  onPointerMove={moveXAxisCursor}
                   onPointerUp={finishXDrag}
                   onPointerCancel={finishXDrag}
                 />
@@ -1444,9 +1634,15 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
                   height={plotHeight}
                   fill="transparent"
                   className="plot-y-axis-hit"
+                  onPointerEnter={() => setHoveredAxis('y')}
+                  onPointerLeave={() => {
+                    window.cancelAnimationFrame(axisCursorFrameRef.current)
+                    setHoveredAxis(null)
+                    setAxisCursor(null)
+                  }}
                   onWheel={handleYWheel}
                   onPointerDown={beginYDrag}
-                  onPointerMove={moveYDrag}
+                  onPointerMove={moveYAxisCursor}
                   onPointerUp={finishYDrag}
                   onPointerCancel={finishYDrag}
                 />
@@ -1493,6 +1689,25 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
                   {formatAxisValue(tick.value)}
                 </span>
               ))}
+              {axisCursor?.axis === 'x' && (
+                <span
+                  className="plot-axis-cursor-label x"
+                  style={{ left: `${(axisCursor.x / 1000) * 100}%` }}
+                >
+                  {axisCursor.pointOffset}
+                </span>
+              )}
+              {axisCursor?.axis === 'y' && (
+                <span
+                  className="plot-axis-cursor-label y"
+                  style={{
+                    left: `${((plotRight + 15) / 1000) * 100}%`,
+                    top: `${(axisCursor.y / 420) * 100}%`
+                  }}
+                >
+                  {formatAxisValue(axisCursor.value)}
+                </span>
+              )}
             </div>
           )}
           {hover && series.length > 0 && (
