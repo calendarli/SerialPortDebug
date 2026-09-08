@@ -100,7 +100,6 @@
           <a href="#reply">自动回复</a>
           <a href="#pairs">虚拟串口对</a>
           <a href="#transfer">文件传输</a>
-          <a href="#scripts">脚本</a>
           <a href="#programming">编程参数</a>
           <a href="#modbus">Modbus RTU</a>
           <a href="#project">工程导入导出</a>
@@ -123,13 +122,13 @@
         <article id="layout" data-title="界面布局 导航 功能在哪里">
           <h2>界面布局</h2>
           <dl class="map">
-            <dt>顶部状态栏</dt><dd>显示当前已打开的串口数量、端口号以及正在运行的脚本数量。</dd>
-            <dt>左侧图标栏</dt><dd>切换串口、串口对、指令、回复、脚本、文件、Modbus、帮助和关于。</dd>
+            <dt>顶部状态栏</dt><dd>显示当前已打开的串口数量和端口号。</dd>
+            <dt>左侧图标栏</dt><dd>切换串口、串口对、指令、回复、Modbus、帮助和关于，也可收起或展开配置区。</dd>
             <dt>左侧配置区</dt><dd>显示当前导航项的配置内容。拖动配置区右边缘可调整宽度，双击恢复默认宽度。</dd>
             <dt>实时曲线</dt><dd>位于中央上方。可拖动底部把手改变高度；收起后为数据交互释放空间。</dd>
             <dt>数据交互</dt><dd>集中显示每个端口的 RX/TX 数据，支持 HEX、时间戳、暂停、搜索和条件暂停。</dd>
             <dt>发送区</dt><dd>位于中央下方，用于选择目标串口、编辑内容、切换 ASCII/HEX、CRC 和自动发送。</dd>
-            <dt>底部状态栏</dt><dd>显示操作结果、RX/TX 次数、缓存占用、数据频率及 IPC 批处理状态。</dd>
+            <dt>底部状态栏</dt><dd>显示操作结果、RX/TX 次数、缓存占用和数据频率。</dd>
           </dl>
         </article>
 
@@ -223,12 +222,7 @@
 
         <article id="transfer" data-title="文件传输 发送文件 接收文件 协议 原始模式">
           <h2>串口文件传输</h2>
-          <p>打开“文件”页后选择已打开的串口。可发送文件，也可指定目录等待接收。SerialFlow 协议提供分块和进度信息；原始模式直接发送文件字节，需由对端协议保证完整性。</p>
-        </article>
-
-        <article id="scripts" data-title="脚本 JavaScript 自动化 端口 运行 停止">
-          <h2>脚本</h2>
-          <p>使用内置编辑器编写自动化逻辑，对串口数据进行处理或执行周期任务。启用脚本会显示在顶部状态栏；修改关键通信流程后应先在低风险设备上验证。</p>
+          <p>在底部发送区切换到“发送文件”，选择文件、分块大小、区块延时和已打开的目标串口。文件以原始二进制发送，需由对端协议保证完整性。</p>
         </article>
 
         <article id="programming" data-title="编程参数手册 参数程序 JavaScript API 示例">

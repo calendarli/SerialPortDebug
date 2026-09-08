@@ -12,12 +12,13 @@ type Props = {
   aboutContent: ReactNode
 }
 const storageKey = 'serialflow.sidebarWidth'
-const defaultWidth = 320
-const minWidth = 270
+const collapsedStorageKey = 'serialflow.sidebarCollapsed'
+const tabRailWidth = 52
+const tabPageWidth = 260
+const defaultWidth = tabRailWidth + tabPageWidth
 
 function clampWidth(value: number): number {
-  const maxWidth = Math.min(560, Math.floor(window.innerWidth * 0.48))
-  return Math.min(Math.max(value, minWidth), Math.max(minWidth, maxWidth))
+  return Math.min(Math.max(value, tabRailWidth), defaultWidth)
 }
 
 function initialWidth(): number {
@@ -28,6 +29,9 @@ function initialWidth(): number {
 export function Sidebar(props: Props): React.JSX.Element {
   const fullPage = ['modbus', 'pairs'].includes(props.activeTab)
   const [width, setWidth] = useState(initialWidth)
+  const [collapsed, setCollapsed] = useState(
+    () => localStorage.getItem(collapsedStorageKey) === 'true'
+  )
   const [resizing, setResizing] = useState(false)
   const dragStart = useRef({ x: 0, width: defaultWidth })
   const widthRef = useRef(width)
@@ -45,7 +49,13 @@ export function Sidebar(props: Props): React.JSX.Element {
 
   const beginResize = (event: React.PointerEvent<HTMLDivElement>): void => {
     event.preventDefault()
-    dragStart.current = { x: event.clientX, width }
+    const startWidth = collapsed ? tabRailWidth : width
+    dragStart.current = { x: event.clientX, width: startWidth }
+    if (collapsed) {
+      setWidth(tabRailWidth)
+      widthRef.current = tabRailWidth
+      setCollapsed(false)
+    }
     event.currentTarget.setPointerCapture(event.pointerId)
     setResizing(true)
   }
@@ -54,6 +64,9 @@ export function Sidebar(props: Props): React.JSX.Element {
     const nextWidth = clampWidth(dragStart.current.width + event.clientX - dragStart.current.x)
     widthRef.current = nextWidth
     setWidth(nextWidth)
+    const nextCollapsed = nextWidth <= tabRailWidth
+    setCollapsed(nextCollapsed)
+    localStorage.setItem(collapsedStorageKey, String(nextCollapsed))
   }
   const finishResize = (event: React.PointerEvent<HTMLDivElement>): void => {
     if (!resizing) return
@@ -66,11 +79,22 @@ export function Sidebar(props: Props): React.JSX.Element {
     widthRef.current = defaultWidth
     localStorage.setItem(storageKey, String(defaultWidth))
   }
+  const toggleCollapsed = (): void => {
+    setCollapsed((current) => {
+      const next = !current
+      const nextWidth = next ? tabRailWidth : defaultWidth
+      setWidth(nextWidth)
+      widthRef.current = nextWidth
+      localStorage.setItem(storageKey, String(nextWidth))
+      localStorage.setItem(collapsedStorageKey, String(next))
+      return next
+    })
+  }
 
   return (
     <aside
-      className={`config-panel resizable-sidebar ${fullPage ? 'full-page-tab-only' : ''} ${resizing ? 'resizing' : ''}`}
-      style={{ width: fullPage ? 52 : width }}
+      className={`config-panel resizable-sidebar ${fullPage ? 'full-page-tab-only' : ''} ${collapsed ? 'collapsed' : ''} ${resizing ? 'resizing' : ''}`}
+      style={{ width: fullPage || collapsed ? tabRailWidth : width }}
     >
       <nav className="side-tabs" aria-label="侧栏导航">
         <button
@@ -128,6 +152,17 @@ export function Sidebar(props: Props): React.JSX.Element {
           <span className="tab-icon">?</span>
           <span>帮助</span>
         </button>
+        {!fullPage && (
+          <button
+            className="sidebar-collapse-tab"
+            title={collapsed ? '展开侧栏' : '收起侧栏'}
+            aria-label={collapsed ? '展开侧栏' : '收起侧栏'}
+            onClick={toggleCollapsed}
+          >
+            <span className="tab-icon">{collapsed ? '»' : '«'}</span>
+            <span>{collapsed ? '展开' : '收起'}</span>
+          </button>
+        )}
         <button
           title="关于"
           className={`about-tab ${props.activeTab === 'about' ? 'active' : ''}`}
@@ -139,15 +174,17 @@ export function Sidebar(props: Props): React.JSX.Element {
       </nav>
       {!fullPage && (
         <>
-          <div className="side-page">
-            {props.activeTab === 'serial'
-              ? props.serialContent
-              : props.activeTab === 'commands'
-                ? props.commandsContent
-                : props.activeTab === 'rules'
-                  ? props.rulesContent
-                  : props.aboutContent}
-          </div>
+          {!collapsed && (
+            <div className="side-page">
+              {props.activeTab === 'serial'
+                ? props.serialContent
+                : props.activeTab === 'commands'
+                  ? props.commandsContent
+                  : props.activeTab === 'rules'
+                    ? props.rulesContent
+                    : props.aboutContent}
+            </div>
+          )}
           <div
             className="sidebar-resizer"
             title="拖拽调整宽度，双击恢复默认"

@@ -43,7 +43,7 @@ export function AboutPanel(): React.JSX.Element {
       </div>
 
       <p className="about-description">
-        面向设备联调和高频数据场景，提供多串口通信、快捷指令、自动回复以及脚本化数据处理能力。
+        面向设备联调和高频数据场景，提供多串口通信、快捷指令、自动回复以及可编程参数能力。
       </p>
 
       <dl className="about-details">

@@ -848,9 +848,11 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
               <b className="folder-icon">▰</b>
               <strong>{group.name}</strong>
               <em>{groupCommandCount(group.id)} 条指令</em>
-              <span className="group-global-badge">
-                global · {Object.keys(group.globals).length}
-              </span>
+              {Object.keys(group.globals).length > 0 && (
+                <span className="group-global-badge">
+                  global · {Object.keys(group.globals).length}
+                </span>
+              )}
             </button>
             {group.autoLoop && (
               <button

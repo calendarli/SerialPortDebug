@@ -797,11 +797,14 @@ footer > span:first-child {
 .resizable-sidebar {
   position: relative;
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr);
+  grid-template-columns: 52px 260px;
   padding: 0;
   overflow: hidden;
-  min-width: 270px;
-  max-width: 560px;
+  min-width: 52px;
+  max-width: 312px;
+}
+.resizable-sidebar.collapsed {
+  grid-template-columns: 52px;
 }
 .resizable-sidebar.full-page-tab-only {
   grid-template-columns: 52px;
@@ -813,6 +816,7 @@ footer > span:first-child {
   min-width: 0;
   overflow: auto;
   background: rgba(255, 255, 255, 0.76);
+  container-type: inline-size;
 }
 .resizable-sidebar .side-tabs {
   height: auto;
@@ -3529,6 +3533,8 @@ footer > span:first-child {
   font-weight: 400;
 }
 .group-title > strong {
+  min-width: 0;
+  flex: 1 1 auto;
   overflow: hidden;
   font-size: 17px;
   text-overflow: ellipsis;
@@ -3630,6 +3636,7 @@ footer > span:first-child {
   font-weight: 700;
 }
 .group-title > em {
+  flex: 0 0 auto;
   margin-left: auto;
   padding: 2px 6px;
   border-radius: 9px;
@@ -5253,6 +5260,311 @@ footer > span:first-child {
   overflow: auto;
   border-radius: 10px;
   pointer-events: auto;
+}
+.command-head > .command-send,
+.command-head .format-badge,
+.command-head .auto-send-badge {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+@container (max-width: 300px) {
+  .commands-panel .group-global-badge {
+    display: none;
+  }
+  .commands-panel .group-title {
+    gap: 3px;
+    padding-right: 5px;
+    padding-left: 5px;
+  }
+  .commands-panel .group-title > strong {
+    font-size: 15px;
+  }
+  .commands-panel .command-item {
+    padding: 8px;
+  }
+}
+
+/* Compact quick-command tree: preserve hierarchy without oversized cards. */
+.commands-panel {
+  padding: 10px;
+}
+.commands-panel .side-section-head {
+  margin-bottom: 8px;
+}
+.commands-panel .side-section-head strong {
+  font-size: 18px;
+}
+.commands-panel .side-section-head small {
+  margin-top: 0;
+  font-size: 13px;
+}
+.commands-panel .side-section-actions > button {
+  min-height: 25px;
+  padding: 2px 7px;
+}
+.commands-panel .side-section-count {
+  padding: 2px 6px;
+  font-size: 13px;
+}
+.commands-panel .command-list {
+  gap: 6px;
+}
+.commands-panel .command-group {
+  padding: 4px;
+  border-radius: 8px;
+  box-shadow: none;
+}
+.commands-panel .group-title {
+  height: 30px;
+  padding: 0 6px;
+  border-radius: 6px;
+}
+.commands-panel .group-title .group-arrow {
+  width: 10px;
+  font-size: 13px;
+}
+.commands-panel .group-title .folder-icon {
+  font-size: 16px;
+}
+.commands-panel .group-title > strong {
+  font-size: 15px;
+}
+.commands-panel .group-title > em {
+  padding: 1px 5px;
+  font-size: 12px;
+  box-shadow: none;
+}
+.commands-panel .group-children {
+  gap: 5px;
+  margin: 4px 0 0 7px;
+  padding: 1px 0 1px 7px;
+  border-left-width: 1px;
+}
+.commands-panel .command-item {
+  padding: 7px;
+  border-radius: 7px;
+  box-shadow: none;
+}
+.commands-panel .command-head > div {
+  gap: 5px;
+}
+.commands-panel .command-head strong {
+  font-size: 15px;
+}
+.commands-panel .format-badge,
+.commands-panel .auto-send-badge {
+  padding: 1px 5px;
+  font-size: 12px;
+}
+.commands-panel .command-head > .command-send {
+  height: 25px;
+  padding: 0 9px;
+  font-size: 14px;
+}
+.commands-panel .command-parameter {
+  gap: 5px;
+  margin-top: 6px;
+}
+.commands-panel .command-parameter label {
+  grid-template-columns: minmax(48px, auto) minmax(0, 1fr);
+  gap: 5px;
+}
+.commands-panel .command-parameter label span {
+  font-size: 13px;
+}
+.commands-panel .command-parameter input,
+.commands-panel .command-parameter .parameter-mode-select {
+  height: 28px;
+}
+
+/* Oscilloscope-style plot: chart, right-side channel readings and compact controls. */
+.interaction-content .plot-panel.embedded:not(.collapsed) {
+  grid-template-columns: minmax(0, 1fr) 164px;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  column-gap: 0;
+  row-gap: 0;
+  background: #fff;
+}
+.interaction-content .plot-panel.embedded:not(.collapsed) > .plot-toolbar {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  border-bottom: 1px solid #d7dce2;
+}
+.interaction-content .plot-panel.embedded:not(.collapsed) > .plot-canvas {
+  grid-column: 1;
+  grid-row: 2;
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  border-right: 1px solid #d7dce2;
+}
+.interaction-content .plot-panel.embedded:not(.collapsed) > .plot-legend {
+  grid-column: 2;
+  grid-row: 2;
+  align-content: start;
+  display: grid;
+  gap: 0;
+  max-height: none;
+  margin: 0;
+  padding: 7px 9px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: #fff;
+}
+.interaction-content .plot-panel.embedded .plot-legend > div {
+  position: relative;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 2px 6px;
+  padding: 8px 2px;
+  border: 0;
+  border-bottom: 1px solid #eef0f3;
+  border-radius: 0;
+  background: transparent;
+}
+.interaction-content .plot-panel.embedded .plot-channel-enabled {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: center;
+}
+.interaction-content .plot-panel.embedded .plot-series-color {
+  position: absolute;
+  top: 9px;
+  right: 2px;
+  width: 15px;
+  height: 15px;
+}
+.interaction-content .plot-panel.embedded .plot-legend strong {
+  grid-column: 2;
+  padding-right: 19px;
+  color: #172033;
+  font-size: 14px;
+}
+.interaction-content .plot-panel.embedded .plot-legend span {
+  display: none;
+}
+.interaction-content .plot-panel.embedded .plot-legend span:first-of-type {
+  display: block;
+  grid-column: 2;
+  color: #334155;
+  font: 600 14px/1.4 Consolas, monospace;
+}
+.interaction-content .plot-panel.embedded .plot-side-controls {
+  position: static;
+  width: auto;
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+  margin: 0;
+  white-space: nowrap;
+}
+.interaction-content .plot-panel.embedded .plot-side-controls > button {
+  width: auto;
+  height: 30px;
+  padding: 0 8px;
+}
+.interaction-content .plot-panel.embedded .plot-grid-line {
+  stroke-dasharray: 3 3;
+}
+.interaction-content .plot-panel.embedded .plot-axis {
+  stroke: #4b5563;
+}
+.interaction-content .plot-panel.embedded .plot-html-x-label,
+.interaction-content .plot-panel.embedded .plot-html-y-label {
+  color: #111827;
+  font-weight: 600;
+}
+.interaction-content .plot-panel.embedded > .plot-panel-resizer {
+  grid-column: 1 / -1;
+}
+.interaction-content .plot-panel.embedded .plot-x-range {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  padding: 5px 12px 8px;
+  border-top: 1px solid #e5e7eb;
+  background: #fff;
+}
+.plot-x-range-meta {
+  height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: #475569;
+  font-size: 12px;
+}
+.plot-x-range-meta button {
+  height: 23px;
+  margin-left: auto;
+  padding: 0 7px;
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  cursor: pointer;
+}
+.plot-x-range-meta button:disabled {
+  color: #64748b;
+  cursor: default;
+}
+.plot-x-range-track {
+  position: relative;
+  height: 14px;
+  margin: 1px 7px 0;
+  border-radius: 7px;
+  background: #e5e7eb;
+  touch-action: none;
+}
+.plot-x-range-selection {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  min-width: 8px;
+  border-radius: 5px;
+  background: #72c7bb;
+  cursor: grab;
+  touch-action: none;
+}
+.plot-x-range-track.dragging .plot-x-range-selection {
+  cursor: grabbing;
+}
+.plot-x-range-handle {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 4px #0f172a33;
+  cursor: ew-resize;
+  touch-action: none;
+}
+.plot-x-range-handle.start {
+  background: #ef4444;
+}
+.plot-x-range-handle.end {
+  background: #7e22ce;
+}
+.plot-x-range-track:has(.plot-x-range-handle.overlap) {
+  height: 24px;
+}
+.plot-x-range-handle.start.overlap {
+  top: 28%;
+  z-index: 3;
+}
+.plot-x-range-handle.end.overlap {
+  top: 72%;
+}
+@container (max-width: 650px) {
+  .interaction-content .plot-panel.embedded:not(.collapsed) {
+    grid-template-columns: minmax(0, 1fr) 126px;
+  }
+  .interaction-content .plot-panel.embedded .plot-legend {
+    padding-right: 5px;
+    padding-left: 5px;
+  }
 }
 
 /* Global overlay order: dialogs < menus/panels < tooltips. */
