@@ -2,36 +2,30 @@
 
 SerialFlow 是一款基于 Electron、React 和 TypeScript 开发的桌面串口调试工具，适用于常规设备联调，以及电机 PWM、PID 参数、传感器遥测等高频数据收发场景。
 
-应用支持多串口、ASCII/HEX 收发、快捷指令、自动回复、CRC、自动发送和 JavaScript/TypeScript 脚本。数据交互区使用虚拟列表和受限缓存，持续显示实际收到与发出的数据，不主动减帧。
+应用支持多串口、ASCII/HEX 收发、快捷指令、自动回复、CRC、自动发送和 JavaScript/TypeScript 编程。数据交互区使用虚拟列表和受限缓存，持续显示实际收到与发出的数据，不主动减帧。
+
+项目仓库：[calendarli/SerialPortDebug](https://github.com/calendarli/SerialPortDebug)。应用侧栏提供“帮助”入口，编程接口参见 [编程手册](src/renderer/public/programming-manual.html)。
 
 ## 主要功能
 
 ### 协议分帧与高吞吐管线
 
 - 每个串口可独立选择原始数据块、分隔符、固定长度、帧头帧尾或空闲超时分帧。
-- 完整帧统一进入数据显示、条件暂停、自动回复和脚本处理，避免系统数据块拆帧或粘包造成误匹配。
+- 完整帧统一进入数据显示、条件暂停和自动回复处理，避免系统数据块拆帧或粘包造成误匹配。
 - 接收链路使用二进制批量 IPC，按时间窗口或数据量合并跨进程通知，不使用 Base64 中转，也不丢弃原始帧。
 
-### 记录、分析与自动化
+### 实时曲线与 PID 分析
 
-- 原始 RX/TX 会话可持续录制到 `.serialflow-session` 文件，不受交互区缓存上限影响，并支持按原始时序回放。
-- “曲线”页面可自动识别 `PWM=10,Speed=20` 或 `10,20,30` 格式，显示多通道实时曲线及当前值、最小值和最大值。
-- “测试”页面支持按步骤发送 ASCII/HEX、等待正则回复、超时判定和顺序执行。
-- “Modbus”页面支持生成并发送 RTU 功能码 01～06 请求，自动附加 CRC-16/MODBUS。
-- 整套串口配置、快捷指令、自动回复、脚本及常用设置可以导入或导出为 `.serialflow` 工程文件。
+- 交互区上方提供多通道实时曲线，可识别 `PWM=10,Speed=20` 或 `10,20,30` 等数值格式。
+- 支持通道开关、曲线颜色、横轴窗口和纵轴范围调整，以及悬停查看采样值。
+- PID 分析提供上升时间、稳定时间、超调和参数调整建议；建议不会自动写入设备。
 
-### 串口文件传输
+### Modbus RTU 与配置共享
 
-- “文件”页面支持在两个已打开的串口之间发送和接收单个文件。
-- 发送时可选择“SerialFlow 可靠传输”或“原始二进制”：可靠模式需要另一端运行 SerialFlow 文件接收，原始模式直接向下位机发送文件字节且不等待回应。
-- 文件使用二进制分块发送，每帧带有 CRC32 校验，并通过 ACK、超时和最多 5 次重试保证可靠传输。
-- 接收端先写入 `.serialflow-part` 临时文件，完成后进行 SHA-256 校验，校验通过才改为正式文件名。
-- 中断后再次发送相同文件时，可根据文件大小、SHA-256 和分块大小从临时文件断点续传。
-- 可选择 256 B、512 B、1 KB 或 4 KB 数据块，以适配不同质量和速度的串口链路。
-- 文件传输期间，所用串口由文件协议独占，二进制文件数据不会进入普通数据显示、自动回复或脚本处理。
-- Windows 允许同时启动多个 SerialFlow 进程，可分别打开虚拟串口对的两端，在同一台电脑上测试文件发送与接收。
-
-使用时先在接收端打开目标串口，进入“文件”页面选择保存目录并启用文件接收；然后在发送端打开串口、选择文件和分块大小，点击“开始发送”。双方的波特率、数据位、停止位和校验位必须一致。
+- “Modbus RTU”页面支持保持寄存器读取、定时轮询，以及 H06/H10 写入。
+- 寄存器支持 HEX16、UINT16、INT32、UINT32、FLOAT32 显示和字序设置。
+- 支持 MBP 导入及 Modbus JSON 配置导入、导出。
+- 串口配置、快捷指令、自动回复及常用设置可导入或导出为 `.serialflow` 工程文件；快捷指令和自动回复也支持单独导入、导出。
 
 ### 多串口管理
 
@@ -39,13 +33,13 @@ SerialFlow 是一款基于 Electron、React 和 TypeScript 开发的桌面串口
 - 支持端口、波特率、数据位、停止位、校验位和流控制配置。
 - 支持使用 SerialFlow 自有 UMDF 2 驱动创建、查看和删除本地虚拟串口对。
 - “管理与安装”可自动检测并安装开发版驱动所需的测试签名证书；证书已安装时不再显示安装按钮。
-- 普通发送、快捷指令、指令组、自动回复和脚本均可选择目标端口。
+- 普通发送、快捷指令、指令组和自动回复均可选择目标端口。
 - 串口配置、面板尺寸和常用显示选项会自动持久化。
 - 打开失败时同时显示底部状态和弹窗，并针对端口占用、设备断开、参数不受支持等情况给出提示。
 
 ### 数据交互
 
-- 在同一交互区展示 RX、TX 和脚本结果，并使用方向、端口、时间戳和颜色加以区分。
+- 在同一交互区展示 RX 和 TX，并使用方向、端口、时间戳和颜色加以区分。
 - 使用虚拟列表降低数千条数据持续更新时的渲染开销；收到多少显示多少，不主动丢弃显示帧。
 - 默认自动跟随到最新数据，鼠标悬停时突出当前记录。
 - 支持 ASCII/HEX 接收显示、时间戳、暂停显示和条件自动暂停。
@@ -155,37 +149,6 @@ AA {{计数}} BB
 
 编程模式可通过 `global.counter` 读写所属自动回复分组的共享变量。快捷指令分组使用独立的 `global`，指令模板通过 `{{global.counter}}` 读取、`{{global.counter++}}` 发送后递增，或通过 `{{++global.counter}}` 递增后发送。各分组互不影响，变量随本地配置和导出的工程保存；“重置 global”会清空当前分组变量。
 
-### JavaScript/TypeScript 脚本
-
-- 使用 Monaco Editor，支持 JavaScript/TypeScript 语法高亮、格式化、测试和 `Ctrl + 鼠标滚轮` 缩放字体。
-- 脚本列表通过右键菜单完成新建、导入、导出、重命名和删除等操作。
-- 支持仅发送、仅接收或双向处理，并可限制目标端口。
-- 输入可转换为 ASCII、HEX、JSON 或字节数组。
-- 接收分帧支持原始数据块、分隔符、固定长度、帧头帧尾和空闲超时。
-- 脚本结果可追加显示、替换原始显示或隐藏。
-- 测试输入/运行输出区域高度及编辑器字号会自动保存。
-- 脚本在独立 QuickJS 运行环境中执行，TypeScript 保存时会编译为 JavaScript。
-
-脚本必须通过 `execute` 注册处理函数：
-
-```typescript
-const handleSerial: SerialHandler = (value, msgType, index, context) => {
-  if (msgType === 'received') {
-    return {
-      value,
-      display: `${context.port}: ${String(value)}`,
-      tags: ['脚本']
-    }
-  }
-
-  return value
-}
-
-execute(handleSerial)
-```
-
-处理函数可以直接返回新值，也可返回包含 `value`、`encoding`、`display`、`tags` 或 `dropDisplay` 的结果对象。
-
 ## 快速开始
 
 ### 使用安装程序
@@ -203,10 +166,12 @@ Windows 安装程序采用引导式安装，用户可自行选择安装目录，
 
 ### 从源码运行
 
-环境要求：Node.js、npm，以及当前 Electron 平台可用的原生编译工具链。
+环境要求：Node.js 20.19+（20.x）或 22.12+、npm，以及当前 Electron 平台可用的原生编译工具链。
 
 ```bash
-npm install
+git clone https://github.com/calendarli/SerialPortDebug.git
+cd SerialPortDebug
+npm ci
 npm run dev
 ```
 
@@ -232,7 +197,11 @@ npm run build:win
 npm run build:unpack
 ```
 
-还可使用 `npm run build:mac` 或 `npm run build:linux` 生成对应平台的软件包。
+构建配置还提供 `npm run build:mac` 和 `npm run build:linux`。当前 `extraResources` 包含 Windows 虚拟串口驱动路径，跨平台打包前需调整这些资源配置；虚拟串口驱动仅适用于 Windows。
+
+Windows 打包前需准备 `electron-builder.yml` 中列出的驱动管理器、驱动包和证书，构建要求参见 [驱动说明](driver/SerialFlowVirtualSerial/README.md)。仅运行 `npm run build` 不会编译驱动。
+
+已有自动化测试可通过 `node --test tests/*.test.cjs` 运行。
 
 切换 Electron 版本或运行环境后，如果 `serialport` 原生模块不匹配，请执行：
 
@@ -256,19 +225,13 @@ HEX 文本只能包含 `0-9`、`A-F`，并应组成完整字节，例如 `AA 01 
 
 ### 高频收发时频率低于设置值
 
-1 ms 是调度允许的最小配置值，不代表操作系统、USB 串口芯片和设备一定能达到 1,000 次/秒。实际频率还受波特率、单帧长度、驱动缓冲、Electron 事件循环和界面渲染影响。可减少时间戳与脚本处理、合理限制缓存条数，并确保波特率能够容纳目标数据量。
+1 ms 是调度允许的最小配置值，不代表操作系统、USB 串口芯片和设备一定能达到 1,000 次/秒。实际频率还受波特率、单帧长度、驱动缓冲、Electron 事件循环和界面渲染影响。可减少时间戳与编程处理、合理限制缓存条数，并确保波特率能够容纳目标数据量。
 
 ### 无法安装测试签名证书或虚拟串口驱动
 
 确认使用的是 Windows 版本，并在管理员授权窗口中选择“是”。如果曾取消授权，可重新点击“安装测试签名证书”。按钮消失表示证书已经同时存在于本机的受信任根证书库和受信任发布者证书库。
 
 证书受信任不等于系统一定允许加载测试签名驱动。启用了 Secure Boot、组织安全策略或驱动签名强制时，Windows 仍可能拒绝开发版驱动。SerialFlow 不会自动修改这些系统安全设置；请优先使用 Microsoft 正式签名的驱动包。
-
-### 文件传输一直等待接收端确认
-
-确认接收端已经打开对应串口，并在“文件”页面选择保存目录、启用文件接收。双方串口参数必须一致，且发送端和接收端不能选择同一个本地串口。链路质量较差时可将数据块大小降到 256 B 或 512 B。连续 5 次未收到确认后任务会显示错误，可以保留接收端临时文件并重新发送以继续传输。
-
-部分虚拟串口驱动不支持 Windows `FlushFileBuffers`。文件传输使用逐块 ACK 控制发送速度，只等待数据写入系统缓冲区，不调用串口 `drain()`，因此不会因 `Draining connection (FlushFileBuffers): Unknown error code 1` 误报传输失败。
 
 ## 技术栈
 
@@ -277,6 +240,34 @@ HEX 文本只能包含 `0-9`、`A-F`，并应组成完整字节，例如 `AA 01 
 - TypeScript
 - Vite
 - serialport
-- Monaco Editor
 - QuickJS/Emscripten
 - TanStack Virtual
+
+## 项目结构
+
+- `src/main/`：Electron 主进程、串口通信及系统集成。
+- `src/preload/`：主进程与界面的通信接口。
+- `src/renderer/src/`：React 界面、协议处理及 QuickJS 编程运行时。
+- `src/renderer/public/`：帮助页面与编程手册。
+- `driver/SerialFlowVirtualSerial/`：Windows 虚拟串口驱动及管理器。
+- `tests/`：协议与快捷指令等自动化测试。
+
+## 反馈与贡献
+
+提交问题时请附上应用版本、操作系统、串口设备与参数、复现步骤和相关日志。提交代码前运行 `npm run lint`、`npm run typecheck` 及与修改相关的测试。项目版本更新规则见 [AGENTS.md](AGENTS.md)。
+
+## 开源协议
+
+除另有授权声明的第三方代码外，SerialFlow 原创代码采用 **GNU General Public License v3.0（GPL-3.0-only，仅第 3 版）**，完整协议见 [LICENSE](LICENSE)。
+
+- 允许使用、复制、修改和分发，包括商业使用。
+- 分发本项目或其衍生作品时，须遵守 GPL-3.0，保留版权和许可声明，注明修改，并按协议要求提供对应源代码；分发衍生作品时须继续采用 GPL-3.0。
+- 软件按现状提供，不附带任何担保，具体责任限制以协议全文为准。
+
+以上为简要说明，具体条款以 [GNU 官方协议文本](https://www.gnu.org/licenses/gpl-3.0.html) 和仓库中的 [LICENSE](LICENSE) 为准。
+
+### 第三方代码与驱动
+
+`driver/SerialFlowVirtualSerial/` 基于 Microsoft `serial/VirtualSerial2` 示例开发，该部分按其 [驱动说明](driver/SerialFlowVirtualSerial/README.md) 保留 **Microsoft Public License（Ms-PL）** 授权及 Microsoft 版权声明，不由本项目的 GPL-3.0 声明重新授权。Ms-PL 条款参见 [协议全文](https://opensource.org/license/ms-pl)。
+
+Electron、React、serialport、QuickJS 等第三方依赖继续遵循各自许可证。分发源码或安装包时，也须保留并遵守相关第三方许可及版权声明。
