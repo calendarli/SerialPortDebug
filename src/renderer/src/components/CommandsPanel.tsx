@@ -1,3 +1,4 @@
+import { ProgramCodeEditor } from './ProgramCodeEditor'
 import { memo, useEffect, useRef, useState } from 'react'
 import { bytesToHex, convertSerialText } from '../serial-utils'
 import type { CommandGroup, CrcMode, SavedCommand, TargetPortOption } from '../types'
@@ -1371,9 +1372,9 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
                       </div>
                     </div>
                     {draft.processingMode === 'program' && (
-                      <label className="command-program-editor">
-                        发送前处理函数（JavaScript）
-                        <textarea
+                      <div className="command-program-editor">
+                        发送前处理函数（JS / TS）
+                        <ProgramCodeEditor
                           aria-label="快捷指令处理程序"
                           spellCheck={false}
                           value={draft.processingProgram}
@@ -1407,6 +1408,7 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
                           }}
                         />
                         <small>
+                          直接编写 JS 或 TS，无需切换语言。
                           process(data, context) 返回完整字节数组或 Uint8Array；data
                           是替换参数并编码后的字节。context.phase 区分
                           press（主指令）、release（抬起）、companion（被附带执行）。
@@ -1415,7 +1417,7 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
                           处理顺序：参数替换 → 编码 → 处理函数 → 标准
                           CRC。自定义校验已在函数内追加时，请关闭标准 CRC。Tab 缩进，Ctrl+S 保存。
                         </small>
-                      </label>
+                      </div>
                     )}
                   </div>
                 </section>

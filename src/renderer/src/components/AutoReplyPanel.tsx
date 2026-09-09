@@ -1,3 +1,4 @@
+import { ProgramCodeEditor } from './ProgramCodeEditor'
 import { useEffect, useRef, useState } from 'react'
 import type { AutoReplyGroup, Rule, TargetPortOption } from '../types'
 import { defaultAutoReplyProgram, upgradeAutoReplyProgram } from '../scripts/auto-reply-program'
@@ -286,7 +287,7 @@ export function AutoReplyPanel({
       )
     if (draft.parameterMode === 'program') {
       if (!draft.parameterProgram.trim()) return setError('请输入编程模式代码')
-      if (!/\bfunction\s+calculate\s*\(|\bcalculate\s*=/.test(draft.parameterProgram))
+      if (!/\bfunction\s+calculate\b|\bcalculate\s*(?::[^=]+)?=/.test(draft.parameterProgram))
         return setError('编程模式必须定义 calculate(input, match, context) 函数')
     }
     if (editingRuleId === null) {
@@ -1008,9 +1009,9 @@ export function AutoReplyPanel({
                   </div>
                 )}
                 {draft.parameterMode === 'program' && (
-                  <label className="auto-reply-program-editor">
+                  <div className="auto-reply-program-editor">
                     <span className="program-editor-title">
-                      参数程序（JavaScript）
+                      参数程序（JS / TS）
                       <button
                         type="button"
                         className="program-manual-button"
@@ -1027,7 +1028,7 @@ export function AutoReplyPanel({
                         ?
                       </button>
                     </span>
-                    <textarea
+                    <ProgramCodeEditor
                       aria-label="自动回复参数程序"
                       spellCheck={false}
                       value={draft.parameterProgram}
@@ -1036,7 +1037,8 @@ export function AutoReplyPanel({
                         setDraft({ ...draft, parameterProgram: event.target.value })
                       }
                     />
-                  </label>
+                    <small>直接编写 JS 或 TS，无需切换语言。</small>
+                  </div>
                 )}
               </section>
               {error && <p className="form-error">{error}</p>}

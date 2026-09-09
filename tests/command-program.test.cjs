@@ -7,6 +7,98 @@ const { test } = require('node:test')
 const ts = require('typescript')
 const { getQuickJS } = require('quickjs-emscripten')
 
+test('highlighting preserves incomplete code, Chinese text and template interpolation', () => {
+  const { highlightProgram } = loadTs('scripts/program-highlight.ts')
+  for (const source of [
+    '// 中文注释\nconst 数据: number = 42\n',
+    'const message = `值: ${count + 1}`; const re = /a\\/b/g',
+    'function process(data: number[]) {\n  return "未完成',
+    '/** 参数说明 */\nfunction calculate() { return {计数: 1} }',
+    '<script>alert("text")</script>',
+    ''
+  ]) assert.equal(highlightProgram(source).map((token) => token.text).join(''), source)
+  const tokens = highlightProgram('const value: number = 42; // note\nconst re = /abc/g')
+  assert.ok(tokens.some((token) => token.text === 'const' && token.tone === 'keyword'))
+  assert.ok(tokens.some((token) => token.text === '42' && token.tone === 'number'))
+  assert.ok(tokens.some((token) => token.text.includes('// note') && token.tone === 'comment'))
+  assert.ok(tokens.some((token) => token.text === '/abc/g' && token.tone === 'string'))
+})
+
+test('TypeScript types, generics and enums execute as command bytes in QuickJS', async () => {
+  assert.deepEqual(
+    await execute(
+      `
+    interface Context { phase: string }
+    type Byte = number
+    enum Marker { End = 255 }
+    function copy<T>(value: T): T { return value }
+    function process(data: Byte[], context: Context): Uint8Array {
+      return new Uint8Array([...copy(data), context.phase === 'press' ? Marker.End : 0])
+    }
+  `,
+      [1, 2],
+      { phase: 'press' }
+    ),
+    [1, 2, 255]
+  )
+})
+
+test('TypeScript auto replies preserve top-level and group state in QuickJS', async () => {
+  const code = await compileAutoReplyProgram({
+    parameterProgram: `
+    interface Result { count: number; input: string }
+    let count: number = 0
+    function calculate(input: string, match: string[], context: object): Result {
+      global.total = (global.total ?? 0) + 1
+      return { count: ++count, input }
+    }
+  `
+  })
+  const quickjs = await getQuickJS()
+  const engine = quickjs.newContext()
+  try {
+    const result = engine.evalCode(`let handler; function execute(fn) { handler = fn }
+      ${code}
+      const first = handler('a', 'received', 0, {global:{total: 5}});
+      const second = handler('b', 'received', 1, {global:first.__serialflowGlobal});
+      [first.__serialflowOutput.count, second.__serialflowOutput.count, second.__serialflowOutput.input, second.__serialflowGlobal.total]`)
+    if (result.error) {
+      const error = engine.dump(result.error)
+      result.error.dispose()
+      throw Error(JSON.stringify(error))
+    }
+    assert.deepEqual(engine.dump(result.value), [1, 2, 'b', 7])
+    result.value.dispose()
+  } finally {
+    engine.dispose()
+  }
+})
+
+test('TypeScript reports syntax locations and rejects unsupported module loading', async () => {
+  await assert.rejects(compileProgramSource('const broken: = 1'), /1/)
+  for (const source of ["import x from 'x'", 'export const x = 1', "const x = import('x')"])
+    await assert.rejects(compileProgramSource(source), /import \/ export/)
+})
+
+test('auto reply transfer preserves TS source without a language setting', () => {
+  const source = 'function calculate(input: string): object { return {input} }'
+  const rule = {
+    id: 1,
+    groupId: 1,
+    name: 'TS',
+    pattern: 'AT',
+    reply: '{{input}}',
+    parameters: [],
+    parameterMode: 'program',
+    parameterProgram: source
+  }
+  const roundTrip = (value) =>
+    parseAutoReplyTransfer(
+      JSON.stringify(createAutoReplyTransfer([{ id: 1, name: 'Group' }], [value]))
+    ).rules[0]
+  assert.equal(roundTrip(rule).parameterProgram, source)
+})
+
 function loadTs(relative) {
   const file = path.resolve(__dirname, '../src/renderer/src', relative)
   const exports = {}
@@ -18,14 +110,24 @@ function loadTs(relative) {
     require: (request) =>
       request === './script-runtime'
         ? { ScriptRuntime: class {} }
-        : loadTs(path.resolve(path.dirname(file), request + '.ts'))
+        : request === 'typescript'
+          ? ts
+          : loadTs(path.resolve(path.dirname(file), request + '.ts'))
   })
   return exports
 }
 const { buildCommandProgram } = loadTs('scripts/command-program.ts')
-const { createQuickCommandsTransfer, parseQuickCommandsTransfer } = loadTs('config-transfer.ts')
+const { compileProgramSource } = loadTs('scripts/program-source.ts')
+const { compileAutoReplyProgram } = loadTs('scripts/auto-reply-program.ts')
+const {
+  createQuickCommandsTransfer,
+  parseQuickCommandsTransfer,
+  createAutoReplyTransfer,
+  parseAutoReplyTransfer
+} = loadTs('config-transfer.ts')
 
 async function execute(source, data, context = {}) {
+  const compiled = await compileProgramSource(source)
   const quickjs = await getQuickJS()
   const runtime = quickjs.newRuntime()
   const deadline = Date.now() + 30
@@ -33,7 +135,7 @@ async function execute(source, data, context = {}) {
   const engine = runtime.newContext()
   try {
     const evaluation = engine.evalCode(`let handler; function execute(fn) { handler = fn }
-      ${buildCommandProgram(source)}
+      ${buildCommandProgram(compiled)}
       handler(${JSON.stringify(data)}, 'send', 0, ${JSON.stringify(context)})`)
     if (evaluation.error) {
       const error = engine.dump(evaluation.error)
@@ -101,7 +203,7 @@ test('both attachment sources and program source survive configuration round tri
     autoSendCount: 0,
     parameters: [],
     processingMode: 'program',
-    processingProgram: 'function process(data) { return data }',
+    processingProgram: 'function process(data: number[]): number[] { return data }',
     companion: { enabled: true, source, commandId: 2, template: 'GET X', loop: true, interval: 200 }
   }))
   const parsed = parseQuickCommandsTransfer(

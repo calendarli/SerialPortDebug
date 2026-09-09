@@ -2,6 +2,7 @@ import { encodeSerialData } from '../serial-utils'
 import type { SavedCommand } from '../types'
 import { ScriptRuntime } from './script-runtime'
 import type { SavedScript } from './script-types'
+import { compileProgramSource } from './program-source'
 
 export type CommandPhase = 'press' | 'release' | 'companion'
 
@@ -41,12 +42,14 @@ export class CommandProgramRuntime {
 
   async run(command: SavedCommand, text: string, phase: CommandPhase): Promise<Uint8Array> {
     const bytes = encodeSerialData(text, command.hex)
-    const code = buildCommandProgram(command.processingProgram || '')
+    const code = buildCommandProgram(
+      await compileProgramSource(command.processingProgram || defaultCommandProgram)
+    )
     const now = Date.now()
     const script: SavedScript = {
       id: `quick-command:${command.id}`,
       name: command.name,
-      language: 'javascript',
+      language: 'typescript',
       source: command.processingProgram || defaultCommandProgram,
       compiledCode: code,
       sourceHash: code,

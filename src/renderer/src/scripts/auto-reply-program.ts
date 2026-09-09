@@ -2,6 +2,7 @@ import type { Rule } from '../types'
 import { ScriptRuntime } from './script-runtime'
 import type { SavedScript, ScriptRunResult } from './script-types'
 import { normalizeGroupGlobals, type GroupGlobals } from './group-globals'
+import { compileProgramSource } from './program-source'
 
 const legacyAutoReplyComment = '// 顶层变量会在多次触发间保留，点击“重置状态”后清零'
 const autoReplyProgramComment = `/**
@@ -62,10 +63,11 @@ function runtimeId(ruleId: number): string {
   return `auto-reply:${ruleId}`
 }
 
-function buildProgram(rule: Rule): string {
+export async function compileAutoReplyProgram(rule: Rule): Promise<string> {
+  const source = await compileProgramSource(rule.parameterProgram || defaultAutoReplyProgram)
   return `'use strict';
 let global = {};
-${rule.parameterProgram || defaultAutoReplyProgram}
+${source}
 
 if (typeof calculate !== 'function') {
   throw new TypeError('编程模式必须定义 calculate(input, match, context) 函数')
@@ -136,15 +138,20 @@ class AutoReplyProgramRuntime {
   ): Promise<{ values: Record<string, string>; globals: GroupGlobals }> {
     const revision = this.revisions.get(rule.id) || 0
     const previous = this.queues.get(groupId)
-    const task = (previous ? previous.catch(() => ({ values: {}, globals })) : Promise.resolve({ values: {}, globals })).then(async () => {
+    const task = (
+      previous
+        ? previous.catch(() => ({ values: {}, globals }))
+        : Promise.resolve({ values: {}, globals })
+    ).then(async () => {
       if ((this.revisions.get(rule.id) || 0) !== revision) throw new Error('规则状态已重置')
       const count = (this.triggerCounts.get(rule.id) || 0) + 1
-      const code = buildProgram(rule)
+      const code = await compileAutoReplyProgram(rule)
+      if ((this.revisions.get(rule.id) || 0) !== revision) throw new Error('规则状态已重置')
       const now = Date.now()
       const script: SavedScript = {
         id: runtimeId(rule.id),
         name: rule.name,
-        language: 'javascript',
+        language: 'typescript',
         source: rule.parameterProgram || defaultAutoReplyProgram,
         compiledCode: code,
         sourceHash: hashSource(code),

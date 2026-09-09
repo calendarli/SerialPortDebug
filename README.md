@@ -102,6 +102,20 @@ function process(data, context) {
 
 附带执行也可切换为**自定义输入**，直接填写 ASCII/HEX 内容并引用主指令的参数占位符。此时使用主指令的端口、编码、参数、处理函数和 CRC，处理函数中的 `context.phase` 为 `companion`。**已有快捷指令与自定义输入二选一，仅执行当前选中的来源**，两者均支持单次执行或按指定间隔循环。
 
+快捷指令和自动回复的编程编辑器均直接支持 **JavaScript / TypeScript**，无需手动切换语言，原有 JavaScript 配置继续使用。源码统一转译后执行，支持类型标注、接口、泛型及枚举；会报告语法错误位置，不进行完整静态类型检查，也不支持 `import / export`。源码随配置保存和导入导出，转译结果缓存复用，仍由原有 QuickJS 沙箱执行。
+
+```typescript
+// 快捷指令：返回完整报文字节
+function process(data: number[]): Uint8Array {
+  return new Uint8Array([...data, 0xff])
+}
+
+// 自动回复：返回发送模板所引用的参数
+function calculate(input: string): Record<string, number> {
+  return { 长度: input.length }
+}
+```
+
 ### 自动回复
 
 - 按目标端口匹配收到的数据，并从同一端口发送回复。
