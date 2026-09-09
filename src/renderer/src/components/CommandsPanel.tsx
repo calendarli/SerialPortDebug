@@ -1171,411 +1171,472 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
 
       {creating && (
         <div className="modal-backdrop rule-create-backdrop">
-          <div className="modal create-rule-modal">
+          <div
+            className="modal create-rule-modal command-editor-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="command-editor-title"
+          >
             <div className="modal-head">
               <div>
-                <h2>{editingCommandId === null ? '新建快捷指令' : '编辑快捷指令'}</h2>
+                <h2 id="command-editor-title">
+                  {editingCommandId === null ? '新建快捷指令' : '编辑快捷指令'}
+                </h2>
                 <p>定义模板、参数及最终发送编码</p>
               </div>
-              <button onClick={() => setCreating(false)}>×</button>
+              <button aria-label="关闭指令编辑器" onClick={() => setCreating(false)}>
+                ×
+              </button>
             </div>
-            <div className="create-rule-form">
-              <label>
-                指令名称
-                <input
-                  autoFocus
-                  value={draft.name}
-                  placeholder="例如：设置 PID"
-                  onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-                />
-              </label>
-              <label>
-                按下发送指令
-                <textarea
-                  value={draft.template}
-                  placeholder={
-                    draft.hex
-                      ? '例如：01 06 {{目标值}}'
-                      : '例如：PID {{比例参数}} {{积分参数}} {{微分参数}}\\r\\n'
-                  }
-                  onChange={(event) => setDraft({ ...draft, template: event.target.value })}
-                />
-                <small>
-                  使用完整参数名字定位，例如 <code>{'{{目标速度}}'}</code>
-                </small>
-              </label>
-              <div className="form-row">
-                <span>收发编码</span>
-                <div className="mini-segment">
-                  <button
-                    className={!draft.hex ? 'active' : ''}
-                    onClick={() => setDraft({ ...draft, hex: false })}
+            <div className="create-rule-form command-editor-form">
+              <div className="command-identity-grid">
+                <label className="command-name-field">
+                  指令名称
+                  <input
+                    autoFocus
+                    value={draft.name}
+                    placeholder="例如：设置 PID"
+                    onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+                  />
+                </label>
+                <label className="command-port-field">
+                  目标端口
+                  <select
+                    value={draft.targetPort}
+                    onChange={(event) => setDraft({ ...draft, targetPort: event.target.value })}
                   >
-                    ASCII
-                  </button>
-                  <button
-                    className={draft.hex ? 'active' : ''}
-                    onClick={() => setDraft({ ...draft, hex: true })}
-                  >
-                    HEX
-                  </button>
+                    <option value="">选择目标端口</option>
+                    {props.targetPorts.map((port) => (
+                      <option key={port.path} value={port.path}>
+                        {port.name}（{port.path}）
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="form-row command-encoding-field">
+                  <span>发送编码</span>
+                  <div className="mini-segment">
+                    <button
+                      className={!draft.hex ? 'active' : ''}
+                      onClick={() => setDraft({ ...draft, hex: false })}
+                    >
+                      ASCII
+                    </button>
+                    <button
+                      className={draft.hex ? 'active' : ''}
+                      onClick={() => setDraft({ ...draft, hex: true })}
+                    >
+                      HEX
+                    </button>
+                  </div>
                 </div>
               </div>
-              <label>
-                抬起发送指令（可选）
-                <textarea
-                  className="command-release-input"
-                  value={draft.releaseTemplate}
-                  placeholder={draft.hex ? '例如：01 06 00 00' : '例如：STOP {{目标速度}}\\r\\n'}
-                  onChange={(event) => setDraft({ ...draft, releaseTemplate: event.target.value })}
-                />
-                <small>普通指令按钮抬起时发送；自动发送停止或完成时发送一次</small>
-              </label>
-              <div className="command-companion-settings">
-                <label className="command-option-toggle">
-                  <input
-                    type="checkbox"
-                    checked={draft.companion.enabled}
-                    onChange={(event) =>
-                      setDraft({
-                        ...draft,
-                        companion: { ...draft.companion, enabled: event.target.checked }
-                      })
-                    }
-                  />
-                  附带执行指令
-                </label>
-                {draft.companion.enabled && (
-                  <>
-                    <small>执行来源（二选一）</small>
-                    <div className="mini-segment" role="group" aria-label="附带执行来源（二选一）">
+              <div className="command-editor-columns">
+                <section className="command-editor-main" aria-label="指令内容">
+                  <div className="command-section-heading">
+                    <h3>指令内容</h3>
+                    <span>模板与参数</span>
+                  </div>
+                  <label className="command-packet-field">
+                    按下发送指令
+                    <textarea
+                      className="compact-packet-input"
+                      rows={1}
+                      value={draft.template}
+                      placeholder={
+                        draft.hex
+                          ? '例如：01 06 {{目标值}}'
+                          : '例如：PID {{比例参数}} {{积分参数}} {{微分参数}}\\r\\n'
+                      }
+                      onChange={(event) => setDraft({ ...draft, template: event.target.value })}
+                    />
+                    <small>
+                      使用完整参数名字定位，例如 <code>{'{{目标速度}}'}</code>
+                    </small>
+                  </label>
+                  <label className="command-packet-field command-release-field">
+                    抬起发送指令（可选）
+                    <textarea
+                      rows={1}
+                      className="command-release-input compact-packet-input"
+                      value={draft.releaseTemplate}
+                      placeholder={
+                        draft.hex ? '例如：01 06 00 00' : '例如：STOP {{目标速度}}\\r\\n'
+                      }
+                      onChange={(event) =>
+                        setDraft({ ...draft, releaseTemplate: event.target.value })
+                      }
+                    />
+                    <small>普通指令按钮抬起时发送；自动发送停止或完成时发送一次</small>
+                  </label>
+                  <div className="parameter-editor">
+                    <div className="parameter-editor-head">
+                      <span>指令参数</span>
                       <button
-                        className={draft.companion.source === 'command' ? 'active' : ''}
-                        aria-pressed={draft.companion.source === 'command'}
                         onClick={() =>
                           setDraft({
                             ...draft,
-                            companion: { ...draft.companion, source: 'command' }
+                            parameters: [...draft.parameters, { id: '', byteLength: 1 }]
                           })
                         }
                       >
-                        已有快捷指令
-                      </button>
-                      <button
-                        className={draft.companion.source === 'custom' ? 'active' : ''}
-                        aria-pressed={draft.companion.source === 'custom'}
-                        onClick={() =>
-                          setDraft({
-                            ...draft,
-                            companion: { ...draft.companion, source: 'custom' }
-                          })
-                        }
-                      >
-                        自定义输入
+                        ＋ 添加参数
                       </button>
                     </div>
-                    {draft.companion.source === 'command' ? (
-                      <label>
-                        附带指令
-                        <select
-                          value={draft.companion.commandId ?? ''}
+                    {draft.parameters.map((parameter, index) => (
+                      <div className="parameter-edit-row command-parameter-edit-row" key={index}>
+                        <input
+                          aria-label={`参数 ${index + 1} 名称`}
+                          value={parameter.id}
+                          placeholder="参数名字，例如 目标速度"
                           onChange={(event) =>
                             setDraft({
                               ...draft,
-                              companion: {
-                                ...draft.companion,
-                                commandId: event.target.value ? Number(event.target.value) : null
-                              }
+                              parameters: draft.parameters.map((value, itemIndex) =>
+                                itemIndex === index ? { ...value, id: event.target.value } : value
+                              )
+                            })
+                          }
+                        />
+                        <label className="parameter-byte-length">
+                          <input
+                            aria-label={`参数 ${index + 1} 字节数`}
+                            type="number"
+                            min="1"
+                            max="64"
+                            value={parameter.byteLength}
+                            onChange={(event) =>
+                              setDraft({
+                                ...draft,
+                                parameters: draft.parameters.map((value, itemIndex) =>
+                                  itemIndex === index
+                                    ? { ...value, byteLength: Number(event.target.value) }
+                                    : value
+                                )
+                              })
+                            }
+                          />
+                          <span>字节</span>
+                        </label>
+                        <button
+                          className="copy-placeholder"
+                          disabled={!parameter.id.trim()}
+                          onClick={() => void copyPlaceholder(parameter.id, index)}
+                        >
+                          {copiedIndex === index
+                            ? '已复制'
+                            : parameter.id.trim()
+                              ? `{{${parameter.id.trim()}}}`
+                              : '{{参数名字}}'}
+                        </button>
+                        <button
+                          aria-label={`删除参数 ${index + 1}`}
+                          className="remove-parameter"
+                          onClick={() =>
+                            setDraft({
+                              ...draft,
+                              parameters: draft.parameters.filter(
+                                (_, itemIndex) => itemIndex !== index
+                              )
                             })
                           }
                         >
-                          <option value="">请选择已有快捷指令</option>
-                          {props.commands
-                            .filter((command) => command.id !== editingCommandId)
-                            .map((command) => (
-                              <option key={command.id} value={command.id}>
-                                {props.groups.find((group) => group.id === command.parentId)
-                                  ?.name || '顶层'}{' '}
-                                / {command.name}（{command.targetPort || '未指定端口'}）
-                              </option>
-                            ))}
-                        </select>
-                      </label>
-                    ) : (
-                      <label>
-                        自定义附带内容（{draft.hex ? 'HEX' : 'ASCII'}）
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    {draft.parameters.length > 0 && (
+                      <small className="parameter-byte-help">
+                        DEC/HEX 参数按无符号数限制范围；发送 HEX 指令时按大端顺序左侧补零，例如 2
+                        字节 DEC 10 → 00 0A
+                      </small>
+                    )}
+                  </div>
+                  <div className="command-processing-section">
+                    <div className="form-row">
+                      <span>指令处理</span>
+                      <div className="mini-segment">
+                        <button
+                          className={draft.processingMode === 'template' ? 'active' : ''}
+                          onClick={() => setDraft({ ...draft, processingMode: 'template' })}
+                        >
+                          普通模式
+                        </button>
+                        <button
+                          className={draft.processingMode === 'program' ? 'active' : ''}
+                          onClick={() => setDraft({ ...draft, processingMode: 'program' })}
+                        >
+                          编程模式
+                        </button>
+                      </div>
+                    </div>
+                    {draft.processingMode === 'program' && (
+                      <label className="command-program-editor">
+                        发送前处理函数（JavaScript）
                         <textarea
-                          aria-label="自定义附带指令内容"
-                          value={draft.companion.template}
-                          placeholder={draft.hex ? '例如：01 03 00 00 00 02' : '例如：GET X\\r\\n'}
+                          aria-label="快捷指令处理程序"
+                          spellCheck={false}
+                          value={draft.processingProgram}
                           onChange={(event) =>
-                            setDraft({
-                              ...draft,
-                              companion: { ...draft.companion, template: event.target.value }
-                            })
+                            setDraft({ ...draft, processingProgram: event.target.value })
                           }
+                          onKeyDown={(event) => {
+                            if (
+                              (event.ctrlKey || event.metaKey) &&
+                              event.key.toLowerCase() === 's'
+                            ) {
+                              event.preventDefault()
+                              createCommand()
+                            }
+                            if (event.key === 'Tab') {
+                              event.preventDefault()
+                              const input = event.currentTarget
+                              const start = input.selectionStart
+                              const end = input.selectionEnd
+                              setDraft({
+                                ...draft,
+                                processingProgram:
+                                  draft.processingProgram.slice(0, start) +
+                                  '  ' +
+                                  draft.processingProgram.slice(end)
+                              })
+                              requestAnimationFrame(() =>
+                                input.setSelectionRange(start + 2, start + 2)
+                              )
+                            }
+                          }}
                         />
+                        <small>
+                          process(data, context) 返回完整字节数组或 Uint8Array；data
+                          是替换参数并编码后的字节。context.phase 区分
+                          press（主指令）、release（抬起）、companion（被附带执行）。
+                        </small>
+                        <small>
+                          处理顺序：参数替换 → 编码 → 处理函数 → 标准
+                          CRC。自定义校验已在函数内追加时，请关闭标准 CRC。Tab 缩进，Ctrl+S 保存。
+                        </small>
                       </label>
                     )}
-                    <div className="command-companion-timing">
-                      <label className="command-option-toggle">
-                        <input
-                          type="checkbox"
-                          checked={draft.companion.loop}
-                          onChange={(event) =>
-                            setDraft({
-                              ...draft,
-                              companion: { ...draft.companion, loop: event.target.checked }
-                            })
-                          }
-                        />
-                        循环执行
-                      </label>
-                      <label>
-                        间隔
-                        <input
-                          aria-label="附带指令循环间隔"
-                          type="number"
-                          min="1"
-                          max="2147483647"
-                          step="1"
-                          disabled={!draft.companion.loop}
-                          value={draft.companion.interval}
-                          onChange={(event) =>
-                            setDraft({
-                              ...draft,
-                              companion: {
-                                ...draft.companion,
-                                interval: Number(event.target.value)
-                              }
-                            })
-                          }
-                        />
-                        ms
-                      </label>
-                    </div>
-                    <small>
-                      主指令成功发送后立即执行一次。勾选循环后，每次发送完成再等待指定间隔；松开按钮即停止。
-                      自动发送时跟随启动和停止；组循环中每条主指令附带执行一次。
-                    </small>
-                    <small>
-                      {draft.companion.source === 'custom'
-                        ? '自定义内容支持主指令的参数占位符，使用主指令的端口、编码、编程处理及 CRC。'
-                        : '使用所选指令自己的端口、参数、编程处理及 CRC；不启动它的自动发送、抬起或其他附带指令。'}
-                    </small>
-                  </>
-                )}
-              </div>
-              <label>
-                目标端口
-                <select
-                  value={draft.targetPort}
-                  onChange={(event) => setDraft({ ...draft, targetPort: event.target.value })}
-                >
-                  <option value="">选择目标端口</option>
-                  {props.targetPorts.map((port) => (
-                    <option key={port.path} value={port.path}>
-                      {port.name}（{port.path}）
-                    </option>
-                  ))}
-                </select>
-                <small>发送时该端口必须处于已打开状态</small>
-              </label>
-              <div className="command-crc-settings">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={draft.crcEnabled}
-                    onChange={(event) => setDraft({ ...draft, crcEnabled: event.target.checked })}
-                  />
-                  尾部附加 CRC 校验
-                </label>
-                <select
-                  disabled={!draft.crcEnabled}
-                  value={draft.crcMode}
-                  onChange={(event) =>
-                    setDraft({ ...draft, crcMode: event.target.value as CrcMode })
-                  }
-                >
-                  <option value="crc8">CRC-8</option>
-                  <option value="modbus">CRC-16/MODBUS（低字节在前）</option>
-                  <option value="ccitt-false">CRC-16/CCITT-FALSE</option>
-                  <option value="xmodem">CRC-16/XMODEM</option>
-                  <option value="crc32">CRC-32</option>
-                </select>
-              </div>
-              <div className="command-auto-settings">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={draft.autoSend}
-                    onChange={(event) => setDraft({ ...draft, autoSend: event.target.checked })}
-                  />
-                  允许自动发送（列表中点击启动）
-                </label>
-                <div className={draft.autoSend ? '' : 'disabled'}>
-                  <input
-                    type="number"
-                    min="1"
-                    disabled={!draft.autoSend}
-                    value={draft.autoSendInterval}
-                    onChange={(event) =>
-                      setDraft({ ...draft, autoSendInterval: Number(event.target.value) })
-                    }
-                  />
-                  <span>ms</span>
-                </div>
-                <div className={draft.autoSend ? '' : 'disabled'}>
-                  <input
-                    aria-label="自动发送次数，0 表示无限"
-                    type="number"
-                    min="0"
-                    disabled={!draft.autoSend}
-                    value={draft.autoSendCount}
-                    onChange={(event) =>
-                      setDraft({ ...draft, autoSendCount: Number(event.target.value) })
-                    }
-                  />
-                  <span>次</span>
-                </div>
-              </div>
-              <small className="auto-send-count-help">发送次数为 0 时持续发送，直到手动停止</small>
-              <div className="form-row">
-                <span>指令处理</span>
-                <div className="mini-segment">
-                  <button
-                    className={draft.processingMode === 'template' ? 'active' : ''}
-                    onClick={() => setDraft({ ...draft, processingMode: 'template' })}
-                  >
-                    普通模式
-                  </button>
-                  <button
-                    className={draft.processingMode === 'program' ? 'active' : ''}
-                    onClick={() => setDraft({ ...draft, processingMode: 'program' })}
-                  >
-                    编程模式
-                  </button>
-                </div>
-              </div>
-              {draft.processingMode === 'program' && (
-                <label className="command-program-editor">
-                  发送前处理函数（JavaScript）
-                  <textarea
-                    aria-label="快捷指令处理程序"
-                    spellCheck={false}
-                    value={draft.processingProgram}
-                    onChange={(event) =>
-                      setDraft({ ...draft, processingProgram: event.target.value })
-                    }
-                    onKeyDown={(event) => {
-                      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
-                        event.preventDefault()
-                        createCommand()
-                      }
-                      if (event.key === 'Tab') {
-                        event.preventDefault()
-                        const input = event.currentTarget
-                        const start = input.selectionStart
-                        const end = input.selectionEnd
-                        setDraft({
-                          ...draft,
-                          processingProgram:
-                            draft.processingProgram.slice(0, start) +
-                            '  ' +
-                            draft.processingProgram.slice(end)
-                        })
-                        requestAnimationFrame(() => input.setSelectionRange(start + 2, start + 2))
-                      }
-                    }}
-                  />
-                  <small>
-                    process(data, context) 返回完整字节数组或 Uint8Array；data
-                    是替换参数并编码后的字节。context.phase 区分
-                    press（主指令）、release（抬起）、companion（被附带执行）。
-                  </small>
-                  <small>
-                    处理顺序：参数替换 → 编码 → 处理函数 → 标准
-                    CRC。自定义校验已在函数内追加时，请关闭标准 CRC。Tab 缩进，Ctrl+S 保存。
-                  </small>
-                </label>
-              )}
-              <div className="parameter-editor">
-                <div className="parameter-editor-head">
-                  <span>参数名字与占用字节（支持中文，任意数量）</span>
-                  <button
-                    onClick={() =>
-                      setDraft({
-                        ...draft,
-                        parameters: [...draft.parameters, { id: '', byteLength: 1 }]
-                      })
-                    }
-                  >
-                    ＋ 添加参数
-                  </button>
-                </div>
-                {draft.parameters.map((parameter, index) => (
-                  <div className="parameter-edit-row command-parameter-edit-row" key={index}>
-                    <input
-                      value={parameter.id}
-                      placeholder="参数名字，例如 目标速度"
-                      onChange={(event) =>
-                        setDraft({
-                          ...draft,
-                          parameters: draft.parameters.map((value, itemIndex) =>
-                            itemIndex === index ? { ...value, id: event.target.value } : value
-                          )
-                        })
-                      }
-                    />
-                    <label className="parameter-byte-length">
+                  </div>
+                </section>
+                <aside className="command-editor-options" aria-label="发送选项">
+                  <div className="command-section-heading">
+                    <h3>发送选项</h3>
+                    <span>按需启用</span>
+                  </div>
+                  <div className="command-crc-settings">
+                    <label>
                       <input
+                        type="checkbox"
+                        checked={draft.crcEnabled}
+                        onChange={(event) =>
+                          setDraft({ ...draft, crcEnabled: event.target.checked })
+                        }
+                      />
+                      附加 CRC 校验
+                    </label>
+                    <select
+                      aria-label="CRC 校验算法"
+                      disabled={!draft.crcEnabled}
+                      value={draft.crcMode}
+                      onChange={(event) =>
+                        setDraft({ ...draft, crcMode: event.target.value as CrcMode })
+                      }
+                    >
+                      <option value="crc8">CRC-8</option>
+                      <option value="modbus">CRC-16/MODBUS（低字节在前）</option>
+                      <option value="ccitt-false">CRC-16/CCITT-FALSE</option>
+                      <option value="xmodem">CRC-16/XMODEM</option>
+                      <option value="crc32">CRC-32</option>
+                    </select>
+                  </div>
+                  <div className="command-auto-settings">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={draft.autoSend}
+                        onChange={(event) => setDraft({ ...draft, autoSend: event.target.checked })}
+                      />
+                      自动发送
+                    </label>
+                    <div className={draft.autoSend ? '' : 'disabled'}>
+                      <input
+                        aria-label="自动发送间隔"
                         type="number"
                         min="1"
-                        max="64"
-                        value={parameter.byteLength}
+                        disabled={!draft.autoSend}
+                        value={draft.autoSendInterval}
+                        onChange={(event) =>
+                          setDraft({ ...draft, autoSendInterval: Number(event.target.value) })
+                        }
+                      />
+                      <span>ms 间隔</span>
+                    </div>
+                    <div className={draft.autoSend ? '' : 'disabled'}>
+                      <input
+                        aria-label="自动发送次数，0 表示无限"
+                        type="number"
+                        min="0"
+                        disabled={!draft.autoSend}
+                        value={draft.autoSendCount}
+                        onChange={(event) =>
+                          setDraft({ ...draft, autoSendCount: Number(event.target.value) })
+                        }
+                      />
+                      <span>次数</span>
+                    </div>
+                  </div>
+                  <small className="auto-send-count-help">
+                    {draft.autoSend
+                      ? '在指令列表点击启动，0 次表示持续发送。'
+                      : '启用后可设置发送间隔和次数。'}
+                  </small>
+                  <div className="command-companion-settings">
+                    <label className="command-option-toggle">
+                      <input
+                        type="checkbox"
+                        checked={draft.companion.enabled}
                         onChange={(event) =>
                           setDraft({
                             ...draft,
-                            parameters: draft.parameters.map((value, itemIndex) =>
-                              itemIndex === index
-                                ? { ...value, byteLength: Number(event.target.value) }
-                                : value
-                            )
+                            companion: { ...draft.companion, enabled: event.target.checked }
                           })
                         }
                       />
-                      <span>字节</span>
+                      附带执行指令
                     </label>
-                    <button
-                      className="copy-placeholder"
-                      disabled={!parameter.id.trim()}
-                      onClick={() => void copyPlaceholder(parameter.id, index)}
-                    >
-                      {copiedIndex === index
-                        ? '已复制'
-                        : parameter.id.trim()
-                          ? `{{${parameter.id.trim()}}}`
-                          : '{{参数名字}}'}
-                    </button>
-                    <button
-                      className="remove-parameter"
-                      onClick={() =>
-                        setDraft({
-                          ...draft,
-                          parameters: draft.parameters.filter((_, itemIndex) => itemIndex !== index)
-                        })
-                      }
-                    >
-                      ×
-                    </button>
+                    {draft.companion.enabled && (
+                      <>
+                        <small>执行来源（二选一）</small>
+                        <div
+                          className="mini-segment"
+                          role="group"
+                          aria-label="附带执行来源（二选一）"
+                        >
+                          <button
+                            className={draft.companion.source === 'command' ? 'active' : ''}
+                            aria-pressed={draft.companion.source === 'command'}
+                            onClick={() =>
+                              setDraft({
+                                ...draft,
+                                companion: { ...draft.companion, source: 'command' }
+                              })
+                            }
+                          >
+                            已有快捷指令
+                          </button>
+                          <button
+                            className={draft.companion.source === 'custom' ? 'active' : ''}
+                            aria-pressed={draft.companion.source === 'custom'}
+                            onClick={() =>
+                              setDraft({
+                                ...draft,
+                                companion: { ...draft.companion, source: 'custom' }
+                              })
+                            }
+                          >
+                            自定义输入
+                          </button>
+                        </div>
+                        {draft.companion.source === 'command' ? (
+                          <label>
+                            附带指令
+                            <select
+                              value={draft.companion.commandId ?? ''}
+                              onChange={(event) =>
+                                setDraft({
+                                  ...draft,
+                                  companion: {
+                                    ...draft.companion,
+                                    commandId: event.target.value
+                                      ? Number(event.target.value)
+                                      : null
+                                  }
+                                })
+                              }
+                            >
+                              <option value="">请选择已有快捷指令</option>
+                              {props.commands
+                                .filter((command) => command.id !== editingCommandId)
+                                .map((command) => (
+                                  <option key={command.id} value={command.id}>
+                                    {props.groups.find((group) => group.id === command.parentId)
+                                      ?.name || '顶层'}{' '}
+                                    / {command.name}（{command.targetPort || '未指定端口'}）
+                                  </option>
+                                ))}
+                            </select>
+                          </label>
+                        ) : (
+                          <label>
+                            自定义附带内容（{draft.hex ? 'HEX' : 'ASCII'}）
+                            <textarea
+                              className="compact-packet-input"
+                              rows={1}
+                              aria-label="自定义附带指令内容"
+                              value={draft.companion.template}
+                              placeholder={
+                                draft.hex ? '例如：01 03 00 00 00 02' : '例如：GET X\\r\\n'
+                              }
+                              onChange={(event) =>
+                                setDraft({
+                                  ...draft,
+                                  companion: { ...draft.companion, template: event.target.value }
+                                })
+                              }
+                            />
+                          </label>
+                        )}
+                        <div className="command-companion-timing">
+                          <label className="command-option-toggle">
+                            <input
+                              type="checkbox"
+                              checked={draft.companion.loop}
+                              onChange={(event) =>
+                                setDraft({
+                                  ...draft,
+                                  companion: { ...draft.companion, loop: event.target.checked }
+                                })
+                              }
+                            />
+                            循环执行
+                          </label>
+                          <label>
+                            间隔
+                            <input
+                              aria-label="附带指令循环间隔"
+                              type="number"
+                              min="1"
+                              max="2147483647"
+                              step="1"
+                              disabled={!draft.companion.loop}
+                              value={draft.companion.interval}
+                              onChange={(event) =>
+                                setDraft({
+                                  ...draft,
+                                  companion: {
+                                    ...draft.companion,
+                                    interval: Number(event.target.value)
+                                  }
+                                })
+                              }
+                            />
+                            ms
+                          </label>
+                        </div>
+                        <small>
+                          主指令成功发送后立即执行一次。勾选循环后，每次发送完成再等待指定间隔；松开按钮即停止。
+                          自动发送时跟随启动和停止；组循环中每条主指令附带执行一次。
+                        </small>
+                        <small>
+                          {draft.companion.source === 'custom'
+                            ? '自定义内容支持主指令的参数占位符，使用主指令的端口、编码、编程处理及 CRC。'
+                            : '使用所选指令自己的端口、参数、编程处理及 CRC；不启动它的自动发送、抬起或其他附带指令。'}
+                        </small>
+                      </>
+                    )}
                   </div>
-                ))}
-                {draft.parameters.length > 0 && (
-                  <small className="parameter-byte-help">
-                    DEC/HEX 参数按无符号数限制范围；发送 HEX 指令时按大端顺序左侧补零，例如 2 字节
-                    DEC 10 → 00 0A
-                  </small>
-                )}
+                </aside>
               </div>
               {error && <p className="form-error">{error}</p>}
             </div>

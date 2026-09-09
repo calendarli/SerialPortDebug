@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AutoReplyGroup, Rule, TargetPortOption } from '../types'
 import { defaultAutoReplyProgram, upgradeAutoReplyProgram } from '../scripts/auto-reply-program'
+import { saveReplyGroup } from '../auto-reply-groups'
 
 type Props = {
   rules: Rule[]
   setRules: (rules: Rule[]) => void
   groups: AutoReplyGroup[]
   setGroups: (groups: AutoReplyGroup[]) => void
+  onDeleteGroup: (groupId: number, targetGroupId: number) => void
   targetPorts: TargetPortOption[]
   onResetState: (ruleId: number, notify?: boolean) => void
   onImport: () => Promise<boolean>
@@ -79,6 +81,7 @@ export function AutoReplyPanel({
   setRules,
   groups,
   setGroups,
+  onDeleteGroup,
   targetPorts,
   onResetState,
   onImport,
@@ -88,6 +91,9 @@ export function AutoReplyPanel({
   const [editingRuleId, setEditingRuleId] = useState<number | null>(null)
   const [draft, setDraft] = useState<Draft>(emptyDraft)
   const [error, setError] = useState('')
+  const [groupEditor, setGroupEditor] = useState<{ id: number | null; name: string } | null>(null)
+  const [groupDeletion, setGroupDeletion] = useState<{ id: number; targetId: number } | null>(null)
+  const [groupError, setGroupError] = useState('')
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
   const [collapsedRuleIds, setCollapsedRuleIds] = useState<Set<number>>(new Set())
   const [menu, setMenu] = useState<{ x: number; y: number; ruleId: number | null } | null>(null)
@@ -110,10 +116,14 @@ export function AutoReplyPanel({
       const saved = JSON.parse(localStorage.getItem(ruleModalSizeKey) || 'null') as {
         width?: number
         height?: number
+        layoutVersion?: number
       } | null
-      if (saved && Number.isFinite(saved.width) && Number.isFinite(saved.height)) {
-        modal.style.width = `${Math.max(540, Math.min(saved.width!, window.innerWidth - 24))}px`
-        modal.style.height = `${Math.max(420, Math.min(saved.height!, window.innerHeight - 24))}px`
+      // Older widths belong to the single-column editor; use the new CSS default once.
+      if (saved?.layoutVersion === 2 && Number.isFinite(saved.width)) {
+        modal.style.width = `${Math.min(Math.max(500, saved.width!), window.innerWidth - 24)}px`
+      }
+      if (saved && Number.isFinite(saved.height)) {
+        modal.style.height = `${Math.min(Math.max(800, saved.height!), window.innerHeight - 24)}px`
       }
     } catch {
       localStorage.removeItem(ruleModalSizeKey)
@@ -124,7 +134,7 @@ export function AutoReplyPanel({
       persistTimer = window.setTimeout(() => {
         localStorage.setItem(
           ruleModalSizeKey,
-          JSON.stringify({ width: modal.offsetWidth, height: modal.offsetHeight })
+          JSON.stringify({ width: modal.offsetWidth, height: modal.offsetHeight, layoutVersion: 2 })
         )
       }, 120)
     }
@@ -135,7 +145,7 @@ export function AutoReplyPanel({
       window.clearTimeout(persistTimer)
       localStorage.setItem(
         ruleModalSizeKey,
-        JSON.stringify({ width: modal.offsetWidth, height: modal.offsetHeight })
+        JSON.stringify({ width: modal.offsetWidth, height: modal.offsetHeight, layoutVersion: 2 })
       )
     }
   }, [creating])
@@ -345,6 +355,26 @@ export function AutoReplyPanel({
 
   const detectedProgramParameters = extractReturnedParameterIds(draft.parameterProgram)
 
+  const saveGroup = (): void => {
+    if (!groupEditor) return
+    try {
+      setGroups(saveReplyGroup(groups, groupEditor.id, groupEditor.name))
+      setGroupEditor(null)
+    } catch (cause) {
+      setGroupError(cause instanceof Error ? cause.message : String(cause))
+    }
+  }
+
+  const deleteGroup = (): void => {
+    if (!groupDeletion) return
+    try {
+      onDeleteGroup(groupDeletion.id, groupDeletion.targetId)
+      setGroupDeletion(null)
+    } catch (cause) {
+      setGroupError(cause instanceof Error ? cause.message : String(cause))
+    }
+  }
+
   return (
     <div className="auto-reply-panel" onContextMenu={(event) => openMenu(event, null)}>
       <div className="side-section-head">
@@ -360,9 +390,8 @@ export function AutoReplyPanel({
         <div className="side-section-actions">
           <button
             onClick={() => {
-              const name = window.prompt('自动回复分组名称')?.trim()
-              if (!name) return
-              setGroups([...groups, { id: Date.now(), name, globals: {} }])
+              setGroupError('')
+              setGroupEditor({ id: null, name: '' })
             }}
           >
             ＋ 分组
@@ -377,15 +406,36 @@ export function AutoReplyPanel({
             <strong title={group.name}>{group.name}</strong>
             <span>global · {Object.keys(group.globals).length}</span>
             <button
+              aria-label={`编辑分组 ${group.name}`}
+              onClick={() => {
+                setGroupError('')
+                setGroupEditor({ id: group.id, name: group.name })
+              }}
+            >
+              编辑
+            </button>
+            <button
+              aria-label={`删除分组 ${group.name}`}
+              disabled={groups.length <= 1}
+              title={groups.length <= 1 ? '至少保留一个变量分组' : '删除分组并迁移规则'}
+              onClick={() => {
+                setGroupError('')
+                setGroupDeletion({
+                  id: group.id,
+                  targetId: groups.find((item) => item.id !== group.id)!.id
+                })
+              }}
+            >
+              删除
+            </button>
+            <button
               disabled={!Object.keys(group.globals).length}
               onClick={() => {
                 const firstRule = rules.find((rule) => rule.groupId === group.id)
                 if (firstRule) onResetState(firstRule.id)
                 else
                   setGroups(
-                    groups.map((item) =>
-                      item.id === group.id ? { ...item, globals: {} } : item
-                    )
+                    groups.map((item) => (item.id === group.id ? { ...item, globals: {} } : item))
                   )
               }}
             >
@@ -398,138 +448,145 @@ export function AutoReplyPanel({
         {rules.map((rule) => {
           const isCollapsed = collapsedRuleIds.has(rule.id)
           return (
-          <section
-            className={`reply-item ${isCollapsed ? 'collapsed' : ''}`}
-            key={rule.id}
-            onContextMenu={(event) => openMenu(event, rule.id)}
-          >
-            <div className="reply-item-head">
-              <button
-                className="reply-collapse-button"
-                title={isCollapsed ? '展开规则' : '收起规则'}
-                onClick={() =>
-                  setCollapsedRuleIds((current) => {
-                    const next = new Set(current)
-                    if (next.has(rule.id)) next.delete(rule.id)
-                    else next.add(rule.id)
-                    return next
-                  })
-                }
-              >
-                {isCollapsed ? '▸' : '▾'}
-              </button>
-              <label className="rule-enable">
-                <input
-                  type="checkbox"
-                  checked={rule.enabled}
-                  onChange={(event) => update(rule.id, { enabled: event.target.checked })}
-                />
-                <strong title={rule.name}>{rule.name}</strong>
-              </label>
-              <span
-                className="port-badge"
-                title={groups.find((group) => group.id === rule.groupId)?.name || '默认分组'}
-              >
-                {groups.find((group) => group.id === rule.groupId)?.name || '默认分组'}
-              </span>
-              {isProgramRule(rule) && (
+            <section
+              className={`reply-item ${isCollapsed ? 'collapsed' : ''}`}
+              key={rule.id}
+              onContextMenu={(event) => openMenu(event, rule.id)}
+            >
+              <div className="reply-item-head">
                 <button
-                  className="rule-state-reset"
-                  title="清除该规则编程模式中的变量、计数和累计状态"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    onResetState(rule.id)
-                  }}
+                  className="reply-collapse-button"
+                  title={isCollapsed ? '展开规则' : '收起规则'}
+                  onClick={() =>
+                    setCollapsedRuleIds((current) => {
+                      const next = new Set(current)
+                      if (next.has(rule.id)) next.delete(rule.id)
+                      else next.add(rule.id)
+                      return next
+                    })
+                  }
                 >
-                  重置状态
+                  {isCollapsed ? '▸' : '▾'}
                 </button>
-              )}
-            </div>
-            {!isCollapsed && <><dl>
-              <div>
-                <dt>接收</dt>
-                <dd className="reply-receive-preview">
-                  <span className="reply-match-format">
-                    {rule.receiveHex ? 'HEX' : 'ASCII'}
-                    {rule.regex !== false ? ' · 正则' : ''}
-                  </span>
-                  <span className="reply-pattern" title={rule.pattern}>
-                    {rule.pattern}
-                  </span>
-                </dd>
+                <label className="rule-enable">
+                  <input
+                    type="checkbox"
+                    checked={rule.enabled}
+                    onChange={(event) => update(rule.id, { enabled: event.target.checked })}
+                  />
+                  <strong title={rule.name}>{rule.name}</strong>
+                </label>
+                <span
+                  className="port-badge"
+                  title={groups.find((group) => group.id === rule.groupId)?.name || '默认分组'}
+                >
+                  {groups.find((group) => group.id === rule.groupId)?.name || '默认分组'}
+                </span>
+                {isProgramRule(rule) && (
+                  <button
+                    className="rule-state-reset"
+                    title="清除该规则编程模式中的变量、计数和累计状态"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onResetState(rule.id)
+                    }}
+                  >
+                    重置状态
+                  </button>
+                )}
               </div>
-              <div>
-                <dt>发送</dt>
-                <dd title={rule.reply}>{rule.reply}</dd>
-              </div>
-            </dl>
-            {!isProgramRule(rule) && rule.parameters.length > 0 && (
-              <div className="parameter-list">
-                <span className="parameter-title">发送参数</span>
-                {rule.parameters.map((parameter) => (
-                  <label key={parameter.id}>
-                    <code>{`{{${parameter.id}}}`}</code>
-                    <input
-                      value={parameter.value}
-                      inputMode={parameter.inputMode === 'dec' ? 'numeric' : 'text'}
-                      placeholder={parameterValuePlaceholder(
-                        parameter.inputMode || (rule.hex ? 'hex' : 'ascii')
-                      )}
-                      onChange={(event) => {
-                        const inputMode = parameter.inputMode || (rule.hex ? 'hex' : 'ascii')
-                        const value = event.target.value
-                        if (
-                          inputMode === 'ascii' ||
-                          !value ||
-                          (inputMode === 'dec' ? /^\d+$/.test(value) : /^[0-9a-f]+$/i.test(value))
-                        )
-                          updateParameter(
-                            rule,
-                            parameter.id,
-                            inputMode === 'hex' ? value.toUpperCase() : value
-                          )
-                      }}
-                    />
-                    <select
-                      aria-label={`${parameter.id} 参数格式`}
-                      value={parameter.inputMode || (rule.hex ? 'hex' : 'ascii')}
-                      onChange={(event) =>
-                        updateParameterMode(
-                          rule,
-                          parameter.id,
-                          event.target.value as 'ascii' | 'dec' | 'hex'
-                        )
-                      }
+              {!isCollapsed && (
+                <>
+                  <dl>
+                    <div>
+                      <dt>接收</dt>
+                      <dd className="reply-receive-preview">
+                        <span className="reply-match-format">
+                          {rule.receiveHex ? 'HEX' : 'ASCII'}
+                          {rule.regex !== false ? ' · 正则' : ''}
+                        </span>
+                        <span className="reply-pattern" title={rule.pattern}>
+                          {rule.pattern}
+                        </span>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>发送</dt>
+                      <dd title={rule.reply}>{rule.reply}</dd>
+                    </div>
+                  </dl>
+                  {!isProgramRule(rule) && rule.parameters.length > 0 && (
+                    <div className="parameter-list">
+                      <span className="parameter-title">发送参数</span>
+                      {rule.parameters.map((parameter) => (
+                        <label key={parameter.id}>
+                          <code>{`{{${parameter.id}}}`}</code>
+                          <input
+                            value={parameter.value}
+                            inputMode={parameter.inputMode === 'dec' ? 'numeric' : 'text'}
+                            placeholder={parameterValuePlaceholder(
+                              parameter.inputMode || (rule.hex ? 'hex' : 'ascii')
+                            )}
+                            onChange={(event) => {
+                              const inputMode = parameter.inputMode || (rule.hex ? 'hex' : 'ascii')
+                              const value = event.target.value
+                              if (
+                                inputMode === 'ascii' ||
+                                !value ||
+                                (inputMode === 'dec'
+                                  ? /^\d+$/.test(value)
+                                  : /^[0-9a-f]+$/i.test(value))
+                              )
+                                updateParameter(
+                                  rule,
+                                  parameter.id,
+                                  inputMode === 'hex' ? value.toUpperCase() : value
+                                )
+                            }}
+                          />
+                          <select
+                            aria-label={`${parameter.id} 参数格式`}
+                            value={parameter.inputMode || (rule.hex ? 'hex' : 'ascii')}
+                            onChange={(event) =>
+                              updateParameterMode(
+                                rule,
+                                parameter.id,
+                                event.target.value as 'ascii' | 'dec' | 'hex'
+                              )
+                            }
+                          >
+                            <option value="ascii">ASCII</option>
+                            <option value="dec">DEC</option>
+                            <option value="hex">HEX</option>
+                          </select>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  {isProgramRule(rule) && (
+                    <div className="program-output-list">
+                      <span>程序输出</span>
+                      {rule.parameters.map((parameter) => (
+                        <code key={parameter.id} title={`{{${parameter.id}}}`}>
+                          {`{{${parameter.id}}}`}
+                        </code>
+                      ))}
+                    </div>
+                  )}
+                  <div className="reply-item-meta">
+                    <span className={`format-badge ${rule.hex ? 'hex' : ''}`}>
+                      {rule.hex ? 'HEX' : 'ASCII'}
+                    </span>
+                    <span
+                      className={`parameter-mode-badge ${isProgramRule(rule) ? 'program' : ''}`}
                     >
-                      <option value="ascii">ASCII</option>
-                      <option value="dec">DEC</option>
-                      <option value="hex">HEX</option>
-                    </select>
-                  </label>
-                ))}
-              </div>
-            )}
-            {isProgramRule(rule) && (
-              <div className="program-output-list">
-                <span>程序输出</span>
-                {rule.parameters.map((parameter) => (
-                  <code key={parameter.id} title={`{{${parameter.id}}}`}>
-                    {`{{${parameter.id}}}`}
-                  </code>
-                ))}
-              </div>
-            )}
-            <div className="reply-item-meta">
-              <span className={`format-badge ${rule.hex ? 'hex' : ''}`}>
-                {rule.hex ? 'HEX' : 'ASCII'}
-              </span>
-              <span className={`parameter-mode-badge ${isProgramRule(rule) ? 'program' : ''}`}>
-                {isProgramRule(rule) ? '编程模式' : '参数模式'}
-              </span>
-              <span className="port-badge">{rule.targetPort || '未指定端口'}</span>
-            </div>
-            </>}
-          </section>
+                      {isProgramRule(rule) ? '编程模式' : '参数模式'}
+                    </span>
+                    <span className="port-badge">{rule.targetPort || '未指定端口'}</span>
+                  </div>
+                </>
+              )}
+            </section>
           )
         })}
         {!rules.length && <div className="empty-rules">在空白处右键新建规则</div>}
@@ -578,6 +635,124 @@ export function AutoReplyPanel({
         </div>
       )}
 
+      {(groupEditor || groupDeletion) && (
+        <div
+          className="modal-backdrop rule-create-backdrop"
+          onContextMenu={(event) => event.stopPropagation()}
+        >
+          <div
+            className="modal reply-group-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reply-group-title"
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                setGroupEditor(null)
+                setGroupDeletion(null)
+              }
+            }}
+          >
+            <div className="modal-head">
+              <div>
+                <h2 id="reply-group-title">
+                  {groupDeletion
+                    ? '删除变量分组'
+                    : groupEditor?.id === null
+                      ? '新建变量分组'
+                      : '编辑变量分组'}
+                </h2>
+                <p>同组规则共享 global，分组之间相互隔离</p>
+              </div>
+              <button
+                aria-label="关闭分组管理"
+                onClick={() => {
+                  setGroupEditor(null)
+                  setGroupDeletion(null)
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <div className="create-rule-form">
+              {groupEditor && (
+                <label>
+                  分组名称
+                  <input
+                    autoFocus
+                    value={groupEditor.name}
+                    placeholder="例如：电机状态"
+                    onChange={(event) => {
+                      setGroupEditor({ ...groupEditor, name: event.target.value })
+                      setGroupError('')
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+                        event.preventDefault()
+                        saveGroup()
+                      }
+                    }}
+                  />
+                  <small>修改名称会保留该组的规则、共享变量和运行状态。</small>
+                </label>
+              )}
+              {groupDeletion && (
+                <>
+                  <p>
+                    删除“{groups.find((group) => group.id === groupDeletion.id)?.name}
+                    ”后，该组共享变量将被清除。
+                  </p>
+                  <label>
+                    将 {rules.filter((rule) => rule.groupId === groupDeletion.id).length}{' '}
+                    条规则迁移到
+                    <select
+                      autoFocus
+                      value={groupDeletion.targetId}
+                      onChange={(event) => {
+                        setGroupDeletion({ ...groupDeletion, targetId: Number(event.target.value) })
+                        setGroupError('')
+                      }}
+                    >
+                      {groups
+                        .filter((group) => group.id !== groupDeletion.id)
+                        .map((group) => (
+                          <option key={group.id} value={group.id}>
+                            {group.name}
+                          </option>
+                        ))}
+                    </select>
+                    <small>
+                      迁移的规则将暂停，编程状态会重置。目标分组已有的变量和规则保持不变。
+                    </small>
+                  </label>
+                </>
+              )}
+              {groupError && (
+                <p className="form-error" role="alert">
+                  {groupError}
+                </p>
+              )}
+            </div>
+            <div className="modal-foot">
+              <button
+                className="cancel-button"
+                onClick={() => {
+                  setGroupEditor(null)
+                  setGroupDeletion(null)
+                }}
+              >
+                取消
+              </button>
+              <button
+                className={groupDeletion ? 'reply-group-delete' : ''}
+                onClick={groupDeletion ? deleteGroup : saveGroup}
+              >
+                {groupDeletion ? '删除并迁移' : groupEditor?.id === null ? '创建分组' : '保存修改'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {creating && (
         <div
           className="modal-backdrop rule-create-backdrop"
@@ -587,7 +762,10 @@ export function AutoReplyPanel({
         >
           <div
             ref={modalRef}
-            className="modal create-rule-modal"
+            className="modal create-rule-modal reply-editor-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reply-editor-title"
             onKeyDown={(event) => {
               if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
                 event.preventDefault()
@@ -597,246 +775,270 @@ export function AutoReplyPanel({
           >
             <div className="modal-head">
               <div>
-                <h2>{editingRuleId === null ? '新建自动回复规则' : '编辑自动回复规则'}</h2>
+                <h2 id="reply-editor-title">
+                  {editingRuleId === null ? '新建自动回复规则' : '编辑自动回复规则'}
+                </h2>
                 <p>定义接收条件、发送指令及运行时参数</p>
               </div>
-              <button onClick={() => setCreating(false)}>×</button>
+              <button aria-label="关闭规则编辑器" onClick={() => setCreating(false)}>
+                ×
+              </button>
             </div>
-            <div className="create-rule-form">
-              <label>
-                所属分组
-                <select
-                  value={draft.groupId}
-                  onChange={(event) => setDraft({ ...draft, groupId: Number(event.target.value) })}
-                >
-                  {groups.map((group) => (
-                    <option key={group.id} value={group.id}>{group.name}</option>
-                  ))}
-                </select>
-                <small>同一分组中的编程规则共享 global，分组之间相互隔离</small>
-              </label>
-              <label>
-                规则名称
-                <input
-                  autoFocus
-                  value={draft.name}
-                  placeholder="例如：设置 PWM"
-                  onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-                />
-              </label>
-              <label>
-                接收内容
-                <div className="receive-format-row">
-                  <span>收发编码</span>
-                  <div className="mini-segment">
-                    <button
-                      className={!draft.receiveHex ? 'active' : ''}
-                      onClick={() => setDraft({ ...draft, receiveHex: false, hex: false })}
-                    >
-                      ASCII
-                    </button>
-                    <button
-                      className={draft.receiveHex ? 'active' : ''}
-                      onClick={() => setDraft({ ...draft, receiveHex: true, hex: true })}
-                    >
-                      HEX
-                    </button>
-                  </div>
-                </div>
-                <div className="rule-pattern-input">
+            <div className="create-rule-form reply-editor-form">
+              <div className="reply-identity-grid">
+                <label className="reply-name-field">
+                  规则名称
                   <input
-                    value={draft.pattern}
-                    placeholder={
-                      draft.receiveHex
-                        ? '例如：AA 01 BB'
-                        : draft.regex
-                          ? '例如：^SET PWM$'
-                          : '例如：SET PWM'
-                    }
-                    onChange={(event) => setDraft({ ...draft, pattern: event.target.value })}
+                    autoFocus
+                    value={draft.name}
+                    placeholder="例如：设置 PWM"
+                    onChange={(event) => setDraft({ ...draft, name: event.target.value })}
                   />
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={draft.regex}
-                      onChange={(event) => setDraft({ ...draft, regex: event.target.checked })}
-                    />
-                    正则
-                    <span
-                      className="regex-help"
-                      tabIndex={0}
-                      aria-label="自动回复正则使用说明"
-                      data-tooltip={
-                        draft.receiveHex
-                          ? '匹配标准化 HEX 字节文本，字节间用空格分隔。\n. 匹配任意字符；[0-9A-F]{2} 匹配一个字节。\n示例：^AA [0-9A-F]{2} BB$'
-                          : '匹配接收到的 ASCII 文本，并自动兼容 CR/LF 行尾。\n^ 表示开头，$ 表示结尾，.* 表示任意内容。\n示例：^TEMP=[0-9]+$'
-                      }
-                    >
-                      ?
-                    </span>
-                  </label>
-                </div>
-                <small>
-                  {draft.regex
-                    ? `启用后按${draft.receiveHex ? '标准化 HEX 字节文本' : 'ASCII 文本'}正则匹配`
-                    : `默认按完整${draft.receiveHex ? ' HEX 字节' : '指令文本'}匹配，特殊字符无需转义`}
-                </small>
-              </label>
-              <label className="auto-reply-send-field">
-                <span>发送（发送指令）</span>
-                <textarea
-                  className="auto-reply-send-input"
-                  value={draft.reply}
-                  placeholder={'例如：PWM {{占空比}}\\r\\n'}
-                  onChange={(event) => setDraft({ ...draft, reply: event.target.value })}
-                />
-                <small>
-                  使用完整参数名字引用，例如 <code>{'{{目标速度}}'}</code>
-                </small>
-              </label>
-              <label>
-                目标端口
-                <select
-                  value={draft.targetPort}
-                  onChange={(event) => setDraft({ ...draft, targetPort: event.target.value })}
-                >
-                  <option value="">选择目标端口</option>
-                  {targetPorts.map((port) => (
-                    <option key={port.path} value={port.path}>{port.name}（{port.path}）</option>
-                  ))}
-                </select>
-                <small>仅匹配该端口收到的数据，并从该端口发送回复</small>
-              </label>
-              <div className="form-row">
-                <span>参数生成模式</span>
-                <div className="mini-segment">
-                  <button
-                    className={draft.parameterMode === 'parameters' ? 'active' : ''}
-                    onClick={() => setDraft({ ...draft, parameterMode: 'parameters' })}
+                </label>
+                <label>
+                  所属分组
+                  <select
+                    value={draft.groupId}
+                    onChange={(event) =>
+                      setDraft({ ...draft, groupId: Number(event.target.value) })
+                    }
                   >
-                    参数模式
-                  </button>
-                  <button
-                    className={draft.parameterMode === 'program' ? 'active' : ''}
-                    onClick={() => setDraft({ ...draft, parameterMode: 'program' })}
+                    {groups.map((group) => (
+                      <option key={group.id} value={group.id}>
+                        {group.name}
+                      </option>
+                    ))}
+                  </select>
+                  <small>组内共享 global，组间隔离</small>
+                </label>
+                <label>
+                  目标端口
+                  <select
+                    value={draft.targetPort}
+                    onChange={(event) => setDraft({ ...draft, targetPort: event.target.value })}
                   >
-                    编程模式
-                  </button>
-                </div>
+                    <option value="">选择目标端口</option>
+                    {targetPorts.map((port) => (
+                      <option key={port.path} value={port.path}>
+                        {port.name}（{port.path}）
+                      </option>
+                    ))}
+                  </select>
+                  <small>仅匹配并回复此端口</small>
+                </label>
               </div>
-              {draft.parameterMode === 'parameters' ? (
-                <div className="parameter-editor">
-                  <div className="parameter-editor-head">
-                    <span>参数名字（支持中文，任意数量）</span>
-                    <button
-                      onClick={() =>
-                        setDraft({
-                          ...draft,
-                          parameters: [...draft.parameters, { id: '' }]
-                        })
-                      }
-                    >
-                      ＋ 添加参数
-                    </button>
-                  </div>
-                  {draft.parameters.map((parameter, index) => (
-                    <div className="parameter-edit-row" key={index}>
-                      <input
-                        value={parameter.id}
-                        placeholder="参数名字，例如 占空比"
-                        onChange={(event) =>
-                          updateDraftParameter(index, { id: event.target.value })
-                        }
-                      />
+              <section className="reply-flow-section" aria-label="匹配与回复">
+                <div className="reply-flow-heading">
+                  <h3>匹配与回复</h3>
+                  <div className="receive-format-row">
+                    <span>收发编码</span>
+                    <div className="mini-segment">
                       <button
-                        className="copy-placeholder"
-                        disabled={!parameter.id.trim()}
-                        title={
-                          parameter.id.trim()
-                            ? `复制 {{${parameter.id.trim()}}}`
-                            : '请先输入参数名字'
-                        }
-                        onClick={() => void copyPlaceholder(parameter.id, index)}
+                        className={!draft.receiveHex ? 'active' : ''}
+                        onClick={() => setDraft({ ...draft, receiveHex: false, hex: false })}
                       >
-                        {copiedIndex === index
-                          ? '已复制'
-                          : parameter.id.trim()
-                            ? `{{${parameter.id.trim()}}}`
-                            : '{{参数名字}}'}
+                        ASCII
                       </button>
                       <button
-                        className="remove-parameter"
-                        title="删除参数"
+                        className={draft.receiveHex ? 'active' : ''}
+                        onClick={() => setDraft({ ...draft, receiveHex: true, hex: true })}
+                      >
+                        HEX
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className="reply-packet-grid">
+                  <div className="reply-packet-field reply-receive-field">
+                    <label htmlFor="reply-receive-pattern">接收条件</label>
+                    <div className="rule-pattern-input">
+                      <input
+                        id="reply-receive-pattern"
+                        value={draft.pattern}
+                        placeholder={
+                          draft.receiveHex
+                            ? '例如：AA 01 BB'
+                            : draft.regex
+                              ? '例如：^SET PWM$'
+                              : '例如：SET PWM'
+                        }
+                        onChange={(event) => setDraft({ ...draft, pattern: event.target.value })}
+                      />
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={draft.regex}
+                          onChange={(event) => setDraft({ ...draft, regex: event.target.checked })}
+                        />
+                        正则
+                        <span
+                          className="regex-help"
+                          tabIndex={0}
+                          aria-label="自动回复正则使用说明"
+                          data-tooltip={
+                            draft.receiveHex
+                              ? '匹配标准化 HEX 字节文本，字节间用空格分隔。\n. 匹配任意字符；[0-9A-F]{2} 匹配一个字节。\n示例：^AA [0-9A-F]{2} BB$'
+                              : '匹配接收到的 ASCII 文本，并自动兼容 CR/LF 行尾。\n^ 表示开头，$ 表示结尾，.* 表示任意内容。\n示例：^TEMP=[0-9]+$'
+                          }
+                        >
+                          ?
+                        </span>
+                      </label>
+                    </div>
+                    <small>
+                      {draft.regex
+                        ? `启用后按${draft.receiveHex ? '标准化 HEX 字节文本' : 'ASCII 文本'}正则匹配`
+                        : `默认按完整${draft.receiveHex ? ' HEX 字节' : '指令文本'}匹配，特殊字符无需转义`}
+                    </small>
+                  </div>
+                  <label className="auto-reply-send-field reply-packet-field">
+                    <span>回复内容</span>
+                    <textarea
+                      className="auto-reply-send-input compact-packet-input"
+                      rows={1}
+                      value={draft.reply}
+                      placeholder={'例如：PWM {{占空比}}\\r\\n'}
+                      onChange={(event) => setDraft({ ...draft, reply: event.target.value })}
+                    />
+                    <small>
+                      使用完整参数名字引用，例如 <code>{'{{目标速度}}'}</code>
+                    </small>
+                  </label>
+                </div>
+              </section>
+              <section className="reply-parameters-section" aria-label="参数生成">
+                <div className="form-row reply-parameter-heading">
+                  <span>参数生成模式</span>
+                  <div className="mini-segment">
+                    <button
+                      className={draft.parameterMode === 'parameters' ? 'active' : ''}
+                      onClick={() => setDraft({ ...draft, parameterMode: 'parameters' })}
+                    >
+                      参数模式
+                    </button>
+                    <button
+                      className={draft.parameterMode === 'program' ? 'active' : ''}
+                      onClick={() => setDraft({ ...draft, parameterMode: 'program' })}
+                    >
+                      编程模式
+                    </button>
+                  </div>
+                </div>
+                {draft.parameterMode === 'parameters' ? (
+                  <div className="parameter-editor">
+                    <div className="parameter-editor-head">
+                      <span>指令参数</span>
+                      <button
                         onClick={() =>
                           setDraft({
                             ...draft,
-                            parameters: draft.parameters.filter(
-                              (_, itemIndex) => itemIndex !== index
-                            )
+                            parameters: [...draft.parameters, { id: '' }]
                           })
                         }
                       >
-                        ×
+                        ＋ 添加参数
                       </button>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="program-placeholder-note">
-                  <div className="program-placeholder-head">
-                    <span>实时识别程序返回对象，点击参数可复制到发送指令</span>
-                    <strong className={detectedProgramParameters.length ? '' : 'empty'}>
-                      实时监控 · {detectedProgramParameters.length} 个
-                    </strong>
-                  </div>
-                  <div className="program-placeholder-values" aria-live="polite">
-                    {detectedProgramParameters.length ? (
-                      detectedProgramParameters.map((id, index) => (
+                    {draft.parameters.map((parameter, index) => (
+                      <div className="parameter-edit-row" key={index}>
+                        <input
+                          value={parameter.id}
+                          placeholder="参数名字，例如 占空比"
+                          onChange={(event) =>
+                            updateDraftParameter(index, { id: event.target.value })
+                          }
+                        />
                         <button
-                          className="program-placeholder-copy"
-                          key={id}
-                          title={`复制 {{${id}}}`}
-                          onClick={() => void copyPlaceholder(id, index)}
+                          className="copy-placeholder"
+                          disabled={!parameter.id.trim()}
+                          title={
+                            parameter.id.trim()
+                              ? `复制 {{${parameter.id.trim()}}}`
+                              : '请先输入参数名字'
+                          }
+                          onClick={() => void copyPlaceholder(parameter.id, index)}
                         >
-                          {copiedIndex === index ? '已复制' : `{{${id}}}`}
+                          {copiedIndex === index
+                            ? '已复制'
+                            : parameter.id.trim()
+                              ? `{{${parameter.id.trim()}}}`
+                              : '{{参数名字}}'}
                         </button>
-                      ))
-                    ) : (
-                      <small>尚未识别到返回参数，例如：return {'{ 计数: i }'}</small>
-                    )}
+                        <button
+                          className="remove-parameter"
+                          title="删除参数"
+                          onClick={() =>
+                            setDraft({
+                              ...draft,
+                              parameters: draft.parameters.filter(
+                                (_, itemIndex) => itemIndex !== index
+                              )
+                            })
+                          }
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                </div>
-              )}
-              {draft.parameterMode === 'program' && (
-                <label className="auto-reply-program-editor">
-                  <span className="program-editor-title">
-                    编程参数程序（JavaScript）
-                    <button
-                      type="button"
-                      className="program-manual-button"
-                      title="打开编程参数手册"
-                      aria-label="打开编程参数手册"
-                      onClick={(event) => {
-                        event.preventDefault()
-                        window.open(
-                          new URL('programming-manual.html', window.location.href).toString(),
-                          'serialflow-programming-manual'
-                        )
-                      }}
-                    >
-                      ?
-                    </button>
-                  </span>
-                  <textarea
-                    spellCheck={false}
-                    value={draft.parameterProgram}
-                    onKeyDown={insertProgramTab}
-                    onChange={(event) =>
-                      setDraft({ ...draft, parameterProgram: event.target.value })
-                    }
-                  />
-                </label>
-              )}
+                ) : (
+                  <div className="program-placeholder-note">
+                    <div className="program-placeholder-head">
+                      <span>程序返回参数，点击复制占位符</span>
+                      <strong className={detectedProgramParameters.length ? '' : 'empty'}>
+                        实时监控 · {detectedProgramParameters.length} 个
+                      </strong>
+                    </div>
+                    <div className="program-placeholder-values" aria-live="polite">
+                      {detectedProgramParameters.length ? (
+                        detectedProgramParameters.map((id, index) => (
+                          <button
+                            className="program-placeholder-copy"
+                            key={id}
+                            title={`复制 {{${id}}}`}
+                            onClick={() => void copyPlaceholder(id, index)}
+                          >
+                            {copiedIndex === index ? '已复制' : `{{${id}}}`}
+                          </button>
+                        ))
+                      ) : (
+                        <small>尚未识别到返回参数，例如：return {'{ 计数: i }'}</small>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {draft.parameterMode === 'program' && (
+                  <label className="auto-reply-program-editor">
+                    <span className="program-editor-title">
+                      参数程序（JavaScript）
+                      <button
+                        type="button"
+                        className="program-manual-button"
+                        title="打开编程参数手册"
+                        aria-label="打开编程参数手册"
+                        onClick={(event) => {
+                          event.preventDefault()
+                          window.open(
+                            new URL('programming-manual.html', window.location.href).toString(),
+                            'serialflow-programming-manual'
+                          )
+                        }}
+                      >
+                        ?
+                      </button>
+                    </span>
+                    <textarea
+                      aria-label="自动回复参数程序"
+                      spellCheck={false}
+                      value={draft.parameterProgram}
+                      onKeyDown={insertProgramTab}
+                      onChange={(event) =>
+                        setDraft({ ...draft, parameterProgram: event.target.value })
+                      }
+                    />
+                  </label>
+                )}
+              </section>
               {error && <p className="form-error">{error}</p>}
             </div>
             <div className="modal-foot">

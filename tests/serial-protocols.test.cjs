@@ -216,3 +216,46 @@ test('Modbus multiple-register writes check echoed address and quantity', async 
   client.push(Uint8Array.from([...wrong, ...right]))
   assert.deepEqual(await result, right)
 })
+
+test('reply groups support add and rename without losing live shared variables', () => {
+  const { saveReplyGroup } = load('auto-reply-groups')
+  const original = [{ id: 1, name: 'Default', globals: { count: 7 } }]
+  const created = saveReplyGroup(original, null, '  Motor  ')
+  assert.equal(created.length, 2)
+  assert.equal(created[1].name, 'Motor')
+  assert.notEqual(created[1].id, 1)
+  const renamed = saveReplyGroup(created, 1, 'State')
+  assert.equal(renamed[0].id, 1)
+  assert.equal(renamed[0].globals, original[0].globals)
+  assert.equal(original[0].name, 'Default')
+  assert.throws(() => saveReplyGroup(created, null, '  '))
+  assert.throws(() => saveReplyGroup(created, 1, 'Motor'))
+  assert.throws(() => saveReplyGroup(created, 999, 'Missing'))
+})
+
+test('deleting reply groups preserves rules and destination state while pausing migrated rules', () => {
+  const { removeReplyGroup } = load('auto-reply-groups')
+  const groups = [
+    { id: 1, name: 'A', globals: { count: 1 } },
+    { id: 2, name: 'B', globals: { count: 9 } }
+  ]
+  const rules = [
+    { id: 10, groupId: 1, enabled: true, pattern: 'PING', parameterProgram: 'code' },
+    { id: 11, groupId: 2, enabled: true }
+  ]
+  const result = removeReplyGroup(groups, rules, 1, 2)
+  assert.equal(result.groups.length, 1)
+  assert.equal(result.groups[0], groups[1])
+  assert.equal(result.rules.length, 2)
+  assert.equal(result.rules[0].groupId, 2)
+  assert.equal(result.rules[0].enabled, false)
+  assert.equal(result.rules[0].pattern, 'PING')
+  assert.equal(result.rules[0].parameterProgram, 'code')
+  assert.equal(result.rules[1], rules[1])
+  assert.equal(result.movedIds.join(','), '10')
+  assert.equal(rules[0].enabled, true)
+  assert.throws(() => removeReplyGroup([groups[0]], rules, 1, 2))
+  assert.throws(() => removeReplyGroup(groups, rules, 1, 1))
+  assert.throws(() => removeReplyGroup(groups, rules, 1, 999))
+  assert.throws(() => removeReplyGroup(groups, rules, 999, 2))
+})

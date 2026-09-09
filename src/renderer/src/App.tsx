@@ -1,4 +1,5 @@
 import { findReplyMatch, replyByteOffset } from './reply-matcher'
+import { removeReplyGroup } from './auto-reply-groups'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ReceivePanel } from './components/ReceivePanel'
 import { PlotPanel } from './components/PlotPanel'
@@ -1418,6 +1419,14 @@ function App(): React.JSX.Element {
               setRules={setRules}
               groups={autoReplyGroups}
               setGroups={setAutoReplyGroups}
+              onDeleteGroup={(groupId, targetGroupId) => {
+                const next = removeReplyGroup(autoReplyGroups, rules, groupId, targetGroupId)
+                autoReplyProgramRuntime.resetGroup(groupId, next.movedIds)
+                for (const id of next.movedIds) autoReplyErrorCountsRef.current.delete(id)
+                setAutoReplyGroups(next.groups)
+                setRules(next.rules)
+                setMessage(`分组已删除，${next.movedIds.length} 条规则已迁移并暂停`)
+              }}
               targetPorts={targetPortOptions}
               onResetState={resetAutoReplyState}
               onImport={importAutoReplies}

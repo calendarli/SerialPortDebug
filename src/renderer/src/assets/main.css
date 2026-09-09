@@ -6085,3 +6085,277 @@ footer > span:first-child {
 }
 .plot-options-popover > button:hover { background: #f4f7fc; color: var(--primary); }
 .plot-options-popover > .plot-clear-action { color: #bc4848; }
+
+/* Quick-command editor: packet editing first, optional delivery settings alongside. */
+.modal.command-editor-modal {
+  width: min(1040px, calc(100vw - 40px));
+  height: min(740px, calc(100vh - 40px));
+  min-width: min(560px, calc(100vw - 24px));
+  container: command-editor / inline-size;
+  border-radius: 14px;
+}
+.command-editor-modal > .modal-head { padding: 18px 24px; align-items: center; }
+.command-editor-modal .modal-head h2 { font-size: 19px; margin-bottom: 5px; }
+.command-editor-modal .modal-head p { font-size: 12px; color: #8492a6; }
+.command-editor-modal .modal-head > button {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  color: #8492a6;
+}
+.command-editor-modal .modal-head > button:hover { background: #f1f5f9; color: #334155; }
+.command-editor-modal .command-editor-form { gap: 22px; padding: 22px 24px; }
+.command-identity-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 18px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid #e8edf4;
+}
+.command-editor-modal .command-identity-grid > label,
+.command-editor-modal .command-packet-field,
+.command-editor-modal .command-program-editor {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+  color: #526078;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.command-editor-modal .command-identity-grid :is(input, select),
+.command-editor-modal .command-packet-field textarea,
+.command-editor-modal .command-program-editor textarea {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid #dce3ed;
+  border-radius: 7px;
+  background: #fff;
+  color: #253249;
+  font-size: 13px;
+}
+.command-editor-modal .command-identity-grid :is(input, select) { height: 36px; }
+.command-editor-modal .command-encoding-field {
+  display: grid;
+  justify-content: start;
+  gap: 7px;
+  font-size: 13px;
+  color: #526078;
+}
+.command-editor-modal .command-encoding-field .mini-segment { height: 36px; align-items: stretch; }
+.command-editor-modal .mini-segment { padding: 3px; border-radius: 7px; }
+.command-editor-modal .mini-segment button { font-size: 12px; padding: 4px 9px; }
+.command-editor-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 288px;
+  gap: 24px;
+  align-items: start;
+}
+.command-editor-main,
+.command-editor-options { display: grid; gap: 16px; min-width: 0; }
+.command-editor-options {
+  padding: 16px;
+  gap: 12px;
+  border: 1px solid #e7ecf3;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+.command-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.command-section-heading h3 { margin: 0; font-size: 14px; font-weight: 650; color: #26354d; }
+.command-section-heading > span { font-size: 11px; color: #8b98aa; }
+.command-editor-modal .command-packet-field textarea {
+  background: #fbfcfe;
+  font: 13px/1.7 Consolas, monospace;
+}
+.command-editor-modal :is(.command-packet-field, .command-program-editor) small {
+  font-size: 11px;
+  line-height: 1.6;
+  color: #8b98aa;
+}
+.command-editor-modal code { color: #386bd1; font-size: 12px; }
+.command-editor-modal .parameter-editor { padding: 12px; border-color: #e4eaf2; background: #fafbfd; border-radius: 8px; }
+.command-editor-modal .parameter-editor-head { gap: 12px; font-size: 13px; color: #526078; }
+.command-editor-modal .parameter-editor-head button { font-size: 12px; white-space: nowrap; }
+.command-editor-modal .command-parameter-edit-row { grid-template-columns: minmax(0, 1fr) 76px 104px 24px; gap: 6px; }
+.command-editor-modal .command-parameter-edit-row > input:first-child { grid-column: auto; }
+.command-editor-modal .command-parameter-edit-row .copy-placeholder { min-width: 0; max-width: 104px; font-size: 11px; }
+.command-editor-modal .parameter-byte-help { font-size: 11px; line-height: 1.6; }
+.command-processing-section { display: grid; gap: 12px; padding-top: 16px; border-top: 1px solid #e8edf4; }
+.command-editor-modal .command-processing-section > .form-row { font-size: 13px; }
+.command-editor-modal .command-program-editor textarea { min-height: 240px; resize: vertical; tab-size: 2; white-space: pre; font: 13px/1.6 Consolas, monospace; }
+.command-editor-modal .command-editor-options > :is(.command-crc-settings, .command-auto-settings, .command-companion-settings) {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  margin: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+}
+.command-editor-modal .command-editor-options :is(label, .command-option-toggle) { min-width: 0; font-size: 13px; color: #526078; }
+.command-editor-modal .command-editor-options input[type='checkbox'] { width: 14px; height: 14px; accent-color: var(--primary); }
+.command-editor-modal .command-crc-settings select { width: 100%; max-width: none; min-width: 0; font-size: 12px; }
+.command-editor-modal .command-crc-settings select:disabled,
+.command-editor-modal .command-auto-settings > div.disabled { display: none; }
+.command-editor-modal .command-editor-options > .command-auto-settings { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.command-editor-modal .command-auto-settings > label { grid-column: 1 / -1; }
+.command-editor-modal .command-auto-settings > div { display: grid; min-width: 0; gap: 5px; }
+.command-editor-modal .command-auto-settings > div input { width: 100%; padding: 0 7px; font-size: 13px; }
+.command-editor-modal .command-auto-settings > div span { margin: 0; font-size: 11px; color: #8b98aa; }
+.command-editor-modal .auto-send-count-help { margin: -4px 2px 2px; font-size: 11px; line-height: 1.6; }
+.command-editor-modal .command-companion-settings { min-width: 0; }
+.command-editor-modal .command-companion-settings .mini-segment { display: flex; min-width: 0; }
+.command-editor-modal .command-companion-settings .mini-segment button { flex: 1; min-width: 0; padding: 4px; font-size: 11px; }
+.command-editor-modal .command-companion-settings small { font-size: 11px; line-height: 1.6; }
+.command-editor-modal .command-companion-settings select { min-width: 0; font-size: 12px; }
+.command-editor-modal .command-companion-timing { gap: 10px; }
+.command-editor-modal .command-companion-timing input[type='number'] { width: 80px; }
+.command-editor-modal :is(input, select, textarea):focus-visible { outline: 2px solid #9dbfff; outline-offset: 1px; }
+.command-editor-modal button:focus-visible { outline: 2px solid #9dbfff; outline-offset: 2px; }
+.command-editor-modal > .modal-foot { padding: 14px 24px; border-top: 1px solid #e8edf4; background: #fbfcfe; }
+.command-editor-modal .modal-foot button { min-width: 88px; height: 36px; font-size: 13px; }
+@container command-editor (max-width: 800px) {
+  .command-editor-columns { grid-template-columns: minmax(0, 1fr); }
+  .command-editor-options { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .command-editor-options > .command-section-heading,
+  .command-editor-options > .command-companion-settings { grid-column: 1 / -1; }
+  .command-editor-options > .command-crc-settings { grid-column: 1; grid-row: 2; align-self: start; }
+  .command-editor-options > .command-auto-settings { grid-column: 2; grid-row: 2; align-self: start; }
+  .command-editor-options > .auto-send-count-help { grid-column: 2; }
+}
+@container command-editor (max-width: 580px) {
+  .command-editor-modal .command-editor-form { padding: 16px; gap: 16px; }
+  .command-identity-grid { grid-template-columns: minmax(0, 1fr) auto; gap: 14px; padding-bottom: 16px; }
+  .command-name-field { grid-column: 1 / -1; }
+  .command-editor-modal .command-parameter-edit-row { grid-template-columns: minmax(0, 1fr) 76px 24px; }
+  .command-editor-modal .command-parameter-edit-row > input:first-child { grid-column: 1 / -1; }
+  .command-editor-modal .command-parameter-edit-row .copy-placeholder { max-width: none; width: 100%; }
+  .command-editor-options { grid-template-columns: minmax(0, 1fr); }
+  .command-editor-options > .command-crc-settings,
+  .command-editor-options > .command-auto-settings,
+  .command-editor-options > .auto-send-count-help { grid-column: 1; grid-row: auto; }
+}
+
+/* Shared short packet fields across command and auto-reply dialogs. */
+.modal.create-rule-modal textarea.compact-packet-input {
+  field-sizing: content;
+  height: auto;
+  min-height: 40px;
+  max-height: 160px;
+  overflow-y: auto;
+  resize: vertical;
+}
+
+/* Auto-reply editor shares the compact hierarchy of the command editor. */
+.modal.reply-editor-modal {
+  width: min(1040px, calc(100vw - 40px));
+  height: min(800px, calc(100vh - 40px));
+  container: reply-editor / inline-size;
+  border-radius: 14px;
+}
+.reply-editor-modal > .modal-head { padding: 18px 24px; align-items: center; }
+.reply-editor-modal .modal-head h2 { margin-bottom: 5px; font-size: 19px; }
+.reply-editor-modal .modal-head p { font-size: 12px; color: #8492a6; }
+.reply-editor-modal .modal-head > button { width: 30px; height: 30px; border-radius: 6px; }
+.reply-editor-modal .modal-head > button:hover { background: #f1f5f9; color: #334155; }
+.reply-editor-modal .reply-editor-form { gap: 18px; padding: 20px 24px; }
+.reply-identity-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 1.2fr);
+  gap: 18px;
+  align-items: start;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #e8edf4;
+}
+.reply-editor-modal .reply-identity-grid > label,
+.reply-editor-modal .reply-packet-field,
+.reply-editor-modal .auto-reply-program-editor {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+  gap: 7px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #526078;
+}
+.reply-editor-modal .reply-identity-grid :is(input, select),
+.reply-editor-modal .rule-pattern-input > input,
+.reply-editor-modal .reply-packet-field > textarea,
+.reply-editor-modal .auto-reply-program-editor > textarea {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid #dce3ed;
+  border-radius: 7px;
+  background: #fff;
+  color: #253249;
+  font-size: 13px;
+}
+.reply-editor-modal .reply-identity-grid :is(input, select) { height: 36px; }
+.reply-editor-modal .rule-pattern-input > input { height: 40px; font: 13px/1.7 Consolas, monospace; }
+.reply-editor-modal .reply-packet-field > textarea { font: 13px/1.7 Consolas, monospace; }
+.reply-editor-modal :is(.reply-identity-grid, .reply-packet-field) small { color: #8b98aa; font-size: 11px; line-height: 1.5; }
+.reply-editor-modal code { color: #386bd1; font-size: 12px; }
+.reply-flow-section { display: grid; gap: 12px; }
+.reply-flow-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.reply-flow-heading h3 { margin: 0; color: #26354d; font-size: 14px; font-weight: 650; }
+.reply-editor-modal .receive-format-row { margin: 0; padding: 0; gap: 10px; background: transparent; font-size: 12px; }
+.reply-editor-modal .mini-segment { padding: 3px; border-radius: 7px; }
+.reply-editor-modal .mini-segment button { padding: 4px 9px; font-size: 12px; }
+.reply-packet-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.reply-editor-modal .reply-packet-field { margin: 0; padding: 14px; border: 1px solid #e5ebf3; border-radius: 9px; background: #fafbfd; }
+.reply-editor-modal .rule-pattern-input { margin: 0; gap: 7px; }
+.reply-editor-modal .rule-pattern-input > label { height: 32px; padding: 0 7px; font-size: 12px; background: #fff; border-color: #e2e8f0; }
+.reply-editor-modal .rule-pattern-input > label input { width: 13px; height: 13px; }
+.reply-parameters-section { display: grid; min-width: 0; gap: 12px; padding-top: 16px; border-top: 1px solid #e8edf4; }
+.reply-editor-modal .reply-parameter-heading { font-size: 14px; color: #26354d; }
+.reply-editor-modal .parameter-editor { padding: 12px; border-color: #e4eaf2; background: #fafbfd; border-radius: 8px; }
+.reply-editor-modal .parameter-editor-head { gap: 10px; font-size: 13px; }
+.reply-editor-modal .parameter-editor-head button { font-size: 12px; white-space: nowrap; }
+.reply-editor-modal .program-placeholder-note { gap: 7px; padding: 10px 12px; font-size: 12px; border-color: #e4eaf2; background: #fafbfd; }
+.reply-editor-modal .program-placeholder-head { flex-wrap: wrap; gap: 6px; }
+.reply-editor-modal .program-placeholder-head strong { font-size: 11px; }
+.reply-editor-modal .program-placeholder-copy { font-size: 12px; }
+.reply-editor-modal .program-placeholder-note small { font-size: 12px; }
+.reply-editor-modal .auto-reply-program-editor > textarea {
+  height: 240px;
+  min-height: 180px;
+  max-height: 60vh;
+  resize: vertical;
+  tab-size: 2;
+  background: #f8fafc;
+  font: 13px/1.7 Consolas, 'Microsoft YaHei', monospace;
+}
+.reply-editor-modal .program-editor-title { font-size: 13px; }
+.reply-editor-modal :is(input, textarea, select):focus-visible { outline: 2px solid #9dbfff; outline-offset: 1px; }
+.reply-editor-modal button:focus-visible { outline: 2px solid #9dbfff; outline-offset: 2px; }
+.reply-editor-modal > .modal-foot { padding: 14px 24px; border-top: 1px solid #e8edf4; background: #fbfcfe; }
+.reply-editor-modal .modal-foot button { min-width: 88px; height: 36px; font-size: 13px; }
+.reply-editor-modal .modal-resize-hint { font-size: 11px; }
+@container reply-editor (max-width: 720px) {
+  .reply-identity-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+  .reply-name-field { grid-column: 1 / -1; }
+  .reply-packet-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+}
+@container reply-editor (max-width: 560px) {
+  .reply-editor-modal .reply-editor-form { padding: 16px; gap: 16px; }
+  .reply-editor-modal .receive-format-row > span { display: none; }
+  .reply-editor-modal .modal-resize-hint { display: none; }
+}
+
+.modal.reply-group-modal { width: min(460px, calc(100vw - 32px)); max-height: calc(100vh - 32px); display: flex; flex-direction: column; }
+.reply-group-modal .modal-head { padding: 18px 20px; align-items: center; }
+.reply-group-modal .modal-head h2 { font-size: 18px; }
+.reply-group-modal .modal-head p,
+.reply-group-modal .create-rule-form > p { font-size: 13px; line-height: 1.6; }
+.reply-group-modal .create-rule-form > label { font-size: 13px; }
+.reply-group-modal .create-rule-form > label :is(input, select) { height: 36px; font-size: 13px; }
+.reply-group-modal .create-rule-form small { font-size: 12px; line-height: 1.6; }
+.reply-group-modal .modal-foot { padding: 14px 20px; border-top: 1px solid var(--border); }
+.reply-group-modal .modal-foot > button { height: 34px; font-size: 13px; }
+.reply-group-modal .modal-foot > .reply-group-delete { background: #c24141; border-color: #c24141; }
+.auto-reply-panel .auto-reply-group-list > div > button:disabled { opacity: 0.4; cursor: not-allowed; }
