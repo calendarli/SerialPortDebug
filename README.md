@@ -1,5 +1,9 @@
 # SerialFlow 串口调试助手
 
+[![License: GPL-3.0-only](https://img.shields.io/badge/License-GPL--3.0--only-blue.svg)](LICENSE)
+
+> **开源协议：GPL-3.0（仅第 3 版）**。SerialFlow 原创代码采用 GPL-3.0-only，完整条款见 [LICENSE](LICENSE)；第三方代码及驱动的授权范围见下方[开源协议说明](#开源协议)。
+
 SerialFlow 是一款基于 Electron、React 和 TypeScript 开发的桌面串口调试工具，适用于常规设备联调，以及电机 PWM、PID 参数、传感器遥测等高频数据收发场景。
 
 应用支持多串口、ASCII/HEX 收发、快捷指令、自动回复、CRC、自动发送和 JavaScript/TypeScript 编程。数据交互区使用虚拟列表和受限缓存，持续显示实际收到与发出的数据，不主动减帧。
