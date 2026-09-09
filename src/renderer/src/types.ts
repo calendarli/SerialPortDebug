@@ -63,6 +63,16 @@ export type SavedCommand = {
   name: string
   template: string
   releaseTemplate?: string
+  processingMode?: 'template' | 'program'
+  processingProgram?: string
+  companion?: {
+    enabled: boolean
+    source: 'command' | 'custom'
+    commandId: number | null
+    template: string
+    loop: boolean
+    interval: number
+  }
   hex: boolean
   autoSend: boolean
   autoSendInterval: number

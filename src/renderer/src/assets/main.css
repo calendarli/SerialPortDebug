@@ -5406,6 +5406,44 @@ footer > span:first-child {
 .commands-panel .command-list {
   gap: 6px;
 }
+.commands-panel .command-drag-source,
+.commands-panel .group-title[draggable] {
+  cursor: grab;
+}
+.commands-panel .command-drag-source:active,
+.commands-panel .group-title[draggable]:active {
+  cursor: grabbing;
+}
+.commands-panel .command-drag-grip {
+  color: #8293a8;
+  user-select: none;
+}
+.commands-panel .is-dragging {
+  opacity: 0.45;
+}
+.commands-panel .command-root-drop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin-bottom: 6px;
+  padding: 6px 9px;
+  border: 1px dashed #cfdceb;
+  border-radius: 7px;
+  color: #536780;
+  font-size: 13px;
+}
+.commands-panel .command-root-drop > span {
+  color: #8293a8;
+  font-size: 12px;
+}
+.commands-panel .command-group.is-drop-target,
+.commands-panel .command-root-drop.is-drop-target {
+  border-color: #3b82f6;
+  background: #eaf3ff;
+  outline: 2px solid #93c5fd;
+  outline-offset: -2px;
+}
 .commands-panel .command-group {
   padding: 4px;
   border-radius: 8px;
@@ -5472,6 +5510,267 @@ footer > span:first-child {
 .commands-panel .command-parameter input,
 .commands-panel .command-parameter .parameter-mode-select {
   height: 28px;
+}
+
+.commands-panel .command-features {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+.commands-panel .command-features > span {
+  max-width: 100%;
+  overflow: hidden;
+  margin: 0;
+  padding: 1px 5px;
+  border-radius: 5px;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.command-companion-badge {
+  background: #ecfdf5;
+  color: #047857;
+}
+.commands-panel .command-head > .command-send.held {
+  border-color: #2563eb;
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+.command-companion-settings {
+  display: grid;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid #d8e1ec;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+.command-companion-settings label {
+  color: #64748b;
+  font-size: 15px;
+}
+.command-companion-settings > label > select {
+  display: block;
+  width: 100%;
+  height: 34px;
+  margin-top: 5px;
+  padding: 0 8px;
+  border: 1px solid #d8e1ec;
+  border-radius: 6px;
+  background: #fff;
+}
+.command-companion-settings > label > textarea {
+  display: block;
+  width: 100%;
+  min-height: 60px;
+  margin-top: 5px;
+  padding: 7px 8px;
+  border: 1px solid #d8e1ec;
+  border-radius: 6px;
+  resize: vertical;
+  font: 14px/1.5 Consolas, monospace;
+}
+.command-option-toggle,
+.command-companion-timing,
+.command-companion-timing > label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.command-companion-timing {
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+.command-companion-timing input[type='number'] {
+  width: 100px;
+  height: 30px;
+  padding: 0 6px;
+  border: 1px solid #d8e1ec;
+  border-radius: 6px;
+}
+.command-companion-settings small {
+  color: #8190a5;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.create-rule-form > .command-program-editor textarea {
+  height: 290px;
+  tab-size: 2;
+  white-space: pre;
+  font: 14px/1.6 Consolas, monospace;
+}
+
+/* Compact auto-reply list, including narrow side panels. */
+.auto-reply-panel {
+  padding: 10px;
+}
+.auto-reply-panel .side-section-head {
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.auto-reply-panel .side-section-head strong {
+  font-size: 18px;
+}
+.auto-reply-panel .auto-reply-subtitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px 6px;
+}
+.auto-reply-panel .side-section-head small {
+  margin: 0;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.auto-reply-panel .side-section-count {
+  padding: 1px 5px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.auto-reply-panel .side-section-actions {
+  gap: 4px;
+}
+.auto-reply-panel .side-section-actions > button {
+  min-height: 25px;
+  padding: 2px 6px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.auto-reply-panel .auto-reply-group-list {
+  gap: 4px;
+  margin: 0 0 6px;
+}
+.auto-reply-panel .auto-reply-group-list > div {
+  gap: 6px;
+  padding: 3px 7px;
+}
+.auto-reply-panel .auto-reply-group-list strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.auto-reply-panel .auto-reply-group-list span,
+.auto-reply-panel .auto-reply-group-list button {
+  flex: none;
+}
+.auto-reply-panel .auto-reply-group-list button {
+  min-height: 22px;
+  padding: 0 6px;
+}
+.auto-reply-panel .reply-list {
+  gap: 6px;
+}
+.auto-reply-panel .reply-item {
+  padding: 7px 8px;
+  border-radius: 7px;
+  box-shadow: none;
+}
+.auto-reply-panel .reply-item-head {
+  gap: 5px;
+  margin-bottom: 4px;
+}
+.auto-reply-panel .reply-item-head > .reply-collapse-button {
+  width: 18px;
+  height: 24px;
+  font-size: 14px;
+}
+.auto-reply-panel .rule-enable {
+  min-width: 0;
+  gap: 5px;
+}
+.auto-reply-panel .rule-enable input {
+  flex: none;
+  margin: 0;
+}
+.auto-reply-panel .rule-enable strong {
+  font-size: 15px;
+}
+.auto-reply-panel .reply-item-head > .port-badge {
+  min-width: 0;
+  max-width: 32%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.auto-reply-panel .reply-item-head > .rule-state-reset {
+  flex: none;
+  height: 24px;
+  padding: 0 6px;
+  font-size: 12px;
+}
+.auto-reply-panel .reply-item dl > div {
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 5px;
+  margin-top: 2px;
+  font-size: 14px;
+  line-height: 20px;
+}
+.auto-reply-panel .reply-item dt {
+  white-space: nowrap;
+}
+.auto-reply-panel .reply-receive-preview {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.auto-reply-panel .reply-match-format {
+  flex: none;
+  color: #8190a5;
+  font-size: 11px;
+}
+.auto-reply-panel .reply-pattern {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.auto-reply-panel .program-output-list,
+.auto-reply-panel .parameter-list {
+  gap: 4px;
+  margin-top: 4px;
+  padding-top: 4px;
+}
+.auto-reply-panel .program-output-list span,
+.auto-reply-panel .parameter-title,
+.auto-reply-panel .parameter-list code {
+  font-size: 12px;
+}
+.auto-reply-panel .program-output-list code {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 1px 4px;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.auto-reply-panel .parameter-list label {
+  grid-template-columns: minmax(50px, 0.8fr) minmax(0, 1fr) 64px;
+  gap: 5px;
+}
+.auto-reply-panel .parameter-list input,
+.auto-reply-panel .parameter-list select {
+  height: 26px;
+  padding: 0 5px;
+  font-size: 13px;
+}
+.auto-reply-panel .reply-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+.auto-reply-panel .reply-item .format-badge,
+.auto-reply-panel .reply-item .parameter-mode-badge,
+.auto-reply-panel .reply-item .port-badge {
+  margin: 0;
+  padding: 1px 5px;
+  font-size: 12px;
+  line-height: 18px;
+}
+.auto-reply-panel .reply-item.collapsed .reply-item-head {
+  margin-bottom: 0;
 }
 
 /* Oscilloscope-style plot: chart, right-side channel readings and compact controls. */
@@ -5677,3 +5976,112 @@ footer > span:first-child {
   position: static;
   inset: auto;
 }
+
+/* Keep plot commands on one line; secondary settings live in the anchored popover. */
+.plot-panel .plot-toolbar.plot-toolbar-compact {
+  flex-wrap: nowrap;
+  min-width: 0;
+  gap: 8px;
+  min-height: 58px;
+  padding: 8px 12px;
+}
+.plot-toolbar.plot-toolbar-compact > .plot-heading {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  gap: 2px;
+}
+.plot-toolbar-compact .plot-heading strong { font-size: 16px; }
+.plot-toolbar-compact .plot-heading span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+}
+.plot-panel .plot-toolbar.plot-toolbar-compact > .plot-side-controls {
+  position: static;
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  width: auto;
+  gap: 4px;
+  margin: 0;
+}
+.plot-panel .plot-toolbar.plot-toolbar-compact .plot-side-controls > button,
+.plot-panel .plot-toolbar.plot-toolbar-compact > .plot-collapse-button {
+  width: auto;
+  height: 30px;
+  flex: 0 0 auto;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #526078;
+  font-size: 12px;
+  line-height: 1;
+}
+.plot-panel .plot-toolbar.plot-toolbar-compact button:hover:not(:disabled),
+.plot-panel .plot-toolbar.plot-toolbar-compact button.active {
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+.plot-panel .plot-toolbar.plot-toolbar-compact .plot-live-button.is-live {
+  opacity: 1;
+  color: #168065;
+  background: #edf8f3;
+}
+.plot-panel .plot-toolbar.plot-toolbar-compact .plot-pause-button {
+  color: var(--primary);
+  background: var(--primary-soft);
+  border-color: #d6e4ff;
+}
+.plot-panel .plot-toolbar.plot-toolbar-compact .plot-pause-button[aria-pressed='true'] {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.plot-panel .plot-toolbar.plot-toolbar-compact > .plot-collapse-button {
+  padding-left: 10px;
+  border-left: 1px solid var(--border);
+  border-radius: 0;
+}
+.plot-toolbar-compact button:focus-visible,
+.plot-options-popover :is(button, input):focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.plot-options-popover {
+  display: grid;
+  gap: 12px;
+  width: 240px;
+  max-width: calc(100vw - 16px);
+  padding: 16px;
+  border: 1px solid #dce4ef;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 10px 32px rgb(28 49 82 / 14%), 0 2px 6px rgb(28 49 82 / 6%);
+  color: #334155;
+}
+.plot-options-popover > strong { font-size: 14px; }
+.plot-options-popover > label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 13px;
+}
+.plot-options-popover input { width: 104px; height: 32px; padding: 0 8px; }
+.plot-options-popover small { font-size: 11px; color: var(--muted); }
+.plot-options-popover > button {
+  min-height: 32px;
+  text-align: left;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: #526078;
+  background: #fff;
+  font-size: 13px;
+}
+.plot-options-popover > button:hover { background: #f4f7fc; color: var(--primary); }
+.plot-options-popover > .plot-clear-action { color: #bc4848; }

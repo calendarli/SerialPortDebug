@@ -43,6 +43,8 @@ export type ScriptContext = {
   groups?: Record<string, string>
   parameters?: Record<string, string>
   global?: Record<string, unknown>
+  phase?: 'press' | 'release' | 'companion'
+  text?: string
 }
 
 export type ScriptResult = {

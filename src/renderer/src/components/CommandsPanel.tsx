@@ -2,6 +2,13 @@ import { memo, useEffect, useRef, useState } from 'react'
 import { bytesToHex, convertSerialText } from '../serial-utils'
 import type { CommandGroup, CrcMode, SavedCommand, TargetPortOption } from '../types'
 import { evaluateGlobalPlaceholders } from '../scripts/group-globals'
+import { normalizeCommandExtensions } from '../command-settings'
+import { CommandRunner } from '../command-runner'
+import {
+  CommandProgramRuntime,
+  defaultCommandProgram,
+  type CommandPhase
+} from '../scripts/command-program'
 
 type Props = {
   commands: SavedCommand[]
@@ -9,6 +16,7 @@ type Props = {
   groups: CommandGroup[]
   setGroups: (value: CommandGroup[]) => void
   connected: boolean
+  openedPorts?: readonly string[]
   targetPorts: TargetPortOption[]
   onSend: (
     text: string,
@@ -23,6 +31,9 @@ type Draft = {
   name: string
   template: string
   releaseTemplate: string
+  processingMode: 'template' | 'program'
+  processingProgram: string
+  companion: NonNullable<SavedCommand['companion']>
   hex: boolean
   autoSend: boolean
   autoSendInterval: number
@@ -33,10 +44,21 @@ type Draft = {
   parameters: Array<{ id: string; byteLength: number }>
 }
 type Menu = { x: number; y: number; type: 'root' | 'group' | 'command'; id: number | null }
+type DraggedNode = { type: 'group' | 'command'; id: number }
 const emptyDraft = (): Draft => ({
   name: '',
   template: '',
   releaseTemplate: '',
+  processingMode: 'template',
+  processingProgram: defaultCommandProgram,
+  companion: {
+    enabled: false,
+    source: 'command',
+    commandId: null,
+    template: '',
+    loop: true,
+    interval: 200
+  },
   hex: false,
   autoSend: false,
   autoSendInterval: 1000,
@@ -154,18 +176,37 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
   const [menu, setMenu] = useState<Menu | null>(null)
   const [collapsed, setCollapsed] = useState<Set<number>>(new Set())
+  const [draggedNode, setDraggedNode] = useState<DraggedNode | null>(null)
+  const [dropTargetId, setDropTargetId] = useState<number | null | undefined>(undefined)
   const [activeAutoSendIds, setActiveAutoSendIds] = useState<Set<number>>(new Set())
   const [activeGroupLoopIds, setActiveGroupLoopIds] = useState<Set<number>>(new Set())
-  const autoSendCountsRef = useRef(new Map<number, number>())
+  const [activeHoldIds, setActiveHoldIds] = useState<Set<number>>(new Set())
+  const propsRef = useRef(props)
+  const lifecycleRef = useRef(0)
+  const sendPreparedRef = useRef<
+    (command: SavedCommand, phase: CommandPhase, current: () => boolean) => Promise<boolean>
+  >(async () => false)
+  const [programRuntime] = useState(() => new CommandProgramRuntime())
+  const [runner] = useState(
+    () =>
+      new CommandRunner({
+        getCommand: (id) => propsRef.current.commands.find((command) => command.id === id),
+        send: (command, phase, current) => sendPreparedRef.current(command, phase, current),
+        onChange: (auto, held) => {
+          setActiveAutoSendIds(auto)
+          setActiveHoldIds(held)
+        },
+        onError: (cause) => setError(cause instanceof Error ? cause.message : String(cause))
+      })
+  )
   const groupLoopTokensRef = useRef(new Map<number, number>())
-  const pressedCommandIdsRef = useRef(new Set<number>())
+
   const groupGlobalsRef = useRef(
     new Map(props.groups.map((group) => [group.id, { ...group.globals }]))
   )
 
   useEffect(() => {
-    for (const group of props.groups)
-      groupGlobalsRef.current.set(group.id, { ...group.globals })
+    for (const group of props.groups) groupGlobalsRef.current.set(group.id, { ...group.globals })
     for (const id of groupGlobalsRef.current.keys())
       if (!props.groups.some((group) => group.id === id)) groupGlobalsRef.current.delete(id)
   }, [props.groups])
@@ -184,86 +225,70 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
     return result
   }
 
+  const sendPreparedCommand = async (
+    command: SavedCommand,
+    phase: CommandPhase,
+    current: () => boolean
+  ): Promise<boolean> => {
+    if (!current() || !propsRef.current.connected) return false
+    if (
+      command.targetPort &&
+      propsRef.current.openedPorts &&
+      !propsRef.current.openedPorts.includes(command.targetPort)
+    )
+      throw new Error(`目标串口 ${command.targetPort} 尚未打开`)
+    const text = buildGroupedCommand(
+      command,
+      phase === 'release' ? command.releaseTemplate : command.template
+    )
+    if (command.processingMode === 'program') {
+      const bytes = await programRuntime.run(command, text, phase)
+      if (!current() || !propsRef.current.connected) return false
+      if (
+        command.targetPort &&
+        propsRef.current.openedPorts &&
+        !propsRef.current.openedPorts.includes(command.targetPort)
+      )
+        return false
+      return propsRef.current.onSend(bytesToHex(bytes), true, command.crcMode, command.targetPort)
+    }
+    if (!current()) return false
+    return propsRef.current.onSend(text, command.hex, command.crcMode, command.targetPort)
+  }
   useEffect(() => {
-    if (!props.connected) return
-    let cancelled = false
-    const timers = new Set<number>()
-    for (const command of props.commands.filter(
-      (item) => item.autoSend && activeAutoSendIds.has(item.id)
-    )) {
-      const period = Math.max(1, command.autoSendInterval)
-      let nextDeadline = performance.now() + period
-      const run = async (): Promise<void> => {
-        try {
-          const success = await props.onSend(
-            buildGroupedCommand(command),
-            command.hex,
-            command.crcMode,
-            command.targetPort
-          )
-          if (!success && !cancelled) {
-            autoSendCountsRef.current.delete(command.id)
-            setActiveAutoSendIds((current) => {
-              const next = new Set(current)
-              next.delete(command.id)
-              return next
-            })
-            return
-          }
-          const completed = (autoSendCountsRef.current.get(command.id) || 0) + 1
-          autoSendCountsRef.current.set(command.id, completed)
-          if (command.autoSendCount > 0 && completed >= command.autoSendCount) {
-            if (command.releaseTemplate) {
-              await props.onSend(
-                buildGroupedCommand(command, command.releaseTemplate),
-                command.hex,
-                command.crcMode,
-                command.targetPort
-              )
-            }
-            autoSendCountsRef.current.delete(command.id)
-            setActiveAutoSendIds((current) => {
-              const next = new Set(current)
-              next.delete(command.id)
-              return next
-            })
-            return
-          }
-        } catch (cause) {
-          setError(cause instanceof Error ? cause.message : String(cause))
-          autoSendCountsRef.current.delete(command.id)
-          setActiveAutoSendIds((current) => {
-            const next = new Set(current)
-            next.delete(command.id)
-            return next
-          })
-          return
-        }
-        if (!cancelled) {
-          nextDeadline += period
-          const now = performance.now()
-          if (nextDeadline < now) nextDeadline = now
-          const timer = window.setTimeout(
-            () => {
-              timers.delete(timer)
-              void run()
-            },
-            Math.max(0, nextDeadline - now)
-          )
-          timers.add(timer)
-        }
-      }
-      const timer = window.setTimeout(() => {
-        timers.delete(timer)
-        void run()
-      }, period)
-      timers.add(timer)
+    propsRef.current = props
+    sendPreparedRef.current = sendPreparedCommand
+  })
+  useEffect(() => runner.sync(props.commands), [props.commands, runner])
+  useEffect(() => {
+    if (props.openedPorts) runner.syncPorts(props.openedPorts)
+  }, [props.openedPorts, props.commands, runner])
+  useEffect(() => {
+    if (!props.connected) {
+      runner.stopAll(false)
+      for (const [id, token] of groupLoopTokensRef.current)
+        groupLoopTokensRef.current.set(id, token + 1)
+      setActiveGroupLoopIds(new Set())
     }
+  }, [props.connected, runner])
+  useEffect(() => {
+    const generation = ++lifecycleRef.current
+    const releaseHolds = (): void => runner.stopAll(true, true)
+    const visibility = (): void => {
+      if (document.hidden) releaseHolds()
+    }
+    window.addEventListener('blur', releaseHolds)
+    document.addEventListener('visibilitychange', visibility)
     return () => {
-      cancelled = true
-      timers.forEach((timer) => window.clearTimeout(timer))
+      window.removeEventListener('blur', releaseHolds)
+      document.removeEventListener('visibilitychange', visibility)
+      runner.stopAll()
+      void runner.drain().then(() => {
+        // StrictMode replays effects; only dispose a runtime that remains unmounted.
+        if (lifecycleRef.current === generation) programRuntime.dispose()
+      })
     }
-  }, [activeAutoSendIds, props.commands, props.connected, props.onSend])
+  }, [runner, programRuntime])
 
   useEffect(() => {
     const close = (): void => setMenu(null)
@@ -319,87 +344,20 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
       setError(cause instanceof Error ? cause.message : String(cause))
     }
   }
-  const sendCommand = async (command: SavedCommand): Promise<void> => {
-    const isRunning = props.connected && activeAutoSendIds.has(command.id)
-    if (command.autoSend && isRunning) {
-      autoSendCountsRef.current.delete(command.id)
-      setActiveAutoSendIds((current) => {
-        const next = new Set(current)
-        next.delete(command.id)
-        return next
-      })
-      if (command.releaseTemplate) {
-        try {
-          await props.onSend(
-            buildGroupedCommand(command, command.releaseTemplate),
-            command.hex,
-            command.crcMode,
-            command.targetPort
-          )
-        } catch (cause) {
-          setError(cause instanceof Error ? cause.message : String(cause))
-        }
-      }
-      return
-    }
+  const sendCommand = (command: SavedCommand): void => {
+    if (runner.isActive(command.id)) return void runner.stop(command.id)
     if (!props.connected) return setError('请先打开串口')
-    try {
-      setError('')
-      const success = await props.onSend(
-        buildGroupedCommand(command),
-        command.hex,
-        command.crcMode,
-        command.targetPort
-      )
-      if (success && command.autoSend) {
-        if (command.autoSendCount === 1) {
-          if (command.releaseTemplate)
-            await props.onSend(
-              buildGroupedCommand(command, command.releaseTemplate),
-              command.hex,
-              command.crcMode,
-              command.targetPort
-            )
-        } else {
-          autoSendCountsRef.current.set(command.id, 1)
-          setActiveAutoSendIds((current) => new Set(current).add(command.id))
-        }
-      }
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
-    }
+    setError('')
+    runner.start(command)
   }
-  const pressCommand = async (command: SavedCommand): Promise<void> => {
-    if (command.autoSend || pressedCommandIdsRef.current.has(command.id)) return
+  const pressCommand = (command: SavedCommand): void => {
+    if (command.autoSend) return
     if (!props.connected) return setError('请先打开串口')
-    pressedCommandIdsRef.current.add(command.id)
-    try {
-      setError('')
-      const success = await props.onSend(
-        buildGroupedCommand(command),
-        command.hex,
-        command.crcMode,
-        command.targetPort
-      )
-      if (!success) pressedCommandIdsRef.current.delete(command.id)
-    } catch (cause) {
-      pressedCommandIdsRef.current.delete(command.id)
-      setError(cause instanceof Error ? cause.message : String(cause))
-    }
+    setError('')
+    runner.start(command)
   }
-  const releaseCommand = async (command: SavedCommand): Promise<void> => {
-    if (command.autoSend || !pressedCommandIdsRef.current.delete(command.id)) return
-    if (!command.releaseTemplate) return
-    try {
-      await props.onSend(
-        buildGroupedCommand(command, command.releaseTemplate),
-        command.hex,
-        command.crcMode,
-        command.targetPort
-      )
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
-    }
+  const releaseCommand = (command: SavedCommand): void => {
+    if (!command.autoSend) void runner.stop(command.id)
   }
   const openMenu = (event: React.MouseEvent, type: Menu['type'], id: number | null): void => {
     event.preventDefault()
@@ -428,6 +386,9 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
       name: command.name,
       template: command.template,
       releaseTemplate: command.releaseTemplate || '',
+      processingMode: command.processingMode === 'program' ? 'program' : 'template',
+      processingProgram: command.processingProgram || defaultCommandProgram,
+      companion: normalizeCommandExtensions(command).companion!,
       hex: command.hex,
       autoSend: command.autoSend,
       autoSendInterval: command.autoSendInterval,
@@ -522,6 +483,25 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
   const createCommand = (): void => {
     if (!draft.name.trim()) return setError('请输入指令名称')
     if (!draft.template) return setError('请输入发送指令')
+    if (draft.processingMode === 'program' && !draft.processingProgram.trim())
+      return setError('请输入 process(data, context) 处理函数')
+    if (draft.companion.enabled) {
+      if (draft.companion.source === 'custom' && !draft.companion.template)
+        return setError('请输入自定义附带指令内容')
+      if (
+        draft.companion.source === 'command' &&
+        !props.commands.some(
+          (command) => command.id === draft.companion.commandId && command.id !== editingCommandId
+        )
+      )
+        return setError('请选择一条已有的其他快捷指令作为附带指令')
+      if (
+        !Number.isInteger(draft.companion.interval) ||
+        draft.companion.interval < 1 ||
+        draft.companion.interval > 2147483647
+      )
+        return setError('附带指令间隔必须是 1~2147483647ms 的整数')
+    }
     if (!draft.targetPort) return setError('请选择目标端口')
     if (!Number.isFinite(draft.autoSendInterval) || draft.autoSendInterval < 1)
       return setError('自动发送周期不能小于 1ms')
@@ -551,6 +531,9 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
           name: draft.name.trim(),
           template: draft.template,
           releaseTemplate: draft.releaseTemplate,
+          processingMode: draft.processingMode,
+          processingProgram: draft.processingProgram,
+          companion: { ...draft.companion },
           hex: draft.hex,
           autoSend: draft.autoSend,
           autoSendInterval: draft.autoSendInterval,
@@ -587,6 +570,9 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
                 name: draft.name.trim(),
                 template: draft.template,
                 releaseTemplate: draft.releaseTemplate,
+                processingMode: draft.processingMode,
+                processingProgram: draft.processingProgram,
+                companion: { ...draft.companion },
                 hex: draft.hex,
                 autoSend: draft.autoSend,
                 autoSendInterval: draft.autoSendInterval,
@@ -660,11 +646,102 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
       return next
     })
   }
+  const clearDrag = (): void => {
+    setDraggedNode(null)
+    setDropTargetId(undefined)
+  }
+  const startDrag = (event: React.DragEvent, node: DraggedNode): void => {
+    event.stopPropagation()
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('application/x-serialflow-command-node', JSON.stringify(node))
+    setDraggedNode(node)
+    setDropTargetId(undefined)
+    setMenu(null)
+  }
+  const canDrop = (parentId: number | null): boolean => {
+    if (!draggedNode) return false
+    const source =
+      draggedNode.type === 'group'
+        ? props.groups.find((group) => group.id === draggedNode.id)
+        : props.commands.find((command) => command.id === draggedNode.id)
+    if (!source || source.parentId === parentId) return false
+    const visited = new Set<number>()
+    let ancestorId = parentId
+    while (ancestorId !== null) {
+      if (visited.has(ancestorId)) return false
+      if (draggedNode.type === 'group' && ancestorId === draggedNode.id) return false
+      visited.add(ancestorId)
+      const ancestor = props.groups.find((group) => group.id === ancestorId)
+      if (!ancestor) return false
+      ancestorId = ancestor.parentId
+    }
+    return true
+  }
+  const dragOver = (event: React.DragEvent, parentId: number | null): void => {
+    if (!draggedNode) return
+    event.preventDefault()
+    event.stopPropagation()
+    const allowed = canDrop(parentId)
+    event.dataTransfer.dropEffect = allowed ? 'move' : 'none'
+    setDropTargetId(allowed ? parentId : undefined)
+  }
+  const dragLeave = (event: React.DragEvent): void => {
+    if (!draggedNode) return
+    event.stopPropagation()
+    if (
+      !(event.relatedTarget instanceof Node) ||
+      !event.currentTarget.contains(event.relatedTarget)
+    )
+      setDropTargetId(undefined)
+  }
+  const dropNode = (event: React.DragEvent, parentId: number | null): void => {
+    if (!draggedNode) return
+    event.preventDefault()
+    event.stopPropagation()
+    if (canDrop(parentId)) {
+      const source =
+        draggedNode.type === 'group'
+          ? props.groups.find((group) => group.id === draggedNode.id)!
+          : props.commands.find((command) => command.id === draggedNode.id)!
+      // Running group loops hold a snapshot of their commands. Stop affected ancestors
+      // so a moved command is not sent again from its previous group.
+      const affectedGroups = new Set<number>()
+      for (const startId of [source.parentId, parentId]) {
+        let ancestorId = startId
+        while (ancestorId !== null && !affectedGroups.has(ancestorId)) {
+          affectedGroups.add(ancestorId)
+          ancestorId = props.groups.find((group) => group.id === ancestorId)?.parentId ?? null
+        }
+      }
+      let stoppedLoop = false
+      for (const id of affectedGroups) {
+        if (activeGroupLoopIds.has(id)) {
+          stopGroupLoop(id)
+          stoppedLoop = true
+        }
+      }
+      if (draggedNode.type === 'command') update(draggedNode.id, { parentId })
+      else
+        props.setGroups(
+          props.groups.map((group) =>
+            group.id === draggedNode.id ? { ...group, parentId } : group
+          )
+        )
+      if (parentId !== null)
+        setCollapsed((current) => {
+          const next = new Set(current)
+          next.delete(parentId)
+          return next
+        })
+      setError(stoppedLoop ? '归属已更新，受影响组的自动循环已停止，可手动重新启动' : '')
+    }
+    clearDrag()
+  }
   const importCommands = async (): Promise<void> => {
     if (!(await props.onImport())) return
     for (const id of activeGroupLoopIds)
       groupLoopTokensRef.current.set(id, (groupLoopTokensRef.current.get(id) || 0) + 1)
-    autoSendCountsRef.current.clear()
+    runner.stopAll()
     setActiveAutoSendIds(new Set())
     setActiveGroupLoopIds(new Set())
     setCollapsed(new Set())
@@ -690,12 +767,11 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
           if (groupLoopTokensRef.current.get(group.id) !== token) return
           const command = commands[index]
           try {
-            const success = await props.onSend(
-              buildGroupedCommand(command),
-              command.hex,
-              command.crcMode,
-              command.targetPort
+            const success = await runner.sendOnce(
+              command,
+              () => groupLoopTokensRef.current.get(group.id) === token
             )
+            if (groupLoopTokensRef.current.get(group.id) !== token) return
             if (!success) return stopGroupLoop(group.id)
           } catch (cause) {
             setError(cause instanceof Error ? cause.message : String(cause))
@@ -727,7 +803,7 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
   }
   const renderCommand = (command: SavedCommand): React.JSX.Element => (
     <section
-      className="command-item"
+      className={`command-item ${draggedNode?.type === 'command' && draggedNode.id === command.id ? 'is-dragging' : ''}`}
       key={`command-${command.id}`}
       onContextMenu={(event) => openMenu(event, 'command', command.id)}
     >
@@ -739,7 +815,16 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
             : command.template
         }
       >
-        <div>
+        <div
+          className="command-drag-source"
+          draggable
+          title="拖动指令到目标组或顶层以调整归属"
+          onDragStart={(event) => startDrag(event, { type: 'command', id: command.id })}
+          onDragEnd={clearDrag}
+        >
+          <span className="command-drag-grip" aria-hidden="true">
+            ⠿
+          </span>
           <strong>{command.name}</strong>
           <span className={`format-badge ${command.hex ? 'hex' : ''}`}>
             {command.hex ? 'HEX' : 'ASCII'}
@@ -761,9 +846,10 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
           )}
         </div>
         <button
-          className={`command-send ${props.connected && activeAutoSendIds.has(command.id) ? 'stop' : ''}`}
+          className={`command-send ${props.connected && activeAutoSendIds.has(command.id) ? 'stop' : ''} ${activeHoldIds.has(command.id) ? 'held' : ''}`}
+          aria-pressed={activeAutoSendIds.has(command.id) || activeHoldIds.has(command.id)}
           onPointerDown={(event) => {
-            if (command.autoSend) return
+            if (command.autoSend || event.button !== 0) return
             event.currentTarget.setPointerCapture(event.pointerId)
             void pressCommand(command)
           }}
@@ -773,8 +859,12 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
               event.currentTarget.releasePointerCapture(event.pointerId)
             void releaseCommand(command)
           }}
-          onPointerCancel={() => void releaseCommand(command)}
+          onPointerCancel={() => releaseCommand(command)}
+          onLostPointerCapture={() => releaseCommand(command)}
+          onBlur={() => releaseCommand(command)}
           onKeyDown={(event) => {
+            if (!command.autoSend && (event.key === 'Enter' || event.key === ' '))
+              event.preventDefault()
             if (!command.autoSend && !event.repeat && (event.key === 'Enter' || event.key === ' '))
               void pressCommand(command)
           }}
@@ -790,11 +880,32 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
             ? props.connected && activeAutoSendIds.has(command.id)
               ? '停止'
               : '启动'
-            : command.releaseTemplate
+            : command.releaseTemplate || command.companion?.enabled
               ? '按住发送'
               : '发送'}
         </button>
       </div>
+      {(command.processingMode === 'program' || command.companion?.enabled) && (
+        <div className="command-features">
+          {command.processingMode === 'program' && (
+            <span className="parameter-mode-badge program">编程处理</span>
+          )}
+          {command.companion?.enabled && (
+            <span
+              className="command-companion-badge"
+              title="按住期间执行；自动发送时跟随启动和停止"
+            >
+              附带：
+              {command.companion.source === 'custom'
+                ? '自定义指令'
+                : props.commands.find((item) => item.id === command.companion?.commandId)?.name ||
+                  '指令已删除'}
+              {' · '}
+              {command.companion.loop ? `${command.companion.interval}ms 循环` : '执行一次'}
+            </span>
+          )}
+        </div>
+      )}
       {command.parameters.map((parameter) => (
         <div className="command-parameter" key={parameter.id}>
           <label>
@@ -837,13 +948,23 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
       const isCollapsed = collapsed.has(group.id)
       nodes.push(
         <section
-          className={`command-group ${depth === 0 ? 'root-group' : 'nested-group'}`}
+          className={`command-group ${depth === 0 ? 'root-group' : 'nested-group'} ${draggedNode?.type === 'group' && draggedNode.id === group.id ? 'is-dragging' : ''} ${dropTargetId === group.id ? 'is-drop-target' : ''}`}
           key={`group-${group.id}`}
           style={{ '--tree-depth': depth } as React.CSSProperties}
           onContextMenu={(event) => openMenu(event, 'group', group.id)}
+          onDragOver={(event) => dragOver(event, group.id)}
+          onDragLeave={dragLeave}
+          onDrop={(event) => dropNode(event, group.id)}
         >
           <div className="group-title-row">
-            <button className="group-title" onClick={() => toggleGroup(group.id)}>
+            <button
+              className="group-title"
+              draggable
+              title="点击展开或折叠；拖动到目标组或顶层以调整归属"
+              onDragStart={(event) => startDrag(event, { type: 'group', id: group.id })}
+              onDragEnd={clearDrag}
+              onClick={() => toggleGroup(group.id)}
+            >
               <span className="group-arrow">{isCollapsed ? '▸' : '▾'}</span>
               <b className="folder-icon">▰</b>
               <strong>{group.name}</strong>
@@ -878,7 +999,7 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
       <div className="side-section-head">
         <div>
           <strong>快捷指令</strong>
-          <small>右键新建组或指令</small>
+          <small>右键新建 · 拖动名称调整归属</small>
         </div>
         <div className="side-section-actions">
           <button onClick={() => void importCommands()}>导入</button>
@@ -886,7 +1007,20 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
           <span className="side-section-count">{props.commands.length} 条</span>
         </div>
       </div>
-      <div className="command-list">
+      <div
+        className={`command-root-drop ${dropTargetId === null ? 'is-drop-target' : ''}`}
+        onDragOver={(event) => dragOver(event, null)}
+        onDragLeave={dragLeave}
+        onDrop={(event) => dropNode(event, null)}
+      >
+        顶层（无归属组）<span>拖到此处移出分组</span>
+      </div>
+      <div
+        className="command-list"
+        onDragOver={(event) => dragOver(event, null)}
+        onDragLeave={dragLeave}
+        onDrop={(event) => dropNode(event, null)}
+      >
         {renderLevel(null)}
         {!props.commands.length && !props.groups.length && (
           <div className="empty-rules">在空白处右键新建组或指令</div>
@@ -1013,7 +1147,9 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
                   >
                     <option value="">不修改</option>
                     {props.targetPorts.map((port) => (
-                      <option key={port.path} value={port.path}>{port.name}（{port.path}）</option>
+                      <option key={port.path} value={port.path}>
+                        {port.name}（{port.path}）
+                      </option>
                     ))}
                   </select>
                   <small>保存后同时修改当前组及所有子组内的指令</small>
@@ -1095,6 +1231,141 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
                 />
                 <small>普通指令按钮抬起时发送；自动发送停止或完成时发送一次</small>
               </label>
+              <div className="command-companion-settings">
+                <label className="command-option-toggle">
+                  <input
+                    type="checkbox"
+                    checked={draft.companion.enabled}
+                    onChange={(event) =>
+                      setDraft({
+                        ...draft,
+                        companion: { ...draft.companion, enabled: event.target.checked }
+                      })
+                    }
+                  />
+                  附带执行指令
+                </label>
+                {draft.companion.enabled && (
+                  <>
+                    <small>执行来源（二选一）</small>
+                    <div className="mini-segment" role="group" aria-label="附带执行来源（二选一）">
+                      <button
+                        className={draft.companion.source === 'command' ? 'active' : ''}
+                        aria-pressed={draft.companion.source === 'command'}
+                        onClick={() =>
+                          setDraft({
+                            ...draft,
+                            companion: { ...draft.companion, source: 'command' }
+                          })
+                        }
+                      >
+                        已有快捷指令
+                      </button>
+                      <button
+                        className={draft.companion.source === 'custom' ? 'active' : ''}
+                        aria-pressed={draft.companion.source === 'custom'}
+                        onClick={() =>
+                          setDraft({
+                            ...draft,
+                            companion: { ...draft.companion, source: 'custom' }
+                          })
+                        }
+                      >
+                        自定义输入
+                      </button>
+                    </div>
+                    {draft.companion.source === 'command' ? (
+                      <label>
+                        附带指令
+                        <select
+                          value={draft.companion.commandId ?? ''}
+                          onChange={(event) =>
+                            setDraft({
+                              ...draft,
+                              companion: {
+                                ...draft.companion,
+                                commandId: event.target.value ? Number(event.target.value) : null
+                              }
+                            })
+                          }
+                        >
+                          <option value="">请选择已有快捷指令</option>
+                          {props.commands
+                            .filter((command) => command.id !== editingCommandId)
+                            .map((command) => (
+                              <option key={command.id} value={command.id}>
+                                {props.groups.find((group) => group.id === command.parentId)
+                                  ?.name || '顶层'}{' '}
+                                / {command.name}（{command.targetPort || '未指定端口'}）
+                              </option>
+                            ))}
+                        </select>
+                      </label>
+                    ) : (
+                      <label>
+                        自定义附带内容（{draft.hex ? 'HEX' : 'ASCII'}）
+                        <textarea
+                          aria-label="自定义附带指令内容"
+                          value={draft.companion.template}
+                          placeholder={draft.hex ? '例如：01 03 00 00 00 02' : '例如：GET X\\r\\n'}
+                          onChange={(event) =>
+                            setDraft({
+                              ...draft,
+                              companion: { ...draft.companion, template: event.target.value }
+                            })
+                          }
+                        />
+                      </label>
+                    )}
+                    <div className="command-companion-timing">
+                      <label className="command-option-toggle">
+                        <input
+                          type="checkbox"
+                          checked={draft.companion.loop}
+                          onChange={(event) =>
+                            setDraft({
+                              ...draft,
+                              companion: { ...draft.companion, loop: event.target.checked }
+                            })
+                          }
+                        />
+                        循环执行
+                      </label>
+                      <label>
+                        间隔
+                        <input
+                          aria-label="附带指令循环间隔"
+                          type="number"
+                          min="1"
+                          max="2147483647"
+                          step="1"
+                          disabled={!draft.companion.loop}
+                          value={draft.companion.interval}
+                          onChange={(event) =>
+                            setDraft({
+                              ...draft,
+                              companion: {
+                                ...draft.companion,
+                                interval: Number(event.target.value)
+                              }
+                            })
+                          }
+                        />
+                        ms
+                      </label>
+                    </div>
+                    <small>
+                      主指令成功发送后立即执行一次。勾选循环后，每次发送完成再等待指定间隔；松开按钮即停止。
+                      自动发送时跟随启动和停止；组循环中每条主指令附带执行一次。
+                    </small>
+                    <small>
+                      {draft.companion.source === 'custom'
+                        ? '自定义内容支持主指令的参数占位符，使用主指令的端口、编码、编程处理及 CRC。'
+                        : '使用所选指令自己的端口、参数、编程处理及 CRC；不启动它的自动发送、抬起或其他附带指令。'}
+                    </small>
+                  </>
+                )}
+              </div>
               <label>
                 目标端口
                 <select
@@ -1103,7 +1374,9 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
                 >
                   <option value="">选择目标端口</option>
                   {props.targetPorts.map((port) => (
-                    <option key={port.path} value={port.path}>{port.name}（{port.path}）</option>
+                    <option key={port.path} value={port.path}>
+                      {port.name}（{port.path}）
+                    </option>
                   ))}
                 </select>
                 <small>发送时该端口必须处于已打开状态</small>
@@ -1167,6 +1440,65 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
                 </div>
               </div>
               <small className="auto-send-count-help">发送次数为 0 时持续发送，直到手动停止</small>
+              <div className="form-row">
+                <span>指令处理</span>
+                <div className="mini-segment">
+                  <button
+                    className={draft.processingMode === 'template' ? 'active' : ''}
+                    onClick={() => setDraft({ ...draft, processingMode: 'template' })}
+                  >
+                    普通模式
+                  </button>
+                  <button
+                    className={draft.processingMode === 'program' ? 'active' : ''}
+                    onClick={() => setDraft({ ...draft, processingMode: 'program' })}
+                  >
+                    编程模式
+                  </button>
+                </div>
+              </div>
+              {draft.processingMode === 'program' && (
+                <label className="command-program-editor">
+                  发送前处理函数（JavaScript）
+                  <textarea
+                    aria-label="快捷指令处理程序"
+                    spellCheck={false}
+                    value={draft.processingProgram}
+                    onChange={(event) =>
+                      setDraft({ ...draft, processingProgram: event.target.value })
+                    }
+                    onKeyDown={(event) => {
+                      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+                        event.preventDefault()
+                        createCommand()
+                      }
+                      if (event.key === 'Tab') {
+                        event.preventDefault()
+                        const input = event.currentTarget
+                        const start = input.selectionStart
+                        const end = input.selectionEnd
+                        setDraft({
+                          ...draft,
+                          processingProgram:
+                            draft.processingProgram.slice(0, start) +
+                            '  ' +
+                            draft.processingProgram.slice(end)
+                        })
+                        requestAnimationFrame(() => input.setSelectionRange(start + 2, start + 2))
+                      }
+                    }}
+                  />
+                  <small>
+                    process(data, context) 返回完整字节数组或 Uint8Array；data
+                    是替换参数并编码后的字节。context.phase 区分
+                    press（主指令）、release（抬起）、companion（被附带执行）。
+                  </small>
+                  <small>
+                    处理顺序：参数替换 → 编码 → 处理函数 → 标准
+                    CRC。自定义校验已在函数内追加时，请关闭标准 CRC。Tab 缩进，Ctrl+S 保存。
+                  </small>
+                </label>
+              )}
               <div className="parameter-editor">
                 <div className="parameter-editor-head">
                   <span>参数名字与占用字节（支持中文，任意数量）</span>

@@ -1,3 +1,4 @@
+import { findReplyMatch, replyByteOffset } from './reply-matcher'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ReceivePanel } from './components/ReceivePanel'
 import { PlotPanel } from './components/PlotPanel'
@@ -5,6 +6,7 @@ import { ModbusPanel } from './components/ModbusPanel'
 import { AutoReplyPanel } from './components/AutoReplyPanel'
 import { AboutPanel } from './components/AboutPanel'
 import { CommandsPanel } from './components/CommandsPanel'
+import { normalizeCommandExtensions } from './command-settings'
 import { SendPanel } from './components/SendPanel'
 import { SerialConfigPanel } from './components/SerialConfigPanel'
 import { SerialPairPanel } from './components/SerialPairPanel'
@@ -124,6 +126,7 @@ function loadCommands(): SavedCommand[] {
     return Array.isArray(saved)
       ? saved.map((command) => ({
           ...command,
+          ...normalizeCommandExtensions(command),
           parentId: command.parentId ?? null,
           releaseTemplate:
             typeof command.releaseTemplate === 'string' ? command.releaseTemplate : '',
@@ -164,7 +167,8 @@ function loadCommandGroups(): CommandGroup[] {
           parentId: group.parentId ?? null,
           autoLoop: Boolean(group.autoLoop),
           loopDelay: Math.max(1, group.loopDelay || 100),
-          loopCount: Number.isInteger(group.loopCount) && group.loopCount >= 0 ? group.loopCount : 0,
+          loopCount:
+            Number.isInteger(group.loopCount) && group.loopCount >= 0 ? group.loopCount : 0,
           globals: normalizeGroupGlobals(group.globals)
         }))
       : []
@@ -408,18 +412,15 @@ function App(): React.JSX.Element {
   const [openedPorts, setOpenedPorts] = useState<Set<string>>(new Set())
   const [sendPort, setSendPort] = useState('')
   const connected = openedPorts.size > 0
-  const targetPortOptions = useMemo(
-    () => {
-      const seen = new Set<string>()
-      return serialConfigs.flatMap((config, index) => {
-        const path = config.path.trim().toUpperCase()
-        if (!path || seen.has(path)) return []
-        seen.add(path)
-        return [{ path, name: config.name?.trim() || `串口组 ${index + 1}` }]
-      })
-    },
-    [serialConfigs]
-  )
+  const targetPortOptions = useMemo(() => {
+    const seen = new Set<string>()
+    return serialConfigs.flatMap((config, index) => {
+      const path = config.path.trim().toUpperCase()
+      if (!path || seen.has(path)) return []
+      seen.add(path)
+      return [{ path, name: config.name?.trim() || `串口组 ${index + 1}` }]
+    })
+  }, [serialConfigs])
   const plotPorts = useMemo(
     () =>
       serialConfigs
@@ -483,8 +484,7 @@ function App(): React.JSX.Element {
     localStorage.setItem(globalFontUpgradeKey, '1')
     return upgraded
   })
-  const lineBuffers = useRef(new Map<string, string>())
-  const hexBuffers = useRef(new Map<string, string>())
+  const replyBuffers = useRef(new Map<string, Uint8Array>())
   const pauseLineBuffers = useRef(new Map<string, string>())
   const pauseHexBuffers = useRef(new Map<string, string>())
   const connectionBusyRef = useRef(false)
@@ -505,6 +505,7 @@ function App(): React.JSX.Element {
   })
   const autoSendCompletedRef = useRef(0)
   const serialFramerRef = useRef(new SerialFramer())
+  const framingSignaturesRef = useRef(new Map<string, string>())
   const autoReplyErrorCountsRef = useRef(new Map<number, number>())
   const autoReplyGroupsRef = useRef(autoReplyGroups)
 
@@ -602,7 +603,12 @@ function App(): React.JSX.Element {
           const literal = rule.receiveHex
             ? rule.pattern.trim().replace(/\s+/g, ' ').toUpperCase()
             : rule.pattern
-          const source = rule.regex === false ? `^${escapeRegExp(literal)}$` : rule.pattern
+          const source =
+            rule.regex === false
+              ? rule.receiveHex
+                ? `(?<!\\S)${escapeRegExp(literal)}(?!\\S)`
+                : `^${escapeRegExp(literal)}$`
+              : rule.pattern
           return [{ rule, expression: new RegExp(source, 'm') }]
         } catch {
           return []
@@ -681,9 +687,7 @@ function App(): React.JSX.Element {
         queueInteraction(
           'tx',
           targetPort,
-          effectiveHex || crcMode
-            ? bytesToHex(bytes)
-            : new TextDecoder().decode(bytes),
+          effectiveHex || crcMode ? bytesToHex(bytes) : new TextDecoder().decode(bytes),
           bytes.length
         )
         setMessage(`已通过 ${targetPort} 发送 ${bytes.length} 字节`)
@@ -736,6 +740,26 @@ function App(): React.JSX.Element {
   }, [])
 
   useEffect(() => {
+    const next = new Map(
+      serialConfigs.map((config) => [config.path, JSON.stringify(config.framing)])
+    )
+    for (const [port, signature] of framingSignaturesRef.current) {
+      if (next.get(port) === signature) continue
+      serialFramerRef.current.clear(port)
+      textDecoders.current.delete(port)
+      replyBuffers.current.delete(port)
+      pauseLineBuffers.current.delete(port)
+      pauseHexBuffers.current.delete(port)
+    }
+    framingSignaturesRef.current = next
+  }, [serialConfigs])
+
+  useEffect(() => {
+    const framer = serialFramerRef.current
+    return () => framer.clear()
+  }, [])
+
+  useEffect(() => {
     const processReceivedFrame = (sourcePort: string, bytes: Uint8Array): void => {
       let decoder = textDecoders.current.get(sourcePort)
       if (!decoder) {
@@ -743,18 +767,18 @@ function App(): React.JSX.Element {
         textDecoders.current.set(sourcePort, decoder)
       }
       const text = decoder.decode(bytes, { stream: true })
-      const lineBuffer = ((lineBuffers.current.get(sourcePort) || '') + text).slice(-8192)
-      lineBuffers.current.set(sourcePort, lineBuffer)
-      const previousHex = hexBuffers.current.get(sourcePort) || ''
-      const hexBuffer = `${previousHex}${previousHex ? ' ' : ''}${bytesToHex(bytes)}`
-        .split(/\s+/)
-        .slice(-8192)
-        .join(' ')
-      hexBuffers.current.set(sourcePort, hexBuffer)
+      const chunkHex = bytesToHex(bytes)
+      const previousReply = replyBuffers.current.get(sourcePort) || new Uint8Array()
+      let replyBytes = new Uint8Array(previousReply.length + bytes.length)
+      replyBytes.set(previousReply)
+      replyBytes.set(bytes, previousReply.length)
+      // Process the full incoming chunk before bounding the unmatched suffix.
+      let lineBuffer = new TextDecoder().decode(replyBytes, { stream: true })
+      let hexBuffer = bytesToHex(replyBytes)
       const pauseLineBuffer = ((pauseLineBuffers.current.get(sourcePort) || '') + text).slice(-8192)
       pauseLineBuffers.current.set(sourcePort, pauseLineBuffer)
       const previousPauseHex = pauseHexBuffers.current.get(sourcePort) || ''
-      const pauseHexBuffer = `${previousPauseHex}${previousPauseHex ? ' ' : ''}${bytesToHex(bytes)}`
+      const pauseHexBuffer = `${previousPauseHex}${previousPauseHex ? ' ' : ''}${chunkHex}`
         .split(/\s+/)
         .slice(-8192)
         .join(' ')
@@ -762,7 +786,7 @@ function App(): React.JSX.Element {
       let shouldAutoPause = false
       if (!paused && autoPauseExpression) {
         const pauseCandidates = autoPauseHex
-          ? [pauseHexBuffer, bytesToHex(bytes)]
+          ? [pauseHexBuffer, chunkHex]
           : [
               pauseLineBuffer,
               ...pauseLineBuffer.split(/\r?\n/).map((line) => line.replace(/\r$/, ''))
@@ -772,25 +796,37 @@ function App(): React.JSX.Element {
           return autoPauseExpression.test(candidate)
         })
       }
-      for (const { rule, expression } of compiledRules) {
-        if (rule.targetPort && rule.targetPort !== sourcePort) continue
-        const candidates = rule.receiveHex
-          ? [hexBuffer, bytesToHex(bytes)]
-          : [lineBuffer, ...lineBuffer.split(/\r?\n/).map((line) => line.replace(/\r$/, ''))]
-        let matchedCandidate = ''
-        let matchedResult: RegExpExecArray | null = null
-        for (const candidate of candidates) {
-          expression.lastIndex = 0
-          const result = expression.exec(candidate)
-          if (result) {
-            matchedCandidate = candidate
-            matchedResult = result
-            break
-          }
-        }
-        if (matchedResult) {
-          lineBuffers.current.set(sourcePort, '')
-          hexBuffers.current.set(sourcePort, '')
+      // Consume one match at a time, preserving the unprocessed suffix for later chunks.
+      let matching = true
+      while (matching) {
+        matching = false
+        const matches = compiledRules
+          .flatMap(({ rule, expression }, priority) => {
+            if (rule.targetPort && rule.targetPort !== sourcePort) return []
+            const selected = findReplyMatch(
+              expression,
+              rule.receiveHex ? hexBuffer : lineBuffer,
+              !rule.receiveHex
+            )
+            return selected
+              ? [
+                  {
+                    rule,
+                    selected,
+                    priority,
+                    start: replyByteOffset(replyBytes, selected.start, !!rule.receiveHex)
+                  }
+                ]
+              : []
+          })
+          .sort((a, b) => a.start - b.start || a.priority - b.priority)
+        for (const { rule, selected } of matches) {
+          const { input: matchedCandidate, match: matchedResult, end } = selected
+          const consumedBytes = replyByteOffset(replyBytes, end, !!rule.receiveHex)
+          replyBytes = replyBytes.subarray(consumedBytes)
+          lineBuffer = new TextDecoder().decode(replyBytes, { stream: true })
+          hexBuffer = bytesToHex(replyBytes)
+          matching = true
           if (rule.parameterMode === 'program') {
             const match = Array.from(matchedResult, (value) => value ?? '')
             const groups = { ...(matchedResult.groups || {}) }
@@ -852,16 +888,9 @@ function App(): React.JSX.Element {
           break
         }
       }
-      const rendered = rxHex ? `${bytesToHex(bytes)} ` : text
-      queueInteraction(
-        'rx',
-        sourcePort,
-        rendered,
-        bytes.length,
-        !paused,
-        text,
-        bytesToHex(bytes)
-      )
+      replyBuffers.current.set(sourcePort, replyBytes.slice(-8192))
+      const rendered = rxHex ? `${chunkHex} ` : text
+      queueInteraction('rx', sourcePort, rendered, bytes.length, !paused, text, chunkHex)
       if (shouldAutoPause) {
         pauseLineBuffers.current.set(sourcePort, '')
         pauseHexBuffers.current.set(sourcePort, '')
@@ -883,6 +912,11 @@ function App(): React.JSX.Element {
       }
     })
     const offStatus = window.api.onStatus((status) => {
+      serialFramerRef.current.clear(status.path)
+      textDecoders.current.delete(status.path)
+      replyBuffers.current.delete(status.path)
+      pauseLineBuffers.current.delete(status.path)
+      pauseHexBuffers.current.delete(status.path)
       setOpenedPorts((current) => {
         const next = new Set(current)
         if (status.open) next.add(status.path)
@@ -1132,17 +1166,20 @@ function App(): React.JSX.Element {
     setRxFrequency(0)
     setTxFrequency(0)
   }
-  const resetAutoReplyState = useCallback((ruleId: number, notify = true): void => {
-    const target = rules.find((rule) => rule.id === ruleId)
-    const groupId = target?.groupId || 1
-    const groupRuleIds = rules.filter((rule) => rule.groupId === groupId).map((rule) => rule.id)
-    autoReplyProgramRuntime.resetGroup(groupId, groupRuleIds)
-    setAutoReplyGroups((current) =>
-      current.map((group) => (group.id === groupId ? { ...group, globals: {} } : group))
-    )
-    autoReplyErrorCountsRef.current.delete(ruleId)
-    if (notify) setMessage('当前自动回复分组的 global 和编程状态已重置')
-  }, [rules])
+  const resetAutoReplyState = useCallback(
+    (ruleId: number, notify = true): void => {
+      const target = rules.find((rule) => rule.id === ruleId)
+      const groupId = target?.groupId || 1
+      const groupRuleIds = rules.filter((rule) => rule.groupId === groupId).map((rule) => rule.id)
+      autoReplyProgramRuntime.resetGroup(groupId, groupRuleIds)
+      setAutoReplyGroups((current) =>
+        current.map((group) => (group.id === groupId ? { ...group, globals: {} } : group))
+      )
+      autoReplyErrorCountsRef.current.delete(ruleId)
+      if (notify) setMessage('当前自动回复分组的 global 和编程状态已重置')
+    },
+    [rules]
+  )
   const changeInteractionCacheMb = (value: number): void => {
     const next = Math.min(1024, Math.max(1, Number.isFinite(value) ? Math.round(value) : 8))
     setInteractionCacheMb(next)
@@ -1291,7 +1328,13 @@ function App(): React.JSX.Element {
             globals: normalizeGroupGlobals(group.globals)
           }))
         )
-      if (Array.isArray(project.commands)) setCommands(project.commands as SavedCommand[])
+      if (Array.isArray(project.commands))
+        setCommands(
+          (project.commands as SavedCommand[]).map((command) => ({
+            ...command,
+            ...normalizeCommandExtensions(command)
+          }))
+        )
       if (Array.isArray(project.commandGroups))
         setCommandGroups(
           (project.commandGroups as CommandGroup[]).map((group) => ({
@@ -1362,6 +1405,7 @@ function App(): React.JSX.Element {
               groups={commandGroups}
               setGroups={setCommandGroups}
               connected={connected}
+              openedPorts={openedPortList}
               targetPorts={targetPortOptions}
               onSend={sendCommandData}
               onImport={importQuickCommands}
@@ -1387,7 +1431,6 @@ function App(): React.JSX.Element {
         ) : sideTab === 'modbus' ? (
           <ModbusPanel
             ports={openedPortList}
-            entries={interactionCache.entries}
             onSend={(text, hex, port) => sendCommandData(text, hex, null, port)}
           />
         ) : (

@@ -350,7 +350,12 @@ export function AutoReplyPanel({
       <div className="side-section-head">
         <div>
           <strong>自动回复规则</strong>
-          <small>右键新建或删除规则</small>
+          <div className="auto-reply-subtitle">
+            <small>右键新建或删除</small>
+            <span className="side-section-count">
+              {rules.filter((rule) => rule.enabled).length} 启用
+            </span>
+          </div>
         </div>
         <div className="side-section-actions">
           <button
@@ -364,15 +369,12 @@ export function AutoReplyPanel({
           </button>
           <button onClick={() => void onImport()}>导入</button>
           <button onClick={onExport}>导出</button>
-          <span className="side-section-count">
-            {rules.filter((rule) => rule.enabled).length} 启用
-          </span>
         </div>
       </div>
       <div className="auto-reply-group-list">
         {groups.map((group) => (
           <div key={group.id}>
-            <strong>{group.name}</strong>
+            <strong title={group.name}>{group.name}</strong>
             <span>global · {Object.keys(group.globals).length}</span>
             <button
               disabled={!Object.keys(group.globals).length}
@@ -422,9 +424,12 @@ export function AutoReplyPanel({
                   checked={rule.enabled}
                   onChange={(event) => update(rule.id, { enabled: event.target.checked })}
                 />
-                <strong>{rule.name}</strong>
+                <strong title={rule.name}>{rule.name}</strong>
               </label>
-              <span className="port-badge">
+              <span
+                className="port-badge"
+                title={groups.find((group) => group.id === rule.groupId)?.name || '默认分组'}
+              >
                 {groups.find((group) => group.id === rule.groupId)?.name || '默认分组'}
               </span>
               {isProgramRule(rule) && (
@@ -442,15 +447,20 @@ export function AutoReplyPanel({
             </div>
             {!isCollapsed && <><dl>
               <div>
-                <dt>
-                  接收（{rule.receiveHex ? 'HEX' : 'ASCII'}
-                  {rule.regex !== false ? ' · 正则' : ''}）
-                </dt>
-                <dd>{rule.pattern}</dd>
+                <dt>接收</dt>
+                <dd className="reply-receive-preview">
+                  <span className="reply-match-format">
+                    {rule.receiveHex ? 'HEX' : 'ASCII'}
+                    {rule.regex !== false ? ' · 正则' : ''}
+                  </span>
+                  <span className="reply-pattern" title={rule.pattern}>
+                    {rule.pattern}
+                  </span>
+                </dd>
               </div>
               <div>
                 <dt>发送</dt>
-                <dd>{rule.reply}</dd>
+                <dd title={rule.reply}>{rule.reply}</dd>
               </div>
             </dl>
             {!isProgramRule(rule) && rule.parameters.length > 0 && (
@@ -503,17 +513,21 @@ export function AutoReplyPanel({
               <div className="program-output-list">
                 <span>程序输出</span>
                 {rule.parameters.map((parameter) => (
-                  <code key={parameter.id}>{`{{${parameter.id}}}`}</code>
+                  <code key={parameter.id} title={`{{${parameter.id}}}`}>
+                    {`{{${parameter.id}}}`}
+                  </code>
                 ))}
               </div>
             )}
-            <span className={`format-badge ${rule.hex ? 'hex' : ''}`}>
-              {rule.hex ? 'HEX' : 'ASCII'}
-            </span>
-            <span className={`parameter-mode-badge ${isProgramRule(rule) ? 'program' : ''}`}>
-              {isProgramRule(rule) ? '编程模式' : '参数模式'}
-            </span>
-            <span className="port-badge">{rule.targetPort || '未指定端口'}</span>
+            <div className="reply-item-meta">
+              <span className={`format-badge ${rule.hex ? 'hex' : ''}`}>
+                {rule.hex ? 'HEX' : 'ASCII'}
+              </span>
+              <span className={`parameter-mode-badge ${isProgramRule(rule) ? 'program' : ''}`}>
+                {isProgramRule(rule) ? '编程模式' : '参数模式'}
+              </span>
+              <span className="port-badge">{rule.targetPort || '未指定端口'}</span>
+            </div>
             </>}
           </section>
           )

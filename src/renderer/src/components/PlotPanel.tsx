@@ -1,3 +1,4 @@
+import { settlingTime } from '../settling-time'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { InteractionEntry } from '../types'
 import { FloatingPanel } from './FloatingPanel'
@@ -9,8 +10,7 @@ type YRange = { min: number; max: number }
 type HoverValue = { name: string; color: string; value: number; y: number }
 type HoverState = { x: number; timestamp: number; pointOffset: number; values: HoverValue[] }
 type AxisCursor =
-  | { axis: 'x'; x: number; pointOffset: number }
-  | { axis: 'y'; y: number; value: number }
+  { axis: 'x'; x: number; pointOffset: number } | { axis: 'y'; y: number; value: number }
 type SeriesPoint = { index: number; timestamp: number; value: number }
 type XRangeDrag = {
   mode: 'start' | 'pan' | 'end'
@@ -281,7 +281,7 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
   const [disabledChannels, setDisabledChannels] = useState(loadDisabledChannels)
   const [pidSettings, setPidSettings] = useState(loadPidSettings)
   const [canvasWidth, setCanvasWidth] = useState(1000)
-  const [openPanel, setOpenPanel] = useState<'colors' | 'pid' | null>(null)
+  const [openPanel, setOpenPanel] = useState<'settings' | 'colors' | 'pid' | null>(null)
   const resizeStart = useRef({ y: 0, height: defaultPlotHeight, max: 520 })
   const plotCanvasRef = useRef<HTMLDivElement | null>(null)
   const curveCanvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -297,7 +297,7 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
   const hoverFrameRef = useRef(0)
   const axisCursorFrameRef = useRef(0)
   const lastLiveHoverUpdateRef = useRef(0)
-  const colorButtonRef = useRef<HTMLButtonElement | null>(null)
+  const settingsButtonRef = useRef<HTMLButtonElement | null>(null)
   const pidButtonRef = useRef<HTMLButtonElement | null>(null)
   const latestHeight = useRef(height)
   const xDrag = useRef<{ x: number; end: number } | null>(null)
@@ -403,12 +403,24 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
         const colorIndex = channelNames.indexOf(name)
         const points = visibleSamples.flatMap((sample, index) =>
           Number.isFinite(sample.values[name])
-            ? [{ index: startIndex + index, timestamp: sample.timestamp, value: sample.values[name] }]
+            ? [
+                {
+                  index: startIndex + index,
+                  timestamp: sample.timestamp,
+                  value: sample.values[name]
+                }
+              ]
             : []
         )
         const drawablePoints = drawableSamples.flatMap((sample, index) =>
           Number.isFinite(sample.values[name])
-            ? [{ index: drawableStartIndex + index, timestamp: sample.timestamp, value: sample.values[name] }]
+            ? [
+                {
+                  index: drawableStartIndex + index,
+                  timestamp: sample.timestamp,
+                  value: sample.values[name]
+                }
+              ]
             : []
         )
         const values = points.map((point) => point.value)
@@ -549,20 +561,18 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
     context.restore()
   }, [collapsed, endIndex, height, series, xWindowPoints, yRange])
   const xTickCount = clamp(Math.floor(canvasWidth / 135) + 1, 6, 16)
-  const xTicks = useMemo(
-    () => {
-      const count = Math.min(xTickCount, xWindowPoints)
-      if (count <= 1) return [{ x: plotRight, pointOffset: endIndex - liveEndIndex }]
-      return Array.from({ length: count }, (_, index) => {
-        const ratio = index / (count - 1)
-        return {
-          x: plotLeft + ratio * plotWidth,
-          pointOffset: Math.round(viewStartIndex + ratio * Math.max(0, xWindowPoints - 1)) - liveEndIndex
-        }
-      })
-    },
-    [endIndex, liveEndIndex, viewStartIndex, xTickCount, xWindowPoints]
-  )
+  const xTicks = useMemo(() => {
+    const count = Math.min(xTickCount, xWindowPoints)
+    if (count <= 1) return [{ x: plotRight, pointOffset: endIndex - liveEndIndex }]
+    return Array.from({ length: count }, (_, index) => {
+      const ratio = index / (count - 1)
+      return {
+        x: plotLeft + ratio * plotWidth,
+        pointOffset:
+          Math.round(viewStartIndex + ratio * Math.max(0, xWindowPoints - 1)) - liveEndIndex
+      }
+    })
+  }, [endIndex, liveEndIndex, viewStartIndex, xTickCount, xWindowPoints])
   const yTicks = useMemo(
     () =>
       Array.from({ length: 6 }, (_, index) => {
@@ -711,15 +721,7 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
     const time10 = findResponseTime(0.1)
     const time90 = findResponseTime(0.9)
     const riseTimeMs = time10 !== null && time90 !== null ? Math.max(0, time90 - time10) : null
-    let settlingTimeMs: number | null = null
-    if (stepIndex >= 0) {
-      for (let index = stepIndex; index < points.length; index += 1) {
-        if (points.slice(index).every((point) => Math.abs(target - point.value) <= tolerance)) {
-          settlingTimeMs = points[index].timestamp - points[stepIndex].timestamp
-          break
-        }
-      }
-    }
+    const settlingTimeMs = settlingTime(points, stepIndex, target, tolerance)
     const durationMs = Math.max(1, points.at(-1)!.timestamp - points[0].timestamp)
     const noiseRatio = baselineNoise / Math.max(Math.abs(stepAmplitude), 0.000001)
     const sampleScore = clamp(points.length / 50, 0, 1)
@@ -933,7 +935,9 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
     if (rect) {
       const x = clamp(((event.clientX - rect.left) / rect.width) * 1000, plotLeft, plotRight)
       const pointOffset = Math.round(
-        viewStartIndex + ((x - plotLeft) / plotWidth) * Math.max(0, xWindowPoints - 1) - liveEndIndex
+        viewStartIndex +
+          ((x - plotLeft) / plotWidth) * Math.max(0, xWindowPoints - 1) -
+          liveEndIndex
       )
       window.cancelAnimationFrame(axisCursorFrameRef.current)
       axisCursorFrameRef.current = window.requestAnimationFrame(() =>
@@ -1069,40 +1073,23 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
       className={`plot-panel ${embedded ? 'embedded' : ''} ${collapsed ? 'collapsed' : ''}`}
       style={embedded ? { height: collapsed ? 58 : height } : undefined}
     >
-      <header className="plot-toolbar">
-        <div>
+      <header className="plot-toolbar plot-toolbar-compact">
+        <div className="plot-heading">
           <strong>实时曲线</strong>
           <span>
             {allSamples.length.toLocaleString()} 个采样点 · {series.length} 个通道 ·{' '}
             {xWindowPoints.toLocaleString()} 点视窗 · {viewEndIndex === null ? '实时' : '历史'}
           </span>
         </div>
-        <label>
-          绘图点数
-          <input
-            type="number"
-            min="100"
-            max={maxPlotPoints}
-            value={pointLimit}
-            onChange={(event) => {
-              const value = Math.min(
-                maxPlotPoints,
-                Math.max(100, Number(event.target.value) || 1000)
-              )
-              setPointLimit(value)
-              setXWindowPoints((current) => {
-                const next = current >= pointLimit ? value : Math.min(current, value)
-                localStorage.setItem(xWindowKey, String(next))
-                return next
-              })
-              localStorage.setItem('serialflow.plotPointLimit', String(value))
-            }}
-          />
-        </label>
         {!collapsed && (
-          <div className="plot-side-controls">
-            <button disabled={viewEndIndex === null} onClick={() => setViewEndIndex(null)}>
-              回到实时
+          <div className="plot-side-controls" role="group" aria-label="曲线操作">
+            <button
+              className={`plot-live-button ${viewEndIndex === null ? 'is-live' : ''}`}
+              title="回到实时视窗"
+              disabled={viewEndIndex === null}
+              onClick={() => setViewEndIndex(null)}
+            >
+              {viewEndIndex === null ? '实时' : '回到实时'}
             </button>
             <button
               title="按当前视窗数据执行一次 Y 轴自动缩放"
@@ -1111,24 +1098,83 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
               Y 自动
             </button>
             <button
+              className="plot-pause-button"
+              aria-pressed={paused}
+              title={paused ? '继续绘图' : '暂停绘图'}
               onClick={() => {
                 if (!paused) setFrozenEntries(entries)
                 setPaused((value) => !value)
               }}
             >
-              {paused ? '继续绘图' : '暂停绘图'}
+              {paused ? '继续' : '暂停'}
             </button>
-            <button onClick={() => setStartId(entries.at(-1)?.id || 0)}>清空曲线</button>
             <button
-              ref={colorButtonRef}
-              className={openPanel === 'colors' ? 'active' : ''}
-              aria-expanded={openPanel === 'colors'}
-              onClick={() => setOpenPanel((current) => (current === 'colors' ? null : 'colors'))}
+              ref={pidButtonRef}
+              title="PID 调参"
+              aria-label="PID 调参"
+              className={openPanel === 'pid' ? 'active' : ''}
+              aria-expanded={openPanel === 'pid'}
+              onClick={() => setOpenPanel((current) => (current === 'pid' ? null : 'pid'))}
             >
-              配色
+              PID
+            </button>
+            <button
+              ref={settingsButtonRef}
+              className={openPanel === 'settings' || openPanel === 'colors' ? 'active' : ''}
+              aria-expanded={openPanel === 'settings' || openPanel === 'colors'}
+              aria-haspopup="dialog"
+              onClick={() =>
+                setOpenPanel((current) =>
+                  current === 'settings' || current === 'colors' ? null : 'settings'
+                )
+              }
+            >
+              设置
             </button>
             <FloatingPanel
-              anchorRef={colorButtonRef}
+              anchorRef={settingsButtonRef}
+              open={openPanel === 'settings'}
+              onClose={closeFloatingPanel}
+            >
+              <div className="plot-options-popover" role="dialog" aria-label="曲线设置">
+                <strong>曲线设置</strong>
+                <label>
+                  绘图点数
+                  <input
+                    type="number"
+                    min="100"
+                    max={maxPlotPoints}
+                    value={pointLimit}
+                    onChange={(event) => {
+                      const value = Math.min(
+                        maxPlotPoints,
+                        Math.max(100, Number(event.target.value) || 1000)
+                      )
+                      setPointLimit(value)
+                      setXWindowPoints((current) => {
+                        const next = current >= pointLimit ? value : Math.min(current, value)
+                        localStorage.setItem(xWindowKey, String(next))
+                        return next
+                      })
+                      localStorage.setItem('serialflow.plotPointLimit', String(value))
+                    }}
+                  />
+                </label>
+                <small>最多保留 100,000 个采样点</small>
+                <button onClick={() => setOpenPanel('colors')}>曲线配色</button>
+                <button
+                  className="plot-clear-action"
+                  onClick={() => {
+                    setStartId(entries.at(-1)?.id || 0)
+                    setOpenPanel(null)
+                  }}
+                >
+                  清空曲线
+                </button>
+              </div>
+            </FloatingPanel>
+            <FloatingPanel
+              anchorRef={settingsButtonRef}
               open={openPanel === 'colors'}
               onClose={closeFloatingPanel}
             >
@@ -1175,14 +1221,6 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
                 </button>
               </div>
             </FloatingPanel>
-            <button
-              ref={pidButtonRef}
-              className={openPanel === 'pid' ? 'active' : ''}
-              aria-expanded={openPanel === 'pid'}
-              onClick={() => setOpenPanel((current) => (current === 'pid' ? null : 'pid'))}
-            >
-              PID 调参
-            </button>
             <FloatingPanel
               anchorRef={pidButtonRef}
               open={openPanel === 'pid'}
@@ -1446,6 +1484,8 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
         )}
         {embedded && (
           <button
+            className="plot-collapse-button"
+            aria-expanded={!collapsed}
             title={collapsed ? '展开实时曲线' : '收起实时曲线'}
             onClick={() => {
               const next = !collapsed
@@ -1748,10 +1788,10 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
       {!collapsed && series.length > 0 && (
         <div className="plot-x-range" aria-label="X 轴缩放和平移">
           <div className="plot-x-range-meta">
+            <span>视窗 {xWindowPoints.toLocaleString()} 点</span>
             <span>
-              视窗 {xWindowPoints.toLocaleString()} 点
+              {visibleSamples.length.toLocaleString()} / {pointLimit.toLocaleString()} 点
             </span>
-            <span>{visibleSamples.length.toLocaleString()} / {pointLimit.toLocaleString()} 点</span>
             <button disabled={viewEndIndex === null} onClick={() => setViewEndIndex(null)}>
               {viewEndIndex === null ? '实时' : '回到实时'}
             </button>

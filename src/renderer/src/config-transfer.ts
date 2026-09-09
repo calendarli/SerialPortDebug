@@ -1,4 +1,5 @@
 import { normalizeGroupGlobals } from './scripts/group-globals'
+import { normalizeCommandExtensions } from './command-settings'
 import type { AutoReplyGroup, CommandGroup, Rule, SavedCommand } from './types'
 
 type JsonRecord = Record<string, unknown>
@@ -121,6 +122,7 @@ function parseCommand(value: unknown, index: number): SavedCommand {
     name: text(item.name, `第 ${index + 1} 条快捷指令名称`, false).trim(),
     template: text(item.template, `第 ${index + 1} 条快捷指令内容`),
     releaseTemplate: typeof item.releaseTemplate === 'string' ? item.releaseTemplate : '',
+    ...normalizeCommandExtensions(item),
     hex,
     autoSend: boolean(item.autoSend, false),
     autoSendInterval: positiveInteger(item.autoSendInterval, 1000),

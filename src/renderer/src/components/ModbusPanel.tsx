@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { appendCrc, base64ToBytes, bytesToHex, hexToBytes } from '../serial-utils'
-import type { InteractionEntry } from '../types'
+import { appendCrc, base64ToBytes, bytesToHex } from '../serial-utils'
+import { ModbusClient } from '../modbus-client'
 
 type Props = {
   ports: string[]
-  entries: InteractionEntry[]
   onSend: (text: string, hex: boolean, port: string) => Promise<boolean>
 }
 
@@ -148,12 +147,6 @@ function makeRequest(
   )
 }
 
-function hasValidCrc(bytes: Uint8Array): boolean {
-  if (bytes.length < 4) return false
-  const expected = appendCrc(bytes.slice(0, -2), 'modbus')
-  return expected.at(-2) === bytes.at(-2) && expected.at(-1) === bytes.at(-1)
-}
-
 function registerBytes(
   values: Array<number | undefined>,
   address: number,
@@ -222,7 +215,7 @@ function makeWriteRequest(slave: number, address: number, words: number[]): Uint
   )
 }
 
-export function ModbusPanel({ ports, entries, onSend }: Props): React.JSX.Element {
+export function ModbusPanel({ ports, onSend }: Props): React.JSX.Element {
   const [port, setPort] = useState('')
   const [slave, setSlave] = useState(1)
   const functionCode = 3
@@ -245,7 +238,12 @@ export function ModbusPanel({ ports, entries, onSend }: Props): React.JSX.Elemen
   const [txCount, setTxCount] = useState(0)
   const [errorCount, setErrorCount] = useState(0)
   const [lastResponseMs, setLastResponseMs] = useState<number | null>(null)
-  const lastEntryIdRef = useRef(0)
+  const clientRef = useRef(new ModbusClient())
+  const connectionRevision = useRef({ value: 0 })
+  const onSendRef = useRef(onSend)
+  useEffect(() => {
+    onSendRef.current = onSend
+  }, [onSend])
   const targetPort = ports.includes(port) ? port : ports[0] || ''
   const normalizedSlave = clampInteger(slave, 1, 247)
   const normalizedRate = clampInteger(scanRate, 50, 60000)
@@ -295,77 +293,71 @@ export function ModbusPanel({ ports, entries, onSend }: Props): React.JSX.Elemen
     [functionCode, normalizedSlave]
   )
 
-  const sendRead = async (): Promise<void> => {
-    if (!targetPort) {
-      setPolling(false)
-      setMessage('No connection')
-      return
+  useEffect(() => {
+    const client = clientRef.current
+    const connection = connectionRevision.current
+    const offData = window.api.onData(({ path, chunks }) => {
+      if (path === targetPort) for (const chunk of chunks) client.push(chunk)
+    })
+    const offStatus = window.api.onStatus(({ path, open }) => {
+      if (path === targetPort && !open) {
+        connection.value++
+        client.cancel('Modbus disconnected')
+        setPolling(false)
+        setMessage('No connection')
+      }
+    })
+    return () => {
+      connection.value++
+      client.cancel()
+      offData()
+      offStatus()
     }
-    const success = await onSend(bytesToHex(readRequest), true, targetPort)
-    if (success) {
-      setTxCount((current) => current + 1)
-      setMessage('Waiting for response…')
-    } else {
-      setErrorCount((current) => current + 1)
-      setMessage('Send failed')
+  }, [targetPort, normalizedSlave])
+
+  const sendRead = async (): Promise<void> => {
+    if (!targetPort || clientRef.current.busy) return
+    const revision = connectionRevision.current.value
+    setMessage('Waiting for response...')
+    try {
+      const frame = await clientRef.current.request(readRequest, async () => {
+        const success = await onSendRef.current(bytesToHex(readRequest), true, targetPort)
+        if (success && revision === connectionRevision.current.value)
+          setTxCount((count) => count + 1)
+        return success
+      })
+      if (revision !== connectionRevision.current.value) return
+      setValues(
+        Array.from(
+          { length: registerCount },
+          (_, index) => (frame[3 + index * 2] << 8) | frame[4 + index * 2]
+        )
+      )
+      setLastResponseMs(Date.now())
+      setMessage('Connected')
+    } catch (error) {
+      if (revision !== connectionRevision.current.value) return
+      setErrorCount((count) => count + 1)
+      setMessage(error instanceof Error ? error.message : String(error))
     }
   }
 
   useEffect(() => {
     if (!polling || !targetPort) return
-    const immediate = window.setTimeout(() => void sendRead(), 0)
-    const timer = window.setInterval(() => void sendRead(), normalizedRate)
-    return () => {
-      window.clearTimeout(immediate)
-      window.clearInterval(timer)
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout>
+    const poll = async (): Promise<void> => {
+      await sendRead()
+      if (!cancelled) timer = setTimeout(() => void poll(), normalizedRate)
     }
-    // sendRead intentionally uses the latest render values when this effect restarts.
+    timer = setTimeout(() => void poll(), 0)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+    // The callback's connection and request are fixed for this polling session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [polling, readRequest, normalizedRate, targetPort])
-
-  useEffect(() => {
-    const candidates = entries.filter(
-      (entry) =>
-        entry.id > lastEntryIdRef.current && entry.direction === 'rx' && entry.port === targetPort
-    )
-    if (!candidates.length) return
-    lastEntryIdRef.current = candidates.at(-1)!.id
-    let exceptionMessage = ''
-    let receivedValues: Array<number | undefined> | null = null
-    for (const entry of candidates) {
-      if (!entry.rawHex) continue
-      try {
-        const bytes = hexToBytes(entry.rawHex)
-        if (bytes[0] !== normalizedSlave) continue
-        if (bytes[1] === (functionCode | 0x80)) {
-          exceptionMessage = `Modbus exception ${bytes[2] ?? '--'}`
-          continue
-        }
-        if (bytes[1] !== functionCode || !hasValidCrc(bytes)) continue
-        const byteCount = bytes[2] || 0
-        if (byteCount % 2 || bytes.length < byteCount + 5) continue
-        receivedValues = Array.from({ length: registerCount }, (_, index) => {
-          const offset = 3 + index * 2
-          return offset + 1 < 3 + byteCount ? (bytes[offset] << 8) | bytes[offset + 1] : undefined
-        })
-      } catch {
-        /* Ignore non-Modbus traffic on the selected port. */
-      }
-    }
-    if (receivedValues) {
-      const nextValues = receivedValues
-      window.queueMicrotask(() => {
-        setValues(nextValues)
-        setLastResponseMs(Date.now())
-        setMessage('Connected')
-      })
-    } else if (exceptionMessage) {
-      window.queueMicrotask(() => {
-        setErrorCount((current) => current + 1)
-        setMessage(exceptionMessage)
-      })
-    }
-  }, [entries, functionCode, normalizedSlave, targetPort])
 
   const writeRegister = async (address: number, input: string): Promise<void> => {
     if (!targetPort) return setMessage('No connection')
@@ -390,20 +382,30 @@ export function ModbusPanel({ ports, entries, onSend }: Props): React.JSX.Elemen
     }
     const encodedWords = encodeRegisterValue(numeric, definition, wordOrder)
     const request = makeWriteRequest(normalizedSlave, address, encodedWords)
-    const success = await onSend(bytesToHex(request), true, targetPort)
-    if (success) {
-      setTxCount((count) => count + 1)
+    if (clientRef.current.busy) return setMessage('Waiting for current Modbus response; try again')
+    const revision = connectionRevision.current.value
+    setMessage('Waiting for write confirmation...')
+    try {
+      await clientRef.current.request(request, async () => {
+        const success = await onSendRef.current(bytesToHex(request), true, targetPort)
+        if (success && revision === connectionRevision.current.value)
+          setTxCount((count) => count + 1)
+        return success
+      })
+      if (revision !== connectionRevision.current.value) return
       setValues((currentValues) =>
         currentValues.map((value, index) => {
           const offset = index - address
           return offset >= 0 && offset < encodedWords.length ? encodedWords[offset] : value
         })
       )
+      setLastResponseMs(Date.now())
       setMessage(`Register ${String(address).padStart(5, '0')} written`)
       setRegisterDialog(null)
-    } else {
+    } catch (error) {
+      if (revision !== connectionRevision.current.value) return
       setErrorCount((count) => count + 1)
-      setMessage('Write failed')
+      setMessage(error instanceof Error ? error.message : String(error))
     }
   }
 
