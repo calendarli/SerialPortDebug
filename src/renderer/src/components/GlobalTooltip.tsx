@@ -2,7 +2,12 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 type ActiveTooltip = { anchor: HTMLElement; text: string }
-type TooltipPosition = { left: number; top: number; placement: 'top' | 'bottom'; visible: boolean }
+type TooltipPosition = {
+  left: number
+  top: number
+  placement: 'top' | 'bottom' | 'right'
+  visible: boolean
+}
 
 function findTooltipTarget(target: EventTarget | null): HTMLElement | null {
   return target instanceof Element ? target.closest<HTMLElement>('[data-tooltip]') : null
@@ -42,15 +47,23 @@ export function GlobalTooltip(): React.JSX.Element | null {
       const anchor = findTooltipTarget(event.target)
       if (anchor) setActive((current) => (current?.anchor === anchor ? null : current))
     }
+    const dismiss = (): void => setActive(null)
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') dismiss()
+    }
     document.addEventListener('pointerover', handlePointerOver)
     document.addEventListener('pointerout', handlePointerOut)
     document.addEventListener('focusin', handleFocusIn)
     document.addEventListener('focusout', handleFocusOut)
+    document.addEventListener('pointerdown', dismiss)
+    document.addEventListener('keydown', handleKeyDown)
     return () => {
       document.removeEventListener('pointerover', handlePointerOver)
       document.removeEventListener('pointerout', handlePointerOut)
       document.removeEventListener('focusin', handleFocusIn)
       document.removeEventListener('focusout', handleFocusOut)
+      document.removeEventListener('pointerdown', dismiss)
+      document.removeEventListener('keydown', handleKeyDown)
     }
   }, [])
 
@@ -65,6 +78,20 @@ export function GlobalTooltip(): React.JSX.Element | null {
       const tooltipRect = tooltipRef.current.getBoundingClientRect()
       const gap = 9
       const edge = 8
+      if (
+        active.anchor.dataset.tooltipSide === 'right' &&
+        anchorRect.right + gap + tooltipRect.width <= window.innerWidth - edge
+      ) {
+        const top = Math.max(
+          edge,
+          Math.min(
+            anchorRect.top + (anchorRect.height - tooltipRect.height) / 2,
+            window.innerHeight - tooltipRect.height - edge
+          )
+        )
+        setPosition({ left: anchorRect.right + gap, top, placement: 'right', visible: true })
+        return
+      }
       let placement: 'top' | 'bottom' = 'bottom'
       let top = anchorRect.bottom + gap
       if (top + tooltipRect.height > window.innerHeight - edge) {

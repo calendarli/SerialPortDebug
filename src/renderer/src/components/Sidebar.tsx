@@ -1,4 +1,15 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import {
+  Cable,
+  Network,
+  SquareTerminal,
+  MessagesSquare,
+  Cpu,
+  CircleHelp,
+  PanelLeftOpen,
+  PanelLeftClose,
+  Info
+} from 'lucide-react'
 
 type Tab = 'serial' | 'pairs' | 'commands' | 'rules' | 'modbus' | 'about'
 type Props = {
@@ -14,11 +25,11 @@ type Props = {
 const storageKey = 'serialflow.sidebarWidth'
 const collapsedStorageKey = 'serialflow.sidebarCollapsed'
 const tabRailWidth = 52
-const tabPageWidth = 260
-const defaultWidth = tabRailWidth + tabPageWidth
+const tabPageWidth = 330
+const defaultWidth = tabRailWidth + tabPageWidth + 1 // Include the sidebar's right border.
 
 function clampWidth(value: number): number {
-  return Math.max(value, tabRailWidth)
+  return Math.max(Number.isFinite(value) ? value : defaultWidth, defaultWidth)
 }
 
 function initialWidth(): number {
@@ -35,6 +46,7 @@ export function Sidebar(props: Props): React.JSX.Element {
   const [resizing, setResizing] = useState(false)
   const dragStart = useRef({ x: 0, width: defaultWidth })
   const widthRef = useRef(width)
+  const collapsedRef = useRef(collapsed)
 
   useEffect(() => {
     const handleResize = (): void =>
@@ -51,43 +63,44 @@ export function Sidebar(props: Props): React.JSX.Element {
     event.preventDefault()
     const startWidth = collapsed ? tabRailWidth : width
     dragStart.current = { x: event.clientX, width: startWidth }
-    if (collapsed) {
-      setWidth(tabRailWidth)
-      widthRef.current = tabRailWidth
-      setCollapsed(false)
-    }
     event.currentTarget.setPointerCapture(event.pointerId)
     setResizing(true)
   }
   const resize = (event: React.PointerEvent<HTMLDivElement>): void => {
     if (!resizing) return
-    const nextWidth = clampWidth(dragStart.current.width + event.clientX - dragStart.current.x)
-    widthRef.current = nextWidth
-    setWidth(nextWidth)
-    setCollapsed(nextWidth <= tabRailWidth)
+    const requestedWidth = dragStart.current.width + event.clientX - dragStart.current.x
+    const nextCollapsed = requestedWidth <= tabRailWidth
+    // Keep the last expanded width when dragging shut; never render a clipped page.
+    if (!nextCollapsed) {
+      const nextWidth = clampWidth(requestedWidth)
+      widthRef.current = nextWidth
+      setWidth(nextWidth)
+    }
+    collapsedRef.current = nextCollapsed
+    setCollapsed(nextCollapsed)
   }
   const finishResize = (event: React.PointerEvent<HTMLDivElement>): void => {
     if (!resizing) return
-    event.currentTarget.releasePointerCapture(event.pointerId)
+    if (event.currentTarget.hasPointerCapture(event.pointerId))
+      event.currentTarget.releasePointerCapture(event.pointerId)
     localStorage.setItem(storageKey, String(widthRef.current))
-    localStorage.setItem(collapsedStorageKey, String(widthRef.current <= tabRailWidth))
+    localStorage.setItem(collapsedStorageKey, String(collapsedRef.current))
     setResizing(false)
   }
   const resetWidth = (): void => {
     setWidth(defaultWidth)
     widthRef.current = defaultWidth
+    collapsedRef.current = false
+    setCollapsed(false)
     localStorage.setItem(storageKey, String(defaultWidth))
+    localStorage.setItem(collapsedStorageKey, 'false')
   }
   const toggleCollapsed = (): void => {
-    setCollapsed((current) => {
-      const next = !current
-      const nextWidth = next ? tabRailWidth : defaultWidth
-      setWidth(nextWidth)
-      widthRef.current = nextWidth
-      localStorage.setItem(storageKey, String(nextWidth))
-      localStorage.setItem(collapsedStorageKey, String(next))
-      return next
-    })
+    const next = !collapsedRef.current
+    collapsedRef.current = next
+    setCollapsed(next)
+    localStorage.setItem(storageKey, String(widthRef.current))
+    localStorage.setItem(collapsedStorageKey, String(next))
   }
 
   return (
@@ -97,78 +110,141 @@ export function Sidebar(props: Props): React.JSX.Element {
     >
       <nav className="side-tabs" aria-label="侧栏导航">
         <button
-          title="串口"
+          aria-label="串口"
+          data-tooltip="串口"
+          data-tooltip-side="right"
+          aria-current={props.activeTab === 'serial' ? 'page' : undefined}
           className={props.activeTab === 'serial' ? 'active' : ''}
           onClick={() => props.onTabChange('serial')}
         >
-          <span className="tab-icon">⌁</span>
-          <span>串口</span>
+          <Cable
+            className="tab-icon tab-icon-serial"
+            size={22}
+            strokeWidth={1.8}
+            aria-hidden="true"
+          />
         </button>
         <button
-          title="虚拟串口对"
-          className={props.activeTab === 'pairs' ? 'active' : ''}
-          onClick={() => props.onTabChange('pairs')}
-        >
-          <span className="tab-icon">↔</span>
-          <span>串口对</span>
-        </button>
-        <button
-          title="快捷指令"
+          aria-label="快捷指令"
+          data-tooltip="快捷指令"
+          data-tooltip-side="right"
+          aria-current={props.activeTab === 'commands' ? 'page' : undefined}
           className={props.activeTab === 'commands' ? 'active' : ''}
           onClick={() => props.onTabChange('commands')}
         >
-          <span className="tab-icon">›_</span>
-          <span>指令</span>
-          {props.commandCount > 0 && <b>{props.commandCount}</b>}
+          <SquareTerminal
+            className="tab-icon tab-icon-commands"
+            size={22}
+            strokeWidth={1.8}
+            aria-hidden="true"
+          />
+          {props.commandCount > 0 && (
+            <b aria-hidden="true">{props.commandCount > 99 ? '99+' : props.commandCount}</b>
+          )}
         </button>
         <button
-          title="自动回复"
+          aria-label="自动回复"
+          data-tooltip="自动回复"
+          data-tooltip-side="right"
+          aria-current={props.activeTab === 'rules' ? 'page' : undefined}
           className={props.activeTab === 'rules' ? 'active' : ''}
           onClick={() => props.onTabChange('rules')}
         >
-          <span className="tab-icon">⌘</span>
-          <span>回复</span>
-          {props.enabledRuleCount > 0 && <b>{props.enabledRuleCount}</b>}
+          <MessagesSquare
+            className="tab-icon tab-icon-rules"
+            size={22}
+            strokeWidth={1.8}
+            aria-hidden="true"
+          />
+          {props.enabledRuleCount > 0 && (
+            <b aria-hidden="true">{props.enabledRuleCount > 99 ? '99+' : props.enabledRuleCount}</b>
+          )}
         </button>
         <button
-          title="Modbus RTU"
+          aria-label="虚拟串口对"
+          data-tooltip="虚拟串口对"
+          data-tooltip-side="right"
+          aria-current={props.activeTab === 'pairs' ? 'page' : undefined}
+          className={props.activeTab === 'pairs' ? 'active' : ''}
+          onClick={() => props.onTabChange('pairs')}
+        >
+          <Network
+            className="tab-icon tab-icon-pairs"
+            size={22}
+            strokeWidth={1.8}
+            aria-hidden="true"
+          />
+        </button>
+        <button
+          aria-label="Modbus RTU"
+          data-tooltip="Modbus RTU"
+          data-tooltip-side="right"
+          aria-current={props.activeTab === 'modbus' ? 'page' : undefined}
           className={props.activeTab === 'modbus' ? 'active' : ''}
           onClick={() => props.onTabChange('modbus')}
         >
-          <span className="tab-icon">M</span>
-          <span>Modbus</span>
+          <Cpu
+            className="tab-icon tab-icon-modbus"
+            size={22}
+            strokeWidth={1.8}
+            aria-hidden="true"
+          />
         </button>
         <button
-          title="帮助"
+          aria-label="帮助"
+          data-tooltip="帮助"
+          data-tooltip-side="right"
           className="help-tab"
           onClick={() =>
-            window.open(
-              new URL('help.html', window.location.href).toString(),
-              'serialflow-help'
-            )
+            window.open(new URL('help.html', window.location.href).toString(), 'serialflow-help')
           }
         >
-          <span className="tab-icon">?</span>
-          <span>帮助</span>
+          <CircleHelp
+            className="tab-icon tab-icon-help"
+            size={22}
+            strokeWidth={1.8}
+            aria-hidden="true"
+          />
         </button>
         {!fullPage && (
           <button
             className="sidebar-collapse-tab"
-            title={collapsed ? '展开侧栏' : '收起侧栏'}
+            data-tooltip={collapsed ? '展开侧栏' : '收起侧栏'}
+            data-tooltip-side="right"
             aria-label={collapsed ? '展开侧栏' : '收起侧栏'}
             onClick={toggleCollapsed}
           >
-            <span className="tab-icon">{collapsed ? '»' : '«'}</span>
-            <span>{collapsed ? '展开' : '收起'}</span>
+            {collapsed ? (
+              <PanelLeftOpen
+                className="tab-icon tab-icon-utility"
+                size={22}
+                strokeWidth={1.8}
+                aria-hidden="true"
+              />
+            ) : (
+              <PanelLeftClose
+                className="tab-icon tab-icon-utility"
+                size={22}
+                strokeWidth={1.8}
+                aria-hidden="true"
+              />
+            )}
           </button>
         )}
         <button
-          title="关于"
+          aria-label="关于"
+          data-tooltip="关于"
+          data-tooltip-side="right"
+          aria-current={props.activeTab === 'about' ? 'page' : undefined}
           className={`about-tab ${props.activeTab === 'about' ? 'active' : ''}`}
           onClick={() => props.onTabChange('about')}
         >
-          <span className="tab-icon">ⓘ</span>
-          <span>关于</span>
+          <Info
+            className="tab-icon tab-icon-about"
+            size={22}
+            strokeWidth={1.8}
+            aria-hidden="true"
+          />
         </button>
       </nav>
       {!fullPage && (

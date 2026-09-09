@@ -797,7 +797,7 @@ footer > span:first-child {
 .resizable-sidebar {
   position: relative;
   display: grid;
-  grid-template-columns: 52px minmax(330px, 1fr);
+  grid-template-columns: 52px minmax(0, 1fr);
   padding: 0;
   overflow: hidden;
   min-width: 52px;
@@ -815,7 +815,7 @@ footer > span:first-child {
 .side-page {
   min-width: 0;
   overflow: auto;
-  background: rgba(255, 255, 255, 0.76);
+  background: #fff;
   container-type: inline-size;
 }
 .resizable-sidebar .side-tabs {
@@ -823,10 +823,9 @@ footer > span:first-child {
   display: flex;
   flex-direction: column;
   gap: 5px;
-  padding: 9px 6px;
+  padding: 9px 0 9px 6px;
   border: 0;
-  border-right: 1px solid var(--border);
-  background: #f2f6fb;
+  background: #edf1f6;
 }
 .resizable-sidebar .side-tabs button {
   position: relative;
@@ -836,32 +835,68 @@ footer > span:first-child {
   justify-content: center;
   gap: 3px;
   width: 40px;
-  height: 52px;
+  height: 42px;
+  flex-shrink: 0;
   padding: 0;
   border-radius: 9px;
   font-size: 15px;
 }
 .resizable-sidebar .side-tabs button.active {
+  z-index: 1;
+  width: 46px;
+  padding-right: 6px;
+  border-radius: 12px 0 0 12px;
   background: #fff;
   color: var(--primary);
-  box-shadow: 0 3px 10px #33415514;
+  box-shadow: none;
 }
-.resizable-sidebar .side-tabs button.active:before {
+.resizable-sidebar .side-tabs button.active::before,
+.resizable-sidebar .side-tabs button.active::after {
   content: '';
   position: absolute;
-  left: -6px;
-  top: 13px;
-  width: 3px;
-  height: 26px;
-  border-radius: 0 3px 3px 0;
-  background: var(--primary);
+  right: 0;
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+}
+.resizable-sidebar .side-tabs button.active::before {
+  top: -12px;
+  background: radial-gradient(circle at 0 0, transparent 11.5px, #fff 12px);
+}
+.resizable-sidebar .side-tabs button.active::after {
+  bottom: -12px;
+  background: radial-gradient(circle at 0 100%, transparent 11.5px, #fff 12px);
+}
+.resizable-sidebar .side-tabs button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -3px;
+}
+.resizable-sidebar.full-page-tab-only {
+  border-right: 0;
+}
+.resizable-sidebar .side-tabs button.active b {
+  right: 8px;
+}
+.resizable-sidebar.collapsed:not(.full-page-tab-only) .side-tabs button.active {
+  width: 40px;
+  padding-right: 0;
+  border-radius: 9px;
+}
+.resizable-sidebar.collapsed:not(.full-page-tab-only) .side-tabs button.active::before,
+.resizable-sidebar.collapsed:not(.full-page-tab-only) .side-tabs button.active::after {
+  display: none;
+}
+.resizable-sidebar.collapsed:not(.full-page-tab-only) .side-tabs button.active b {
+  right: 2px;
 }
 .resizable-sidebar .side-tabs .help-tab {
   margin-top: auto;
 }
 .resizable-sidebar .side-tabs .tab-icon {
-  font-size: 22px;
-  line-height: 18px;
+  display: block;
+  width: 22px;
+  height: 22px;
+  flex: none;
 }
 .resizable-sidebar .side-tabs b {
   position: absolute;
@@ -871,7 +906,7 @@ footer > span:first-child {
   height: 15px;
   margin: 0;
   padding: 0 3px;
-  font-size: 14px;
+  font-size: 10px;
 }
 .sidebar-resizer {
   position: absolute;
@@ -6359,3 +6394,34 @@ footer > span:first-child {
 .reply-group-modal .modal-foot > button { height: 34px; font-size: 13px; }
 .reply-group-modal .modal-foot > .reply-group-delete { background: #c24141; border-color: #c24141; }
 .auto-reply-panel .auto-reply-group-list > div > button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.resizable-sidebar .side-tabs button:hover:not(.active) { background: #e2e8f0; color: #355473; }
+.global-tooltip.right { padding: 6px 10px; font-size: 12px; line-height: 1.5; }
+.global-tooltip.right::before {
+  left: -5px;
+  top: 50%;
+  transform: translateY(-50%) rotate(45deg);
+  border-left: 1px solid #475569;
+  border-bottom: 1px solid #475569;
+}
+
+/* Functional color accents stay visible in both inactive and selected tabs. */
+.resizable-sidebar .side-tabs .tab-icon {
+  --icon-color: #64748b;
+  --icon-surface: #e2e8f0;
+  box-sizing: content-box;
+  padding: 5px;
+  border-radius: 8px;
+  color: var(--icon-color);
+  background: var(--icon-surface);
+  transition: background 140ms ease, box-shadow 140ms ease;
+}
+.resizable-sidebar .side-tabs .tab-icon-serial { --icon-color: #2563eb; --icon-surface: #e0ebff; }
+.resizable-sidebar .side-tabs .tab-icon-commands { --icon-color: #b96512; --icon-surface: #fff0d8; }
+.resizable-sidebar .side-tabs .tab-icon-rules { --icon-color: #0d927d; --icon-surface: #d9f5eb; }
+.resizable-sidebar .side-tabs .tab-icon-pairs { --icon-color: #8250ce; --icon-surface: #eee3ff; }
+.resizable-sidebar .side-tabs .tab-icon-modbus { --icon-color: #0786a8; --icon-surface: #d9f2fa; }
+.resizable-sidebar .side-tabs .tab-icon-help { --icon-color: #c05482; --icon-surface: #fbe3ee; }
+.resizable-sidebar .side-tabs .tab-icon-about { --icon-color: #5266d0; --icon-surface: #e6eaff; }
+.resizable-sidebar .side-tabs button.active .tab-icon { box-shadow: 0 0 0 1px color-mix(in srgb, var(--icon-color) 25%, transparent); }
+.resizable-sidebar .side-tabs button:hover .tab-icon { background: color-mix(in srgb, var(--icon-color) 18%, white); }
