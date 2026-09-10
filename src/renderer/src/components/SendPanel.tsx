@@ -1,3 +1,4 @@
+import { ClearActionIcon } from './ClearActionIcon'
 import { useEffect, useRef, useState } from 'react'
 import type { CrcMode } from '../types'
 import { FloatingPanel } from './FloatingPanel'
@@ -130,7 +131,7 @@ export function SendPanel(props: Props): React.JSX.Element {
         <button className={mode === 'message' ? 'active' : ''} onClick={() => setMode('message')}>发送消息</button>
         <button className={mode === 'file' ? 'active' : ''} onClick={() => setMode('file')}>发送文件</button>
         <button
-          className="send-editor-clear"
+          className="send-editor-clear clear-action-button"
           title={mode === 'message' ? '清空输入框' : canCancel ? '文件发送中，暂时不能清空' : '清空所选文件'}
           aria-label={mode === 'message' ? '清空输入框' : '清空所选文件'}
           disabled={mode === 'file' && Boolean(canCancel)}
@@ -144,11 +145,7 @@ export function SendPanel(props: Props): React.JSX.Element {
             setFileStatus('请选择要发送的文件')
           }}
         >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="m15.5 4.5 4 4a2 2 0 0 1 0 2.8l-7.2 7.2H7.8l-3.3-3.3a2 2 0 0 1 0-2.8l8.2-7.9a2 2 0 0 1 2.8 0Z" />
-              <path d="m9 8-4.5 4.4a2 2 0 0 0 0 2.8l3.3 3.3h4.5l2-2" />
-              <path d="M12.3 18.5H21" />
-            </svg>
+          <ClearActionIcon />
         </button>
       </div>
 

@@ -1,3 +1,10 @@
+import {
+  interactionDisplayKey,
+  loadInteractionDisplay,
+  normalizeInteractionDisplay,
+  InteractionTextDecoder,
+  type InteractionDisplay
+} from './interaction-settings'
 import { DataWindowManager } from './components/DataWindowManager'
 import appIcon from './assets/app-icon.png'
 import { WindowPinButton } from './components/WindowPinButton'
@@ -476,6 +483,8 @@ function App(): React.JSX.Element {
   const [message, setMessage] = useState('就绪')
   const [errorDialog, setErrorDialog] = useState<string | null>(null)
   const [sendPanelHeight, setSendPanelHeight] = useState(loadSendPanelHeight)
+  const [interactionDisplay, setInteractionDisplay] = useState(loadInteractionDisplay)
+  const displayDecoders = useRef(new InteractionTextDecoder())
   const [interactionCacheMb, setInteractionCacheMb] = useState(() =>
     loadPositiveSetting(cacheSizeKey, 8)
   )
@@ -691,7 +700,9 @@ function App(): React.JSX.Element {
         queueInteraction(
           'tx',
           targetPort,
-          effectiveHex || crcMode ? bytesToHex(bytes) : new TextDecoder().decode(bytes),
+          effectiveHex || crcMode
+            ? bytesToHex(bytes)
+            : new TextDecoder(interactionDisplay.encoding).decode(bytes),
           bytes.length
         )
         setMessage(`已通过 ${targetPort} 发送 ${bytes.length} 字节`)
@@ -702,6 +713,7 @@ function App(): React.JSX.Element {
       }
     },
     [
+      interactionDisplay.encoding,
       sendLineEnding,
       openedPorts,
       queueInteraction,
@@ -893,7 +905,8 @@ function App(): React.JSX.Element {
         }
       }
       replyBuffers.current.set(sourcePort, replyBytes.slice(-8192))
-      const rendered = rxHex ? `${chunkHex} ` : text
+      const displayText = displayDecoders.current.decode(sourcePort, bytes, interactionDisplay.encoding)
+      const rendered = rxHex ? `${chunkHex} ` : displayText
       queueInteraction('rx', sourcePort, rendered, bytes.length, !paused, text, chunkHex)
       if (shouldAutoPause) {
         pauseLineBuffers.current.set(sourcePort, '')
@@ -916,6 +929,7 @@ function App(): React.JSX.Element {
       }
     })
     const offStatus = window.api.onStatus((status) => {
+      displayDecoders.current.clear(status.path)
       serialFramerRef.current.clear(status.path)
       textDecoders.current.delete(status.path)
       replyBuffers.current.delete(status.path)
@@ -943,6 +957,7 @@ function App(): React.JSX.Element {
       offError()
     }
   }, [
+    interactionDisplay.encoding,
     autoPauseExpression,
     autoPauseHex,
     autoPausePattern,
@@ -1210,6 +1225,12 @@ function App(): React.JSX.Element {
       return { entries, bytes: entries.reduce((total, entry) => total + entry.bytes, 0) }
     })
   }
+  const changeInteractionDisplay = (value: InteractionDisplay): void => {
+    const next = normalizeInteractionDisplay(value)
+    localStorage.setItem(interactionDisplayKey, JSON.stringify(next))
+    if (next.encoding !== interactionDisplay.encoding) displayDecoders.current = new InteractionTextDecoder()
+    setInteractionDisplay(next)
+  }
   const changeInteractionFontSize = (value: number): void => {
     const next = Math.min(24, Math.max(8, Math.round(value)))
     setInteractionFontSize(next)
@@ -1293,7 +1314,8 @@ function App(): React.JSX.Element {
           timestamp,
           interactionCacheMb,
           interactionCacheEntries,
-          interactionFontSize
+          interactionFontSize,
+          interactionDisplay
         }
       })
       if (path) setMessage(`工程已导出：${path}`)
@@ -1354,6 +1376,8 @@ function App(): React.JSX.Element {
           changeInteractionCacheMb(settings.interactionCacheMb)
         if (typeof settings.interactionCacheEntries === 'number')
           changeInteractionEntryLimit(settings.interactionCacheEntries)
+        if (settings.interactionDisplay)
+          changeInteractionDisplay(normalizeInteractionDisplay(settings.interactionDisplay))
         if (typeof settings.interactionFontSize === 'number')
           changeInteractionFontSize(settings.interactionFontSize)
       }
@@ -1468,6 +1492,8 @@ function App(): React.JSX.Element {
                 autoPauseHex={autoPauseHex}
                 cacheSizeMb={interactionCacheMb}
                 cacheEntryLimit={interactionCacheEntries}
+                display={interactionDisplay}
+                onDisplayChange={changeInteractionDisplay}
                 fontSize={interactionFontSize}
                 onClear={clearReceive}
                 onRxHexChange={setRxHex}

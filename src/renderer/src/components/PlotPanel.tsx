@@ -1,3 +1,4 @@
+import { ClearActionIcon } from './ClearActionIcon'
 import { settlingTime } from '../settling-time'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { InteractionEntry } from '../types'
@@ -1131,6 +1132,18 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
             >
               设置
             </button>
+            <button
+              type="button"
+              className="plot-clear-action clear-action-button"
+              title="清空曲线"
+              aria-label="清空曲线"
+              onClick={() => {
+                setStartId(entries.at(-1)?.id || 0)
+                setOpenPanel(null)
+              }}
+            >
+              <ClearActionIcon />
+            </button>
             <FloatingPanel
               anchorRef={settingsButtonRef}
               open={openPanel === 'settings'}
@@ -1162,15 +1175,7 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
                 </label>
                 <small>最多保留 100,000 个采样点</small>
                 <button onClick={() => setOpenPanel('colors')}>曲线配色</button>
-                <button
-                  className="plot-clear-action"
-                  onClick={() => {
-                    setStartId(entries.at(-1)?.id || 0)
-                    setOpenPanel(null)
-                  }}
-                >
-                  清空曲线
-                </button>
+
               </div>
             </FloatingPanel>
             <FloatingPanel

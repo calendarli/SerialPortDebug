@@ -1,3 +1,6 @@
+import { ClearActionIcon } from './ClearActionIcon'
+import { InteractionSettings } from './InteractionSettings'
+import type { InteractionDisplay } from '../interaction-settings'
 import { Clock3, Pause, ChevronDown, ChevronRight } from 'lucide-react'
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
@@ -7,6 +10,8 @@ type SearchDirection = 'up' | 'down' | null
 type ContextMenu = { x: number; y: number; entry: InteractionEntry | null }
 
 type Props = {
+  display: InteractionDisplay
+  onDisplayChange: (value: InteractionDisplay) => void
   entries: InteractionEntry[]
   rxHex: boolean
   timestamp: boolean
@@ -78,12 +83,16 @@ export function ReceivePanel(props: Props): React.JSX.Element {
     count: props.entries.length,
     getScrollElement: () => scrollElement,
     getItemKey: (index) => props.entries[index].id,
-    estimateSize: () => Math.max(20, Math.ceil(props.fontSize * 1.55)),
+    estimateSize: (index) =>
+      Math.max(
+        20,
+        Math.ceil((props.display[props.entries[index].direction].size ?? props.fontSize) * 1.55)
+      ),
     overscan: 14
   })
   const lastEntryId = props.entries[props.entries.length - 1]?.id
 
-  useEffect(() => virtualizer.measure(), [props.fontSize, virtualizer])
+  useEffect(() => virtualizer.measure(), [props.fontSize, props.display, virtualizer])
 
   useLayoutEffect(() => {
     if (!scrollElement || !props.entries.length || !followTailRef.current) return
@@ -216,50 +225,17 @@ export function ReceivePanel(props: Props): React.JSX.Element {
           </button>
         </div>
         <div className="head-tools">
-          <span className="font-size-indicator" title="在数据视窗中按 Ctrl + 鼠标滚轮调整">
-            字号 {props.fontSize}px
-          </span>
-          <div className="cache-controls">
-            <label title="交互记录最大容量">
-              缓存{' '}
-              <input
-                type="number"
-                min="1"
-                max="1024"
-                defaultValue={props.cacheSizeMb}
-                onBlur={(event) => {
-                  const value = Math.min(1024, Math.max(1, Number(event.target.value) || 8))
-                  event.currentTarget.value = String(value)
-                  props.onCacheSizeChange(value)
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') event.currentTarget.blur()
-                }}
-              />{' '}
-              MB
-            </label>
-            <label title="交互记录最大条数，0 表示不限制">
-              条数{' '}
-              <input
-                type="number"
-                min="0"
-                max="1000000"
-                step="100"
-                defaultValue={props.cacheEntryLimit}
-                onBlur={(event) => {
-                  const raw = event.target.value.trim()
-                  const value =
-                    raw === '' ? 5000 : Math.min(1_000_000, Math.max(0, Number(raw) || 0))
-                  event.currentTarget.value = String(value)
-                  props.onCacheEntryLimitChange(value)
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') event.currentTarget.blur()
-                }}
-              />
-            </label>
-          </div>
           <div className="receive-display-toggles" role="group" aria-label="接收显示选项">
+            <InteractionSettings
+              display={props.display}
+              onDisplayChange={props.onDisplayChange}
+              fontSize={props.fontSize}
+              onFontSizeChange={props.onFontSizeChange}
+              cacheSizeMb={props.cacheSizeMb}
+              onCacheSizeChange={props.onCacheSizeChange}
+              cacheEntryLimit={props.cacheEntryLimit}
+              onCacheEntryLimitChange={props.onCacheEntryLimitChange}
+            />
             <button
               type="button"
               className="receive-display-toggle receive-format-toggle"
@@ -288,10 +264,16 @@ export function ReceivePanel(props: Props): React.JSX.Element {
               onClick={() => props.onPausedChange(!props.paused)}
             >
               <Pause size={15} aria-hidden="true" />
-              暂停接收显示
+              暂停接收
             </button>
-            <button className="head-tool-button subtle" onClick={clearEntries}>
-              清空
+            <button
+              type="button"
+              className="head-tool-button subtle clear-action-button"
+              title="清空交互记录"
+              aria-label="清空交互记录"
+              onClick={clearEntries}
+            >
+              <ClearActionIcon />
             </button>
           </div>
         </div>
@@ -426,7 +408,15 @@ export function ReceivePanel(props: Props): React.JSX.Element {
         }}
         onKeyDown={handleKeyDown}
         onContextMenu={(event) => openContextMenu(event, null)}
-        style={{ '--interaction-font-size': `${props.fontSize}px` } as React.CSSProperties}
+        style={
+          {
+            '--interaction-font-size': `${props.fontSize}px`,
+            '--interaction-rx-color': props.display.rx.color,
+            '--interaction-tx-color': props.display.tx.color,
+            '--interaction-rx-font': `"${props.display.rx.font}", monospace`,
+            '--interaction-tx-font': `"${props.display.tx.font}", monospace`
+          } as React.CSSProperties
+        }
       >
         {props.entries.length ? (
           <div className="interaction-virtual-space" style={{ height: virtualizer.getTotalSize() }}>
@@ -437,7 +427,11 @@ export function ReceivePanel(props: Props): React.JSX.Element {
                   className="interaction-virtual-row"
                   key={item.key}
                   data-index={item.index}
-                  style={{ transform: `translateY(${item.start}px)` }}
+                  style={{
+                    transform: `translateY(${item.start}px)`,
+                    height: item.size,
+                    fontSize: props.display[entry.direction].size ?? props.fontSize
+                  }}
                 >
                   <InteractionRow
                     entry={entry}
