@@ -1,3 +1,4 @@
+import { useListReorder } from './useListReorder'
 import { ProgramCodeEditor } from './ProgramCodeEditor'
 import { useEffect, useRef, useState } from 'react'
 import type { AutoReplyGroup, Rule, TargetPortOption } from '../types'
@@ -88,6 +89,7 @@ export function AutoReplyPanel({
   onImport,
   onExport
 }: Props): React.JSX.Element {
+  const ruleOrder = useListReorder(rules, setRules)
   const [creating, setCreating] = useState(false)
   const [editingRuleId, setEditingRuleId] = useState<number | null>(null)
   const [draft, setDraft] = useState<Draft>(emptyDraft)
@@ -450,11 +452,25 @@ export function AutoReplyPanel({
           const isCollapsed = collapsedRuleIds.has(rule.id)
           return (
             <section
-              className={`reply-item ${isCollapsed ? 'collapsed' : ''}`}
+              className={`reply-item ${ruleOrder.className(rule)} ${isCollapsed ? 'collapsed' : ''}`}
               key={rule.id}
+              {...ruleOrder.dropProps(rule)}
               onContextMenu={(event) => openMenu(event, rule.id)}
             >
               <div className="reply-item-head">
+                <span
+                  className="list-drag-handle"
+                  draggable
+                  title="拖动调整规则顺序"
+                  aria-label={`拖动排序 ${rule.name}`}
+                  onDragStart={(event) => {
+                    setMenu(null)
+                    ruleOrder.start(event, rule)
+                  }}
+                  onDragEnd={ruleOrder.clear}
+                >
+                  ⠿
+                </span>
                 <button
                   className="reply-collapse-button"
                   title={isCollapsed ? '展开规则' : '收起规则'}

@@ -1,3 +1,4 @@
+import { useListReorder } from './useListReorder'
 import { ProgramCodeEditor } from './ProgramCodeEditor'
 import { memo, useEffect, useRef, useState } from 'react'
 import { bytesToHex, convertSerialText } from '../serial-utils'
@@ -647,7 +648,27 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
       return next
     })
   }
+  const commandOrder = useListReorder(
+    props.commands,
+    (next, source) => {
+      let ancestorId = source.parentId
+      const visited = new Set<number>()
+      let stoppedLoop = false
+      while (ancestorId !== null && !visited.has(ancestorId)) {
+        visited.add(ancestorId)
+        if (activeGroupLoopIds.has(ancestorId)) {
+          stopGroupLoop(ancestorId)
+          stoppedLoop = true
+        }
+        ancestorId = props.groups.find((group) => group.id === ancestorId)?.parentId ?? null
+      }
+      props.setCommands(next)
+      setError(stoppedLoop ? '顺序已更新，受影响组的自动循环已停止，可手动重新启动' : '')
+    },
+    (source, target) => source.parentId === target.parentId
+  )
   const clearDrag = (): void => {
+    commandOrder.clear()
     setDraggedNode(null)
     setDropTargetId(undefined)
   }
@@ -804,8 +825,9 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
   }
   const renderCommand = (command: SavedCommand): React.JSX.Element => (
     <section
-      className={`command-item ${draggedNode?.type === 'command' && draggedNode.id === command.id ? 'is-dragging' : ''}`}
+      className={`command-item ${commandOrder.className(command)} ${draggedNode?.type === 'command' && draggedNode.id === command.id ? 'is-dragging' : ''}`}
       key={`command-${command.id}`}
+      {...commandOrder.dropProps(command)}
       onContextMenu={(event) => openMenu(event, 'command', command.id)}
     >
       <div
@@ -819,8 +841,11 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
         <div
           className="command-drag-source"
           draggable
-          title="拖动指令到目标组或顶层以调整归属"
-          onDragStart={(event) => startDrag(event, { type: 'command', id: command.id })}
+          title="拖动调整组内顺序，或拖到目标组、顶层调整归属"
+          onDragStart={(event) => {
+            startDrag(event, { type: 'command', id: command.id })
+            commandOrder.start(event, command)
+          }}
           onDragEnd={clearDrag}
         >
           <span className="command-drag-grip" aria-hidden="true">

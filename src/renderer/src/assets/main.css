@@ -6520,3 +6520,25 @@ footer > span:first-child {
     caret-color: CanvasText;
   }
 }
+
+.list-drag-handle {
+  flex-shrink: 0;
+  padding: 2px 4px;
+  color: #8293a8;
+  cursor: grab;
+  user-select: none;
+}
+.list-drag-handle:active {
+  cursor: grabbing;
+}
+.list-is-dragging {
+  opacity: 0.45;
+}
+.command-item.list-drop-before,
+.reply-item.list-drop-before {
+  box-shadow: 0 -3px 0 #409eff;
+}
+.command-item.list-drop-after,
+.reply-item.list-drop-after {
+  box-shadow: 0 3px 0 #409eff;
+}
