@@ -6,3 +6,6 @@ out
 *.log*
 doc/
 design-qa.md
+
+# Local collaboration instructions
+AGENTS.md
