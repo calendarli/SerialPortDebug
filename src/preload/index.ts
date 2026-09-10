@@ -13,6 +13,9 @@ const electron = {
 }
 
 const api = {
+  getAlwaysOnTop: (): Promise<boolean> => ipcRenderer.invoke('window:getAlwaysOnTop'),
+  setAlwaysOnTop: (enabled: boolean): Promise<boolean> =>
+    ipcRenderer.invoke('window:setAlwaysOnTop', enabled),
   getAppInfo: () => ipcRenderer.invoke('app:info'),
   saveProject: (project: unknown) => ipcRenderer.invoke('project:save', project),
   openProject: () => ipcRenderer.invoke('project:open'),

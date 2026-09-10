@@ -1,3 +1,5 @@
+import appIcon from './assets/app-icon.png'
+import { WindowPinButton } from './components/WindowPinButton'
 import { findReplyMatch, replyByteOffset } from './reply-matcher'
 import { removeReplyGroup } from './auto-reply-groups'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -1364,16 +1366,20 @@ function App(): React.JSX.Element {
     <main className="app-shell">
       <header>
         <div className="brand">
+          <img className="brand-logo" src={appIcon} alt="" draggable={false} />
           <div>
             <h1>SerialFlow</h1>
             <small>高速串口调试助手</small>
           </div>
         </div>
-        <div className={`status ${connected ? 'online' : ''}`}>
-          <i />
-          {connected
-            ? `已打开 ${openedPorts.size} 个串口：${[...openedPorts].join('、')}`
-            : '未连接'}
+        <div className="header-actions">
+          <div className={`status ${connected ? 'online' : ''}`}>
+            <i />
+            {connected
+              ? `已打开 ${openedPorts.size} 个串口：${[...openedPorts].join('、')}`
+              : '未连接'}
+          </div>
+          <WindowPinButton />
         </div>
       </header>
       <section className="workspace">

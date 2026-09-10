@@ -42,6 +42,8 @@ declare global {
       }
     }
     api: {
+      getAlwaysOnTop(): Promise<boolean>
+      setAlwaysOnTop(enabled: boolean): Promise<boolean>
       getAppInfo(): Promise<{ version: string; platform: string; arch: string }>
       saveProject(project: unknown): Promise<string | null>
       openProject(): Promise<{ path: string; content: string } | null>

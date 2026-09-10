@@ -6542,3 +6542,78 @@ footer > span:first-child {
 .reply-item.list-drop-after {
   box-shadow: 0 3px 0 #409eff;
 }
+
+.header-actions,
+.window-pin-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.window-pin-control > span {
+  color: #c0392b;
+  font-size: 13px;
+}
+.window-pin-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--muted);
+}
+.window-pin-button.active {
+  color: #1677d2;
+  border-color: #91caff;
+  background: #e6f4ff;
+}
+
+.app-shell > header {
+  height: 50px;
+  padding: 0 16px;
+  gap: 16px;
+}
+.app-shell > header .brand {
+  flex-shrink: 0;
+  gap: 8px;
+}
+.brand-logo {
+  display: block;
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+.app-shell > header .brand h1 {
+  font-size: 17px;
+  line-height: 21px;
+}
+.app-shell > header .brand small {
+  display: block;
+  font-size: 12px;
+  line-height: 16px;
+}
+.app-shell > header .header-actions {
+  min-width: 0;
+  gap: 8px;
+}
+.app-shell > header .status {
+  min-width: 0;
+  padding: 4px 10px;
+  font-size: 14px;
+  line-height: 20px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app-shell > header .window-pin-control {
+  flex-shrink: 0;
+}
+.app-shell > header .window-pin-button {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+}

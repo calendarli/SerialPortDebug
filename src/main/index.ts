@@ -265,6 +265,18 @@ function registerSerialHandlers(): void {
     platform: process.platform,
     arch: process.arch
   }))
+  ipcMain.handle('window:getAlwaysOnTop', (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    if (!window || window.isDestroyed()) throw new Error('窗口不可用')
+    return window.isAlwaysOnTop()
+  })
+  ipcMain.handle('window:setAlwaysOnTop', (event, enabled: unknown) => {
+    if (typeof enabled !== 'boolean') throw new Error('无效的置顶状态')
+    const window = BrowserWindow.fromWebContents(event.sender)
+    if (!window || window.isDestroyed()) throw new Error('窗口不可用')
+    window.setAlwaysOnTop(enabled)
+    return window.isAlwaysOnTop()
+  })
   ipcMain.handle('serial:list', async () => {
     try {
       return await SerialPort.list()
