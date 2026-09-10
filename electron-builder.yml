@@ -3,6 +3,10 @@ productName: SerialFlow
 directories:
   buildResources: build
 files:
+  - '!resources/firmware/**'
+  - '!scripts/**'
+  - '!tests/**'
+  - '!docs/**'
   - '!**/.vscode/*'
   - '!src/*'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
@@ -12,6 +16,8 @@ files:
 asarUnpack:
   - resources/**
 extraResources:
+  - from: resources/firmware
+    to: firmware
   - from: driver/SerialFlowVirtualSerial/Manager/x64/Release/SerialFlowVirtualSerialManager.exe
     to: virtual-serial/SerialFlowVirtualSerialManager.exe
   - from: driver/SerialFlowVirtualSerial/ComPort/x64/Debug/VirtualSerial2um

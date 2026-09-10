@@ -1,0 +1,44 @@
+export type FirmwareFamily = 'stm32' | 'esp32'
+export type FirmwareFile = { path: string; name: string; size: number; address: string }
+export type FirmwareRequest = {
+  family: FirmwareFamily
+  transport: 'uart' | 'swd'
+  port: string
+  probe: string
+  chip: string
+  baudRate: number
+  files: FirmwareFile[]
+  verify: boolean
+  reset: boolean
+  restorePort: boolean
+  eraseAll: boolean
+  manualBoot: boolean
+  connectMode: 'NORMAL' | 'UR'
+  toolPath: string
+}
+export type FirmwareState = {
+  id: string
+  busy: boolean
+  operation: 'detect' | 'flash'
+  port: string
+  phase: string
+  percent: number | null
+  startedAt: number
+  finishedAt?: number
+  outcome?: 'success' | 'error' | 'cancelled'
+  logs: string[]
+  restoreWarning?: string
+}
+export type FirmwareTool = { path: string; available: boolean; version: string; error?: string }
+export const espChips = [
+  'auto',
+  'esp32',
+  'esp32s2',
+  'esp32s3',
+  'esp32c2',
+  'esp32c3',
+  'esp32c5',
+  'esp32c6',
+  'esp32h2',
+  'esp32p4'
+] as const

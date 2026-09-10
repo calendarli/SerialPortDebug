@@ -2,11 +2,13 @@ import { app, shell, BrowserWindow, dialog, ipcMain } from 'electron'
 import { execFile } from 'child_process'
 import { existsSync, mkdirSync } from 'fs'
 import { readFile, stat, writeFile } from 'fs/promises'
-import { join } from 'path'
+import { basename, join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { SerialPort } from 'serialport'
 import icon from '../../resources/icon-v3.png?asset'
 import { FileTransferManager } from './file-transfer'
+import { FirmwareManager } from './firmware/manager'
+import type { FirmwareFamily, FirmwareRequest } from '../shared/firmware'
 
 // Retain existing settings when upgrading installations created under the old package name.
 app.setName('SerialFlow')
@@ -96,6 +98,14 @@ const receiveBatches = new Map<
 >()
 let portOperationQueue: Promise<void> = Promise.resolve()
 let fileTransferManager: FileTransferManager | null = null
+let firmwareManager: FirmwareManager | null = null
+const firmwarePorts = new Set<string>()
+let quitting = false
+let quitReady = false
+
+function assertPortAvailable(path: string): void {
+  if (firmwarePorts.has(path.toUpperCase())) throw new Error(`串口 ${path} 正被固件烧录独占，请等待任务结束`)
+}
 
 function virtualSerialPaths(): { manager: string; inf: string } {
   const root = app.isPackaged
@@ -253,6 +263,7 @@ async function closePort(path: string): Promise<void> {
         active.close((error) => (error ? reject(error) : resolve()))
       )
     } catch (error) {
+      if (active.isOpen) openPorts.set(path, active)
       throw explainRuntimeError(error, '关闭串口', active.path)
     }
   }
@@ -264,6 +275,7 @@ async function closeAllPorts(): Promise<void> {
 }
 
 async function writeRawPort(path: string, data: Buffer): Promise<void> {
+  assertPortAvailable(path)
   const active = openPorts.get(path)
   if (!active?.isOpen) throw new Error(`串口 ${path} 未打开`)
   await new Promise<void>((resolve, reject) =>
@@ -271,7 +283,98 @@ async function writeRawPort(path: string, data: Buffer): Promise<void> {
   )
 }
 
+async function openManagedPort(options: PortOptions): Promise<boolean> {
+  validatePortOptions(options)
+  assertPortAvailable(options.path)
+  await closePort(options.path)
+  let next: SerialPort
+  try {
+    next = new SerialPort({ ...options, autoOpen: false })
+    await new Promise<void>((resolve, reject) =>
+      next.open((error) => (error ? reject(error) : resolve()))
+    )
+  } catch (error) {
+    throw explainOpenError(error, options)
+  }
+  openPorts.set(options.path, next)
+  next.on('data', (chunk: Buffer) => {
+    queueReceivedData(options.path, chunk)
+  })
+  next.on('error', (error) =>
+    emit('serial:error', {
+      path: options.path,
+      message: explainRuntimeError(error, '串口通信', next.path).message
+    })
+  )
+  next.on('close', () => {
+    const unexpected = openPorts.get(options.path) === next
+    if (unexpected) {
+      openPorts.delete(options.path)
+      writeQueues.delete(options.path)
+      emit('serial:error', {
+        path: options.path,
+        message: `串口 ${next.path} 连接意外中断，请检查 USB 连接、供电和驱动状态`
+      })
+    }
+    emit('serial:status', { path: options.path, open: false })
+  })
+  emit('serial:status', { open: true, path: options.path })
+  return true
+}
+
 function registerSerialHandlers(): void {
+  firmwareManager = new FirmwareManager({
+    resources: app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'),
+    temp: app.getPath('temp'),
+    emit: state => emit('firmware:progress', state),
+    acquire: request => enqueuePortOperation(async () => {
+      if (request.transport !== 'uart') return async () => {}
+      const path = request.port
+      assertPortAvailable(path)
+      if (fileTransferManager?.isPortBusy(path)) throw new Error('目标串口正在传输或接收文件，请先停止文件传输')
+      firmwarePorts.add(path.toUpperCase())
+      const port = openPorts.get(path)
+      const saved: PortOptions | undefined = port ? {
+        path, baudRate: port.baudRate, dataBits: port.settings.dataBits ?? 8,
+        stopBits: port.settings.stopBits ?? 1, parity: port.settings.parity ?? 'none'
+      } : undefined
+      try { await closePort(path) } catch (error) { firmwarePorts.delete(path.toUpperCase()); throw error }
+      return () => enqueuePortOperation(async () => {
+        firmwarePorts.delete(path.toUpperCase())
+        if (saved && request.restorePort && !quitting) await openManagedPort(saved)
+      })
+    })
+  })
+  ipcMain.handle('firmware:state', () => firmwareManager!.snapshot())
+  ipcMain.handle('firmware:tool', (_event, family: FirmwareFamily, path: string) => firmwareManager!.toolInfo(family, path))
+  ipcMain.handle('firmware:probes', (_event, path: string) => firmwareManager!.probes(path))
+  ipcMain.handle('firmware:chooseTool', async (_event, family: FirmwareFamily) => {
+    if (!['stm32', 'esp32'].includes(family)) throw new Error('无效芯片系列')
+    const result = await dialog.showOpenDialog({ title: family === 'stm32' ? '选择 STM32_Programmer_CLI' : '选择 esptool 5.x', properties: ['openFile'], filters: process.platform === 'win32' ? [{ name: '烧录工具', extensions: ['exe'] }] : [] })
+    return result.canceled ? null : firmwareManager!.resolveTool(family, result.filePaths[0])
+  })
+  ipcMain.handle('firmware:chooseFiles', async (_event, family: FirmwareFamily) => {
+    if (!['stm32', 'esp32'].includes(family)) throw new Error('无效芯片系列')
+    const result = await dialog.showOpenDialog({ title: '选择烧录固件', properties: family === 'esp32' ? ['openFile', 'multiSelections'] : ['openFile'], filters: [{ name: '固件', extensions: family === 'stm32' ? ['hex', 'bin'] : ['bin'] }] })
+    if (result.canceled) return []
+    return Promise.all(result.filePaths.map(async path => ({ path, name: basename(path), size: (await stat(path)).size, address: family === 'stm32' ? '0x08000000' : '' })))
+  })
+  ipcMain.handle('firmware:start', async (_event, request: FirmwareRequest, operation: 'detect' | 'flash') => {
+    if (operation === 'flash' && request?.eraseAll) {
+      const result = await dialog.showMessageBox({ type: 'warning', title: '确认整片擦除', message: '整片擦除将删除目标芯片上的固件和保存的数据。', detail: `目标：${request.family} / ${request.transport === 'swd' ? request.probe : request.port}。此操作无法撤销。`, buttons: ['取消', '整片擦除并烧录'], defaultId: 0, cancelId: 0 })
+      if (result.response !== 1) return null
+    }
+    return firmwareManager!.start(request, operation)
+  })
+  ipcMain.handle('firmware:cancel', (_event, id: string) => firmwareManager!.cancel(id))
+  ipcMain.handle('firmware:saveLog', async () => {
+    const state = firmwareManager!.snapshot()
+    if (!state) throw new Error('暂无烧录日志')
+    const result = await dialog.showSaveDialog({ defaultPath: `firmware-${state.id}.txt`, filters: [{ name: '日志', extensions: ['txt'] }] })
+    if (result.canceled || !result.filePath) return null
+    await writeFile(result.filePath, `${state.phase}\n${new Date(state.startedAt).toISOString()}\n${state.logs.join('\n')}\n`, 'utf8')
+    return result.filePath
+  })
   fileTransferManager = new FileTransferManager(writeRawPort, (progress) =>
     emit('fileTransfer:progress', progress)
   )
@@ -432,7 +535,10 @@ function registerSerialHandlers(): void {
     return result.canceled ? null : result.filePaths[0] || null
   })
   ipcMain.handle('fileTransfer:setReceiver', async (_event, port: string, directory?: string) => {
-    await fileTransferManager!.setReceiver(port, directory)
+    await enqueuePortOperation(async () => {
+      assertPortAvailable(port)
+      await fileTransferManager!.setReceiver(port, directory)
+    })
   })
   ipcMain.handle(
     'fileTransfer:send',
@@ -443,7 +549,10 @@ function registerSerialHandlers(): void {
       chunkSize: number,
       protocol: 'serialflow' | 'raw',
       chunkDelay?: number
-    ) => fileTransferManager!.sendFile(port, filePath, chunkSize, protocol, chunkDelay)
+    ) => enqueuePortOperation(async () => {
+      assertPortAvailable(port)
+      return fileTransferManager!.sendFile(port, filePath, chunkSize, protocol, chunkDelay)
+    })
   )
   ipcMain.handle('fileTransfer:cancel', (_event, taskId: string) =>
     fileTransferManager!.cancel(taskId)
@@ -536,49 +645,15 @@ function registerSerialHandlers(): void {
     return result.filePath
   })
   ipcMain.handle('serial:open', async (_event, options: PortOptions) =>
-    enqueuePortOperation(async () => {
-      validatePortOptions(options)
-      await closePort(options.path)
-      let next: SerialPort
-      try {
-        next = new SerialPort({ ...options, autoOpen: false })
-        await new Promise<void>((resolve, reject) =>
-          next.open((error) => (error ? reject(error) : resolve()))
-        )
-      } catch (error) {
-        throw explainOpenError(error, options)
-      }
-      openPorts.set(options.path, next)
-      next.on('data', (chunk: Buffer) => {
-        queueReceivedData(options.path, chunk)
-      })
-      next.on('error', (error) =>
-        emit('serial:error', {
-          path: options.path,
-          message: explainRuntimeError(error, '串口通信', next.path).message
-        })
-      )
-      next.on('close', () => {
-        const unexpected = openPorts.get(options.path) === next
-        if (unexpected) {
-          openPorts.delete(options.path)
-          writeQueues.delete(options.path)
-          emit('serial:error', {
-            path: options.path,
-            message: `串口 ${next.path} 连接意外中断，请检查 USB 连接、供电和驱动状态`
-          })
-        }
-        emit('serial:status', { path: options.path, open: false })
-      })
-      emit('serial:status', { open: true, path: options.path })
-      return true
-    })
+    enqueuePortOperation(() => openManagedPort(options))
   )
   ipcMain.handle('serial:close', async (_event, path: string) =>
-    enqueuePortOperation(() => closePort(path))
+    enqueuePortOperation(() => { assertPortAvailable(path); return closePort(path) })
   )
   ipcMain.handle('serial:write', async (_event, path: string, base64: string) => {
     if (!path) throw new Error('请选择发送串口')
+    assertPortAvailable(path)
+    const originalPort = openPorts.get(path)
     if (typeof base64 !== 'string' || !base64) throw new Error('发送内容不能为空')
     const data = Buffer.from(base64, 'base64')
     if (!data.length) throw new Error('发送内容不能为空')
@@ -586,7 +661,9 @@ function registerSerialHandlers(): void {
     const task = previous
       .catch(() => undefined)
       .then(async () => {
+        assertPortAvailable(path)
         const active = openPorts.get(path)
+        if (active !== originalPort) throw new Error('串口连接已变化，已取消旧的发送任务')
         if (!active?.isOpen) throw new Error('串口未打开')
         try {
           await new Promise<void>((resolve, reject) => {
@@ -670,8 +747,17 @@ app.whenReady().then(() => {
   })
 })
 
-app.on('before-quit', () => {
-  void closeAllPorts()
+app.on('before-quit', event => {
+  if (quitReady) return
+  event.preventDefault()
+  if (quitting) return
+  quitting = true
+  void (async () => {
+    await firmwareManager?.shutdown()
+    await closeAllPorts()
+    quitReady = true
+    app.quit()
+  })()
 })
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()

@@ -1,3 +1,5 @@
+import type { FirmwareFamily, FirmwareFile, FirmwareRequest, FirmwareState, FirmwareTool } from '../shared/firmware'
+
 type SerialPortInfo = {
   path: string
   manufacturer?: string
@@ -42,6 +44,15 @@ declare global {
       }
     }
     api: {
+      getFirmwareState(): Promise<FirmwareState | null>
+      getFirmwareTool(family: FirmwareFamily, path: string): Promise<FirmwareTool>
+      listFirmwareProbes(path: string): Promise<string[]>
+      chooseFirmwareTool(family: FirmwareFamily): Promise<string | null>
+      chooseFirmwareFiles(family: FirmwareFamily): Promise<FirmwareFile[]>
+      startFirmware(request: FirmwareRequest, operation: 'detect' | 'flash'): Promise<string | null>
+      cancelFirmware(id: string): Promise<void>
+      saveFirmwareLog(): Promise<string | null>
+      onFirmwareProgress(callback: (state: FirmwareState) => void): () => void
       openDataWindow(id: string): Promise<void>
       closeDataWindow(id: string): Promise<void>
       getOpenedPortPaths(): Promise<string[]>

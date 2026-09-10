@@ -421,6 +421,7 @@ function App(): React.JSX.Element {
   const [ports, setPorts] = useState<Port[]>([])
   const [serialConfigs, setSerialConfigs] = useState<SerialConfig[]>(loadSerialConfigs)
   const [openedPorts, setOpenedPorts] = useState<Set<string>>(new Set())
+  const serialSessionVersions = useRef(new Map<string, number>())
   const [sendPort, setSendPort] = useState('')
   const connected = openedPorts.size > 0
   const targetPortOptions = useMemo(() => {
@@ -844,6 +845,7 @@ function App(): React.JSX.Element {
           hexBuffer = bytesToHex(replyBytes)
           matching = true
           if (rule.parameterMode === 'program') {
+            const sessionVersion = serialSessionVersions.current.get(sourcePort) || 0
             const match = Array.from(matchedResult, (value) => value ?? '')
             const groups = { ...(matchedResult.groups || {}) }
             const replyGroup =
@@ -857,6 +859,7 @@ function App(): React.JSX.Element {
                 replyGroup?.globals || {}
               )
               .then(({ values, globals }) => {
+                if ((serialSessionVersions.current.get(sourcePort) || 0) !== sessionVersion) return
                 if (replyGroup)
                   setAutoReplyGroups((current) =>
                     current.map((group) =>
@@ -929,6 +932,7 @@ function App(): React.JSX.Element {
       }
     })
     const offStatus = window.api.onStatus((status) => {
+      serialSessionVersions.current.set(status.path, (serialSessionVersions.current.get(status.path) || 0) + 1)
       displayDecoders.current.clear(status.path)
       serialFramerRef.current.clear(status.path)
       textDecoders.current.delete(status.path)

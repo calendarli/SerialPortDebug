@@ -182,7 +182,7 @@ export class FileTransferManager {
     )
   }
 
-  private isPortBusy(port: string): boolean {
+  isPortBusy(port: string): boolean {
     return (
       this.receiveDirectories.has(port) ||
       [...this.senders.values()].some(

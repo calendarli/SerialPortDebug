@@ -9,3 +9,8 @@ design-qa.md
 
 # Local collaboration instructions
 AGENTS.md
+
+# Generated firmware QA artifacts
+build/firmware-qa-*/
+build/firmware-ui*.png
+build/test-results.txt

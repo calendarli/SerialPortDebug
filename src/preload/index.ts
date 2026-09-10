@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { FirmwareFamily, FirmwareRequest, FirmwareState } from '../shared/firmware'
 
 // Sandboxed preload scripts can only load Electron's built-in modules.
 // Keep the renderer-facing compatibility surface deliberately small.
@@ -13,6 +14,19 @@ const electron = {
 }
 
 const api = {
+  getFirmwareState: () => ipcRenderer.invoke('firmware:state'),
+  getFirmwareTool: (family: FirmwareFamily, path: string) => ipcRenderer.invoke('firmware:tool', family, path),
+  listFirmwareProbes: (path: string) => ipcRenderer.invoke('firmware:probes', path),
+  chooseFirmwareTool: (family: FirmwareFamily) => ipcRenderer.invoke('firmware:chooseTool', family),
+  chooseFirmwareFiles: (family: FirmwareFamily) => ipcRenderer.invoke('firmware:chooseFiles', family),
+  startFirmware: (request: FirmwareRequest, operation: 'detect' | 'flash') => ipcRenderer.invoke('firmware:start', request, operation),
+  cancelFirmware: (id: string) => ipcRenderer.invoke('firmware:cancel', id),
+  saveFirmwareLog: () => ipcRenderer.invoke('firmware:saveLog'),
+  onFirmwareProgress: (callback: (state: FirmwareState) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, state: FirmwareState): void => callback(state)
+    ipcRenderer.on('firmware:progress', listener)
+    return () => ipcRenderer.removeListener('firmware:progress', listener)
+  },
   openDataWindow: (id: string): Promise<void> => ipcRenderer.invoke('dataWindow:open', id),
   closeDataWindow: (id: string): Promise<void> => ipcRenderer.invoke('dataWindow:close', id),
   getOpenedPortPaths: (): Promise<string[]> => ipcRenderer.invoke('serial:openedPaths'),

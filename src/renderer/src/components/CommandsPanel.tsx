@@ -263,6 +263,26 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
   })
   useEffect(() => runner.sync(props.commands), [props.commands, runner])
   useEffect(() => {
+    let lastTask = ''
+    return window.api.onFirmwareProgress(state => {
+      if (!state.busy || !state.port || state.id === lastTask) return
+      lastTask = state.id
+      const affected = propsRef.current.commands.filter(command => !command.targetPort || command.targetPort === state.port)
+      for (const command of affected) void runner.stop(command.id, false)
+      // Invalidate group loops containing an affected command, including ancestors.
+      const groups = new Set<number>()
+      for (const command of affected) {
+        let id = command.parentId
+        while (id !== null && !groups.has(id)) {
+          groups.add(id)
+          id = propsRef.current.groups.find(group => group.id === id)?.parentId ?? null
+        }
+      }
+      for (const id of groups) groupLoopTokensRef.current.set(id, (groupLoopTokensRef.current.get(id) || 0) + 1)
+      setActiveGroupLoopIds(current => new Set([...current].filter(id => !groups.has(id))))
+    })
+  }, [runner])
+  useEffect(() => {
     if (props.openedPorts) runner.syncPorts(props.openedPorts)
   }, [props.openedPorts, props.commands, runner])
   useEffect(() => {

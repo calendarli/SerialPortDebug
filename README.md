@@ -71,6 +71,10 @@ SerialFlow 是一款基于 Electron、React 和 TypeScript 开发的桌面串口
 - CRC-16/XMODEM
 - CRC-32
 
+### 固件烧录
+
+固件烧录功能位于底部发送区第三个页签，支持 STM32 的 UART / ST-LINK HEX、BIN 烧录，以及 ESP32 单个或多个 BIN 烧录。Windows x64 内置 esptool 5.3.1；STM32 需单独安装 STM32CubeProgrammer。支持固件地址检查、进度日志、停止任务和串口独占/恢复。完整步骤及支持边界见 [固件烧录说明](docs/firmware-flashing.md)。
+
 ### 快捷指令与指令组
 
 - 通过右键菜单新建、编辑或删除指令和指令组。

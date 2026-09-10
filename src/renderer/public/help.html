@@ -234,9 +234,15 @@
           <div class="warn">安装证书、创建和删除虚拟串口需要 Windows 管理员授权。操作后若系统尚未刷新设备列表，请刷新或重启应用。</div>
         </article>
 
-        <article id="transfer" data-title="文件传输 发送文件 接收文件 协议 原始模式">
+        <article id="transfer" data-title="文件传输 发送文件 接收文件 协议 原始模式 固件烧录 STM32 ESP32 HEX BIN ST-LINK">
           <h2>串口文件传输</h2>
           <p>在底部发送区切换到“发送文件”，选择文件、分块大小、区块延时和已打开的目标串口。文件以原始二进制发送，需由对端协议保证完整性。</p>
+          <h3>固件烧录</h3>
+          <p>切换到底部“固件烧录”页签，选择 STM32 或 ESP32。STM32 支持 UART、ST-LINK / SWD 和 HEX / BIN；ESP32 支持一个或多个 BIN。HEX 使用文件内地址，BIN 请按工程输出填写写入地址，ESP32 不自动猜测分区偏移。</p>
+          <p>Windows x64 已内置 esptool 5.3.1。STM32 需先安装 STM32CubeProgrammer；未自动找到时，在高级设置中选择安装目录中的 STM32_Programmer_CLI.exe。</p>
+          <p>先刷新并选择串口或探针，可使用“检测芯片”查看日志，再“开始烧录”。STM32 UART 需要按芯片手册设置 BOOT 并复位，烧录后恢复 BOOT 配置并手动复位。ESP32 无自动下载电路时，选择手动模式并操作 BOOT/RESET。</p>
+          <p>烧录时独占目标串口；若正在传输/接收文件，请先停止。可选择结束后恢复原串口连接，自动发送任务需要重新启动。切换页签不停止烧录；停止或退出应用可能留下不完整固件，需重新烧录。整片擦除会删除设备上的全部数据，默认关闭。</p>
+          <p>日志可查看和导出。固件检查不能证明文件适用于当前硬件，请确认目标芯片与地址。本版不提供解除保护、eFuse、安全启动配置或外部 Flash loader。</p>
         </article>
 
         <article id="programming" data-title="编程参数手册 参数程序 JavaScript API 示例">

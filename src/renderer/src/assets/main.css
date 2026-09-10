@@ -3965,6 +3965,49 @@ footer > span:first-child {
   width: 58px;
   background: #60a5fa;
 }
+
+.firmware-host { flex: 1; min-height: 0; overflow: hidden; }
+.firmware-host[hidden], .send-mode-tabs .send-editor-clear[hidden] { display: none; }
+.firmware-panel { height: 100%; display: flex; flex-direction: column; min-width: 0; color: #365579; font-size: 13px; }
+.firmware-scroll { flex: 1; min-height: 0; overflow: auto; padding: 7px 10px; }
+.firmware-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.firmware-row { display: flex; align-items: center; flex-wrap: wrap; gap: 7px 12px; }
+.firmware-panel label { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.firmware-panel select, .firmware-panel input:not([type='checkbox']), .firmware-panel button { border: 1px solid #dce6f4; border-radius: 5px; background: #fff; color: #365b87; padding: 5px 9px; min-height: 30px; font: inherit; }
+.firmware-panel select { max-width: 240px; }
+.firmware-panel input:not([type='checkbox']) { width: 165px; }
+.firmware-panel input[type='number'] { width: 100px; }
+.firmware-panel input[type='checkbox'] { accent-color: #2563eb; }
+.firmware-panel button { cursor: pointer; white-space: nowrap; }
+.firmware-panel button:disabled, .firmware-fields:disabled { opacity: .6; }
+.firmware-panel button:disabled { cursor: not-allowed; }
+.firmware-panel :focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.firmware-panel .firmware-link { color: #2563eb; margin-left: auto; }
+.firmware-hint { color: #7b8ca5; font-size: 12px; margin: 7px 0 2px; line-height: 1.5; }
+.firmware-files { margin: 7px 0; display: grid; gap: 4px; }
+.firmware-file { display: flex; align-items: center; gap: 10px; padding: 4px 8px; background: #f6f9ff; border: 1px solid #e4ecf7; border-radius: 5px; }
+.firmware-file > span { flex: 1; min-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.firmware-file small { color: #8494ab; margin-left: 8px; }
+.firmware-auto-address { min-width: 165px; padding: 5px 9px; color: #64748b; }
+.firmware-advanced { margin: 7px 0; padding: 8px; border: 1px solid #e2eaf4; border-radius: 5px; }
+.firmware-tool-path { margin-top: 7px; }
+.firmware-tool-path > span { flex: 1; min-width: 100px; overflow-wrap: anywhere; font-size: 12px; }
+.firmware-options { margin-top: 7px; font-size: 12px; }
+.firmware-tool-ok { color: #258361; }
+.firmware-tool-missing { color: #a96516; overflow-wrap: anywhere; }
+.firmware-log { background: #f4f7fb; border: 1px solid #dce6f4; border-radius: 5px; padding: 8px; margin: 7px 0 0; max-height: 180px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.5 Consolas, monospace; user-select: text; }
+.firmware-footer { border-top: 1px solid #e2eaf4; background: #f9fbff; padding: 6px 10px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.firmware-status { flex: 1; min-width: 160px; display: flex; flex-direction: column; gap: 3px; font-size: 12px; overflow-wrap: anywhere; max-height: 65px; overflow: auto; }
+.firmware-status progress { width: 100%; height: 5px; accent-color: #3b82f6; }
+.firmware-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.firmware-panel .send-button { background: #2563eb; color: white; border-color: #2563eb; font-weight: 600; }
+.firmware-panel .send-cancel-button { color: #b45309; }
+.firmware-error { color: #c24135; }
+@media (max-width: 850px) {
+  .firmware-file { flex-wrap: wrap; }
+  .firmware-file > span { flex-basis: 100%; }
+  .firmware-panel select { max-width: 180px; }
+}
 .interaction-view {
   padding: 8px 10px;
   background: #f8fafc;

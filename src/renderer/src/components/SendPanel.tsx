@@ -1,4 +1,5 @@
 import { ClearActionIcon } from './ClearActionIcon'
+import { FirmwareFlashPanel } from './FirmwareFlashPanel'
 import { useEffect, useRef, useState } from 'react'
 import type { CrcMode } from '../types'
 import { FloatingPanel } from './FloatingPanel'
@@ -41,7 +42,7 @@ function formatBytes(bytes: number): string {
 
 export function SendPanel(props: Props): React.JSX.Element {
   const [resizing, setResizing] = useState(false)
-  const [mode, setMode] = useState<'message' | 'file'>('message')
+  const [mode, setMode] = useState<'message' | 'file' | 'firmware'>('message')
   const [file, setFile] = useState<{ path: string; name: string; size: number } | null>(null)
   const [chunkSize, setChunkSize] = useState(1024)
   const [chunkDelay, setChunkDelay] = useState(0)
@@ -130,7 +131,9 @@ export function SendPanel(props: Props): React.JSX.Element {
       <div className="send-mode-tabs">
         <button className={mode === 'message' ? 'active' : ''} onClick={() => setMode('message')}>发送消息</button>
         <button className={mode === 'file' ? 'active' : ''} onClick={() => setMode('file')}>发送文件</button>
+        <button className={mode === 'firmware' ? 'active' : ''} onClick={() => setMode('firmware')}>固件烧录</button>
         <button
+          hidden={mode === 'firmware'}
           className="send-editor-clear clear-action-button"
           title={mode === 'message' ? '清空输入框' : canCancel ? '文件发送中，暂时不能清空' : '清空所选文件'}
           aria-label={mode === 'message' ? '清空输入框' : '清空所选文件'}
@@ -217,7 +220,7 @@ export function SendPanel(props: Props): React.JSX.Element {
             </div>
           </div>
         </>
-      ) : (
+      ) : mode === 'file' ? (
         <div className="send-file-view">
           <div className="send-file-status send-file-main">
             <span>{fileStatus}</span>
@@ -245,7 +248,8 @@ export function SendPanel(props: Props): React.JSX.Element {
             <button className="send-button" disabled={!file || !props.targetPort} onClick={() => void sendFile()}>发送文件</button>
           </div>
         </div>
-      )}
+      ) : null}
+      <div className="firmware-host" hidden={mode !== 'firmware'}><FirmwareFlashPanel /></div>
     </div>
   )
 }
