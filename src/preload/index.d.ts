@@ -42,6 +42,9 @@ declare global {
       }
     }
     api: {
+      openDataWindow(id: string): Promise<void>
+      closeDataWindow(id: string): Promise<void>
+      getOpenedPortPaths(): Promise<string[]>
       getAlwaysOnTop(): Promise<boolean>
       setAlwaysOnTop(enabled: boolean): Promise<boolean>
       getAppInfo(): Promise<{ version: string; platform: string; arch: string }>

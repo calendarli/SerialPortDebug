@@ -79,6 +79,7 @@ function explainRuntimeError(
 
 const openPorts = new Map<string, SerialPort>()
 let mainWindow: BrowserWindow | null = null
+const dataWindows = new Map<string, BrowserWindow>()
 const writeQueues = new Map<string, Promise<void>>()
 const receiveBatches = new Map<
   string,
@@ -207,6 +208,11 @@ function enqueuePortOperation<T>(operation: () => Promise<T>): Promise<T> {
 
 function emit(channel: string, value: unknown): void {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, value)
+  if (channel === 'serial:data' || channel === 'serial:status') {
+    for (const window of dataWindows.values()) {
+      if (!window.isDestroyed()) window.webContents.send(channel, value)
+    }
+  }
 }
 
 function flushReceiveBatch(path: string): void {
@@ -265,6 +271,49 @@ function registerSerialHandlers(): void {
     platform: process.platform,
     arch: process.arch
   }))
+  ipcMain.handle('dataWindow:open', async (event, id: unknown) => {
+    if (event.sender !== mainWindow?.webContents) throw new Error('请从主窗口打开数据窗口')
+    if (typeof id !== 'string' || !/^[a-zA-Z0-9-]{1,80}$/.test(id))
+      throw new Error('无效的数据窗口编号')
+    const existing = dataWindows.get(id)
+    if (existing && !existing.isDestroyed()) {
+      if (existing.isMinimized()) existing.restore()
+      existing.show()
+      existing.focus()
+      return
+    }
+    const window = new BrowserWindow({
+      width: 520,
+      height: 580,
+      minWidth: 360,
+      minHeight: 260,
+      title: 'SerialFlow 数据窗口',
+      icon,
+      alwaysOnTop: true,
+      show: false,
+      autoHideMenuBar: true,
+      webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: true }
+    })
+    dataWindows.set(id, window)
+    window.on('closed', () => dataWindows.delete(id))
+    window.once('ready-to-show', () => window.show())
+    window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+    try {
+      if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+        const url = new URL(process.env['ELECTRON_RENDERER_URL'])
+        url.searchParams.set('dataWindow', id)
+        await window.loadURL(url.toString())
+      } else await window.loadFile(join(__dirname, '../renderer/index.html'), { query: { dataWindow: id } })
+    } catch (error) {
+      if (!window.isDestroyed()) window.destroy()
+      throw error
+    }
+  })
+  ipcMain.handle('dataWindow:close', (event, id: unknown) => {
+    if (event.sender !== mainWindow?.webContents) throw new Error('请从主窗口管理数据窗口')
+    if (typeof id === 'string') dataWindows.get(id)?.close()
+  })
+  ipcMain.handle('serial:openedPaths', () => [...openPorts.keys()])
   ipcMain.handle('window:getAlwaysOnTop', (event) => {
     const window = BrowserWindow.fromWebContents(event.sender)
     if (!window || window.isDestroyed()) throw new Error('窗口不可用')
@@ -562,7 +611,11 @@ function createWindow(): void {
     webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: true }
   })
   mainWindow.on('ready-to-show', () => mainWindow?.show())
-  mainWindow.on('closed', () => (mainWindow = null))
+  mainWindow.on('closed', () => {
+    mainWindow = null
+    for (const window of dataWindows.values()) window.destroy()
+    dataWindows.clear()
+  })
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     try {
       const target = new URL(url)

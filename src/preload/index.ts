@@ -13,6 +13,9 @@ const electron = {
 }
 
 const api = {
+  openDataWindow: (id: string): Promise<void> => ipcRenderer.invoke('dataWindow:open', id),
+  closeDataWindow: (id: string): Promise<void> => ipcRenderer.invoke('dataWindow:close', id),
+  getOpenedPortPaths: (): Promise<string[]> => ipcRenderer.invoke('serial:openedPaths'),
   getAlwaysOnTop: (): Promise<boolean> => ipcRenderer.invoke('window:getAlwaysOnTop'),
   setAlwaysOnTop: (enabled: boolean): Promise<boolean> =>
     ipcRenderer.invoke('window:setAlwaysOnTop', enabled),

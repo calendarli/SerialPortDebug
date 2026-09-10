@@ -1,3 +1,4 @@
+import { Clock3, Pause, ChevronDown, ChevronRight } from 'lucide-react'
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { InteractionEntry } from '../types'
@@ -63,6 +64,9 @@ const InteractionRow = memo(function InteractionRow({
 export function ReceivePanel(props: Props): React.JSX.Element {
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null)
   const [menu, setMenu] = useState<ContextMenu | null>(null)
+  const [autoPauseExpanded, setAutoPauseExpanded] = useState(
+    () => localStorage.getItem('serialflow.autoPauseExpanded') !== 'false'
+  )
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [regex, setRegex] = useState(false)
@@ -192,8 +196,24 @@ export function ReceivePanel(props: Props): React.JSX.Element {
   return (
     <div className="receiver card">
       <div className="card-head interaction-head">
-        <div>
+        <div className="interaction-title">
           <strong>数据交互</strong>
+          <button
+            type="button"
+            className="auto-pause-disclosure"
+            aria-expanded={autoPauseExpanded}
+            aria-controls="auto-pause-settings"
+            title={`${autoPauseExpanded ? '收起' : '展开'}条件暂停设置${props.autoPauseEnabled ? '（条件暂停已启用）' : ''}`}
+            onClick={() => {
+              const next = !autoPauseExpanded
+              setAutoPauseExpanded(next)
+              localStorage.setItem('serialflow.autoPauseExpanded', String(next))
+            }}
+          >
+            {autoPauseExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            条件暂停
+            {props.autoPauseEnabled && <span className="auto-pause-enabled">已启用</span>}
+          </button>
         </div>
         <div className="head-tools">
           <span className="font-size-indicator" title="在数据视窗中按 Ctrl + 鼠标滚轮调整">
@@ -239,89 +259,99 @@ export function ReceivePanel(props: Props): React.JSX.Element {
               />
             </label>
           </div>
-          <label className="head-check">
-            <input
-              type="checkbox"
-              checked={props.rxHex}
-              onChange={(event) => props.onRxHexChange(event.target.checked)}
-            />
-            接收 HEX
-          </label>
-          <label className="head-check">
-            <input
-              type="checkbox"
-              checked={props.timestamp}
-              onChange={(event) => props.onTimestampChange(event.target.checked)}
-            />
-            时间戳
-          </label>
-          <label className="head-check">
-            <input
-              type="checkbox"
-              checked={props.paused}
-              onChange={(event) => props.onPausedChange(event.target.checked)}
-            />
-            暂停接收显示
-          </label>
-          <button className="head-tool-button subtle" onClick={clearEntries}>
-            清空
-          </button>
+          <div className="receive-display-toggles" role="group" aria-label="接收显示选项">
+            <button
+              type="button"
+              className="receive-display-toggle receive-format-toggle"
+              aria-pressed={props.rxHex}
+              title={props.rxHex ? '当前为 Hex，点击切换为 ASCII' : '当前为 ASCII，点击切换为 Hex'}
+              aria-label={props.rxHex ? '接收格式 Hex，切换为 ASCII' : '接收格式 ASCII，切换为 Hex'}
+              onClick={() => props.onRxHexChange(!props.rxHex)}
+            >
+              {props.rxHex ? 'Hex' : 'ASCII'}
+            </button>
+            <button
+              type="button"
+              className="receive-display-toggle"
+              aria-pressed={props.timestamp}
+              title={props.timestamp ? '时间戳已启用，点击关闭' : '时间戳未启用，点击开启'}
+              onClick={() => props.onTimestampChange(!props.timestamp)}
+            >
+              <Clock3 size={15} aria-hidden="true" />
+              时间戳
+            </button>
+            <button
+              type="button"
+              className="receive-display-toggle"
+              aria-pressed={props.paused}
+              title={props.paused ? '接收显示已暂停，点击恢复显示' : '点击暂停接收显示'}
+              onClick={() => props.onPausedChange(!props.paused)}
+            >
+              <Pause size={15} aria-hidden="true" />
+              暂停接收显示
+            </button>
+            <button className="head-tool-button subtle" onClick={clearEntries}>
+              清空
+            </button>
+          </div>
         </div>
       </div>
-      <div className="auto-pause-bar">
-        <label className="head-check">
+      {autoPauseExpanded && (
+        <div className="auto-pause-bar" id="auto-pause-settings">
+          <label className="head-check">
+            <input
+              type="checkbox"
+              checked={props.autoPauseEnabled}
+              onChange={(event) => props.onAutoPauseEnabledChange(event.target.checked)}
+            />
+            条件暂停
+          </label>
+          <div className="mini-segment">
+            <button
+              className={!props.autoPauseHex ? 'active' : ''}
+              onClick={() => props.onAutoPauseHexChange(false)}
+            >
+              ASCII
+            </button>
+            <button
+              className={props.autoPauseHex ? 'active' : ''}
+              onClick={() => props.onAutoPauseHexChange(true)}
+            >
+              HEX
+            </button>
+          </div>
           <input
-            type="checkbox"
-            checked={props.autoPauseEnabled}
-            onChange={(event) => props.onAutoPauseEnabledChange(event.target.checked)}
-          />
-          条件暂停
-        </label>
-        <div className="mini-segment">
-          <button
-            className={!props.autoPauseHex ? 'active' : ''}
-            onClick={() => props.onAutoPauseHexChange(false)}
-          >
-            ASCII
-          </button>
-          <button
-            className={props.autoPauseHex ? 'active' : ''}
-            onClick={() => props.onAutoPauseHexChange(true)}
-          >
-            HEX
-          </button>
-        </div>
-        <input
-          className={autoPausePatternValid ? '' : 'invalid'}
-          disabled={!props.autoPauseEnabled}
-          value={props.autoPausePattern}
-          placeholder={props.autoPauseHex ? '例如：AA 01 BB' : '例如：STOP'}
-          onChange={(event) => props.onAutoPausePatternChange(event.target.value)}
-          title={autoPausePatternValid ? '匹配后自动暂停后续接收显示' : '条件格式无效'}
-        />
-        <label className="head-check">
-          <input
-            type="checkbox"
+            className={autoPausePatternValid ? '' : 'invalid'}
             disabled={!props.autoPauseEnabled}
-            checked={props.autoPauseRegex}
-            onChange={(event) => props.onAutoPauseRegexChange(event.target.checked)}
+            value={props.autoPausePattern}
+            placeholder={props.autoPauseHex ? '例如：AA 01 BB' : '例如：STOP'}
+            onChange={(event) => props.onAutoPausePatternChange(event.target.value)}
+            title={autoPausePatternValid ? '匹配后自动暂停后续接收显示' : '条件格式无效'}
           />
-          正则
-          <span
-            className="regex-help"
-            tabIndex={0}
-            aria-label="条件暂停正则使用说明"
-            data-tooltip={
-              props.autoPauseHex
-                ? '匹配标准化 HEX 字节文本，字节间用空格分隔。\n示例：^AA [0-9A-F]{2} BB$\n匹配后显示当前数据，并暂停后续 RX 显示。'
-                : '匹配接收到的 ASCII 文本，并兼容 CR/LF 行尾。\n示例：^STOP$ 或 ^TEMP=[0-9]+$\n匹配后暂停后续 RX 显示。'
-            }
-          >
-            ?
-          </span>
-        </label>
-        {!autoPausePatternValid && <span className="auto-pause-error">条件格式无效</span>}
-      </div>
+          <label className="head-check">
+            <input
+              type="checkbox"
+              disabled={!props.autoPauseEnabled}
+              checked={props.autoPauseRegex}
+              onChange={(event) => props.onAutoPauseRegexChange(event.target.checked)}
+            />
+            正则
+            <span
+              className="regex-help"
+              tabIndex={0}
+              aria-label="条件暂停正则使用说明"
+              data-tooltip={
+                props.autoPauseHex
+                  ? '匹配标准化 HEX 字节文本，字节间用空格分隔。\n示例：^AA [0-9A-F]{2} BB$\n匹配后显示当前数据，并暂停后续 RX 显示。'
+                  : '匹配接收到的 ASCII 文本，并兼容 CR/LF 行尾。\n示例：^STOP$ 或 ^TEMP=[0-9]+$\n匹配后暂停后续 RX 显示。'
+              }
+            >
+              ?
+            </span>
+          </label>
+          {!autoPausePatternValid && <span className="auto-pause-error">条件格式无效</span>}
+        </div>
+      )}
       {searchOpen && (
         <div
           className="interaction-search"
@@ -431,9 +461,7 @@ export function ReceivePanel(props: Props): React.JSX.Element {
           {menu.entry && (
             <button onClick={() => void copyEntry(menu.entry!)}>
               复制当前
-              {menu.entry.direction === 'tx'
-                ? '发送指令/数据'
-                : '接收数据'}
+              {menu.entry.direction === 'tx' ? '发送指令/数据' : '接收数据'}
             </button>
           )}
           {menu.entry && <div className="menu-separator" />}

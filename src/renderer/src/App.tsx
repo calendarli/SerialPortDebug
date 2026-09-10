@@ -1,3 +1,4 @@
+import { DataWindowManager } from './components/DataWindowManager'
 import appIcon from './assets/app-icon.png'
 import { WindowPinButton } from './components/WindowPinButton'
 import { findReplyMatch, replyByteOffset } from './reply-matcher'
@@ -1379,6 +1380,7 @@ function App(): React.JSX.Element {
               ? `已打开 ${openedPorts.size} 个串口：${[...openedPorts].join('、')}`
               : '未连接'}
           </div>
+          <DataWindowManager />
           <WindowPinButton />
         </div>
       </header>
