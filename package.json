@@ -1,6 +1,7 @@
 {
-  "name": "serialportdebug",
-  "version": "3.2.21",
+  "name": "serialflow",
+  "productName": "SerialFlow",
+  "version": "3.2.22",
   "description": "高速串口数据调试与自动化交互工具",
   "main": "./out/main/index.js",
   "author": "SerialFlow",

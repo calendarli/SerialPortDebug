@@ -1,12 +1,21 @@
 import { app, shell, BrowserWindow, dialog, ipcMain } from 'electron'
 import { execFile } from 'child_process'
-import { existsSync } from 'fs'
+import { existsSync, mkdirSync } from 'fs'
 import { readFile, stat, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { SerialPort } from 'serialport'
 import icon from '../../resources/icon-v3.png?asset'
 import { FileTransferManager } from './file-transfer'
+
+// Retain existing settings when upgrading installations created under the old package name.
+app.setName('SerialFlow')
+const serialFlowUserData = join(app.getPath('appData'), 'SerialFlow')
+const legacyUserData = join(app.getPath('appData'), 'serialportdebug')
+const userDataPath =
+  !existsSync(serialFlowUserData) && existsSync(legacyUserData) ? legacyUserData : serialFlowUserData
+mkdirSync(userDataPath, { recursive: true })
+app.setPath('userData', userDataPath)
 
 type PortOptions = {
   path: string
@@ -652,7 +661,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.serialportdebug.app')
+  electronApp.setAppUserModelId('com.serialflow.desktop')
   app.on('browser-window-created', (_, window) => optimizer.watchWindowShortcuts(window))
   registerSerialHandlers()
   createWindow()

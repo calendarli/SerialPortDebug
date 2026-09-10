@@ -8,7 +8,7 @@ SerialFlow 是一款基于 Electron、React 和 TypeScript 开发的桌面串口
 
 应用支持多串口、ASCII/HEX 收发、快捷指令、自动回复、CRC、自动发送和 JavaScript/TypeScript 编程。数据交互区使用虚拟列表和受限缓存，持续显示实际收到与发出的数据，不主动减帧。
 
-项目仓库：[calendarli/SerialPortDebug](https://github.com/calendarli/SerialPortDebug)。应用侧栏提供“帮助”入口，编程接口参见 [编程手册](src/renderer/public/programming-manual.html)。
+项目仓库：[calendarli/SerialFlow](https://github.com/calendarli/SerialFlow)。应用侧栏提供“帮助”入口，编程接口参见 [编程手册](src/renderer/public/programming-manual.html)。
 
 ## 主要功能
 
@@ -173,8 +173,8 @@ Windows 安装程序采用引导式安装，用户可自行选择安装目录，
 环境要求：Node.js 20.19+（20.x）或 22.12+、npm，以及当前 Electron 平台可用的原生编译工具链。
 
 ```bash
-git clone https://github.com/calendarli/SerialPortDebug.git
-cd SerialPortDebug
+git clone https://github.com/calendarli/SerialFlow.git
+cd SerialFlow
 npm ci
 npm run dev
 ```

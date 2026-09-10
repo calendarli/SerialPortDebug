@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import appIcon from '../assets/app-icon.png'
 
-const repositoryUrl = 'https://github.com/calendarli/SerialPortDebug'
+const repositoryUrl = 'https://github.com/calendarli/SerialFlow'
 
 type AppInfo = {
   version: string
@@ -85,7 +85,7 @@ export function AboutPanel(): React.JSX.Element {
             rel="noreferrer"
             title="在浏览器中打开 GitHub 仓库"
           >
-            github.com/calendarli/SerialPortDebug
+            github.com/calendarli/SerialFlow
           </a>
         </div>
       </div>
