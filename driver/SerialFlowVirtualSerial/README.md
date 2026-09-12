@@ -72,9 +72,24 @@ bun run build:driver
 ```
 
 `bun install` 自动尝试 Release 构建；失败只警告，虚拟串口成为未包含的可选功能。
-`MSBUILD_PATH` 可指定 MSBuild。构建产物保存在 `build/virtual-serial/<arch>`，完整驱动包
+`MSBUILD_PATH` 可指定 MSBuild。构建产物保存在 `.tmp/virtual-serial/<arch>`，完整驱动包
 才会复制到 `resources/virtual-serial/win-<arch>`。不会安装驱动或导入证书。
 目录内 `.gitignore` 只允许源码、工程与文档；已追踪的旧二进制需另行手动取消追踪。
+
+### GitHub Actions Windows 打包
+
+Release workflow 在 `windows-2022`（VS2022，含 WDK 扩展）上从 NuGet 恢复
+`driver/packages.config` 固定的 SDK/WDK 10.0.26100.6584。通过
+`SERIALFLOW_WDK_PACKAGES` 指向包目录，`driver/Directory.Build.props` 只在该变量
+设置时导入 NuGet 工具链；普通本地构建继续使用已安装的 SDK/WDK。
+升级版本时需同步修改上述两个文件，并确认与 CI 的 Visual Studio 版本兼容。
+参考 [微软的 NuGet WDK 构建说明](https://learn.microsoft.com/en-us/windows-hardware/drivers/install-the-wdk-using-nuget)。
+
+CI 设置 `SERIALFLOW_REQUIRE_DRIVER=1`，让 `bun install` 中的驱动构建失败直接终止
+发布；同时要求测试证书存在。打包后再次检查 `dist/win-unpacked/resources/virtual-serial`
+中的管理程序、DLL、INF、CAT 和 CER，缺失或为空时不上传安装包。
+该流程包含现有测试签名驱动，不会完成 Microsoft 正式签名，也不会在 runner 上
+安装驱动、创建串口或修改启动安全设置。普通用户系统的驱动安装限制仍适用。
 
 原始文件中的 Microsoft 版权头必须保留。官方来源：
 <https://github.com/microsoft/Windows-driver-samples/tree/main/serial/VirtualSerial2>

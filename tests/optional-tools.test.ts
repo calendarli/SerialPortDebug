@@ -9,6 +9,7 @@ import {
   resourceTarget
 } from '../scripts/fetch-esptool'
 import { optional, run } from '../scripts/optional'
+import { buildDriver } from '../scripts/build-driver'
 
 const warnings = spyOn(console, 'warn').mockImplementation(() => {
   /* Assert warnings without printing fixtures. */
@@ -44,6 +45,20 @@ test('optional failures do not abort installation', async () => {
     })
   ).resolves.toBeUndefined()
   expect(warnings).toHaveBeenCalledWith('[optional] fixture unavailable: toolchain missing')
+})
+
+test('required driver failures reject instead of silently dropping the feature', async () => {
+  await expect(buildDriver('unsupported', true)).rejects.toThrow(
+    process.platform === 'win32' ? 'Unsupported architecture' : 'requires Windows'
+  )
+  expect(warnings).not.toHaveBeenCalled()
+})
+
+test('local driver builds remain optional when the toolchain cannot build the target', async () => {
+  await expect(buildDriver('unsupported', false)).resolves.toBeUndefined()
+  if (process.platform === 'win32') {
+    expect(warnings).toHaveBeenCalledWith(expect.stringContaining('Unsupported architecture'))
+  }
 })
 
 test('quiet command failures preserve stdout and stderr in optional warnings', async () => {

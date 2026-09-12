@@ -5,10 +5,14 @@ import { resolve, join } from 'node:path'
 import { optional, run } from './optional'
 
 export async function buildDriver(
-  arch = process.env.SERIALFLOW_ARCH || process.arch
+  arch = process.env.SERIALFLOW_ARCH || process.arch,
+  required = process.env.SERIALFLOW_REQUIRE_DRIVER === '1'
 ): Promise<void> {
-  if (process.platform !== 'win32') return
-  await optional('Windows virtual serial driver (requires Visual Studio C++ and WDK)', async () => {
+  if (process.platform !== 'win32') {
+    if (required) throw new Error('Windows virtual serial driver requires Windows')
+    return
+  }
+  const build = async (): Promise<void> => {
     if (!['x64', 'arm64'].includes(arch)) throw new Error(`Unsupported architecture: ${arch}`)
     const root = resolve(import.meta.dirname, '..')
     const destination = join(root, 'resources', 'virtual-serial', `win-${arch}`)
@@ -82,7 +86,9 @@ export async function buildDriver(
       for (const file of [
         'virtualserial2um.inf',
         'SerialFlowVirtualSerial.dll',
-        'serialflowvirtualserial.cat'
+        'serialflowvirtualserial.cat',
+        'SerialFlowVirtualSerialManager.exe',
+        ...(required ? ['SerialFlowVirtualSerial.cer'] : [])
       ]) {
         if (!existsSync(join(stage, file))) throw new Error(`Incomplete driver output: ${file}`)
       }
@@ -91,7 +97,9 @@ export async function buildDriver(
     } finally {
       await rm(stage, { recursive: true, force: true })
     }
-  })
+  }
+  if (required) await build()
+  else await optional('Windows virtual serial driver (requires Visual Studio C++ and WDK)', build)
 }
 
 if (import.meta.main) await buildDriver()

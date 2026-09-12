@@ -60,6 +60,20 @@ jobs:
       - name: Install Linux packaging dependencies
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libarchive-tools libfuse2 rpm
+      - name: Set up NuGet for Windows driver tools
+        if: runner.os == 'Windows'
+        uses: NuGet/setup-nuget@v2
+      - name: Restore pinned Windows SDK and WDK
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $packages = Join-Path $env:GITHUB_WORKSPACE '.tmp/wdk-packages'
+          nuget restore driver/packages.config -PackagesDirectory $packages -Source https://api.nuget.org/v3/index.json -NonInteractive
+          if ($LASTEXITCODE -ne 0) { throw 'Windows SDK/WDK restore failed' }
+          "SERIALFLOW_WDK_PACKAGES=$packages" >> $env:GITHUB_ENV
+          "SERIALFLOW_REQUIRE_DRIVER=1" >> $env:GITHUB_ENV
+          "SERIALFLOW_ARCH=x64" >> $env:GITHUB_ENV
+      # postinstall builds the driver; Windows releases must fail if it cannot be built.
       - run: bun install --frozen-lockfile
       - uses: actions/download-artifact@v4
         with:
@@ -67,6 +81,17 @@ jobs:
           path: build
       - name: Build installer and updater metadata
         run: bun run package:${{ matrix.target }}
+      - name: Verify packaged Windows virtual serial driver
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $driver = 'dist/win-unpacked/resources/virtual-serial'
+          foreach ($file in @('SerialFlowVirtualSerialManager.exe', 'SerialFlowVirtualSerial.dll', 'virtualserial2um.inf', 'serialflowvirtualserial.cat', 'SerialFlowVirtualSerial.cer')) {
+            $path = Join-Path $driver $file
+            if (!(Test-Path -LiteralPath $path -PathType Leaf) -or (Get-Item -LiteralPath $path).Length -eq 0) {
+              throw "Packaged virtual serial driver is missing or empty: $path"
+            }
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: packages-${{ matrix.target }}
