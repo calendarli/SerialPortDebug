@@ -1,0 +1,3 @@
+[run]
+# Run dependency CLIs and their Node shebangs with Bun, even if Node is installed.
+bun = true

@@ -82,7 +82,6 @@
   },
   "packageManager": "bun@1.4.2",
   "engines": {
-    "node": ">=22.18.0",
     "bun": ">=1.4.2"
   }
 }
