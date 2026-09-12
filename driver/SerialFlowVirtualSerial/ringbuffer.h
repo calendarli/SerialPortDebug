@@ -29,51 +29,12 @@ typedef struct _RING_BUFFER
     BYTE*           End;
 
     //
-    // A pointer to the current read point in the ring buffer.
-    //
-    // Updates to this are not protected by any lock. This is different from
-    // the write pointer, which is protected by the "pending read pointer"
-    // lock. The reason for this difference is that in this driver, we do not
-    // keep write requests pending. If there is not enough space to write all
-    // the data that was requested, we write as much as we can and drop the
-    // rest (lossy data transfer).
-    //
-    // If we had multiple threads modifying this pointer, then that would
-    // provide yet another reason for protecting updates to the pointer using a
-    // lock. However, in this driver, at any given time we have only one thread
-    // that modifies this pointer (the thread that runs the read callback).
-    // This is true because we use a sequential queue for read requests. If we
-    // were to change our read queue to be a parallel queue, this would no
-    // longer be true.
-    //
+    // Read and write pointers. The caller must serialize all buffer access.
+    // SerialFlow uses gPairLock for paired-port reads, writes and purges.
+    // Writes that do not fit fail without modifying either pointer or data.
     //
     BYTE*           Head;
 
-    //
-    // A pointer to the current write point in the ring buffer.
-    //
-    // Updates to this pointer are protected by the "pending read pointer
-    // lock", because we do not want a consumer thread to mark a read request
-    // as pending while we are in the process of writing data to the buffer.
-    // The reason is that the write that we are currently performing might
-    // actually supply enough data to satisfy the read request, in which case
-    // it should not be marked pending at all.
-    // If the read request were to be marked pending in the situation described
-    // above, then we would need some trigger to later retrieve the request and
-    // complete it. In our driver, arrival of data is the only event that can
-    // trigger this. So if no more data arrives, the request will remain
-    // pending forever, even though there is enough data in the buffer to
-    // complete it. Hence we do not keep a read request pending in situations
-    // where the read buffer contains enough data to satisfy it.
-    //
-    // If we had multiple threads modifying this pointer, then that would
-    // provide yet another reason for protecting updates to the pointer using a
-    // lock. However, in this driver, at any given time we have only one thread
-    // that modifies this pointer (the thread that runs the write callback).
-    // This is true because we use a sequential queue for write requests. If we
-    // were to change our write queue to be a parallel queue, this would no
-    // longer be true.
-    //
     BYTE*           Tail;
 
 } RING_BUFFER, *PRING_BUFFER;

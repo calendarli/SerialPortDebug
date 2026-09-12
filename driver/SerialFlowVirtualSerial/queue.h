@@ -20,8 +20,9 @@ Environment:
 
 #include "internal.h"
 
-// Set ring buffer size
-#define DATA_BUFFER_SIZE 1024
+// Allow receiver scheduling pauses and bursts (one byte is reserved by the ring).
+// Overflow still fails the write explicitly instead of silently truncating it.
+#define DATA_BUFFER_SIZE (1024 * 1024 + 1)
 
 //
 // Device states
@@ -115,4 +116,3 @@ RequestCopyToBuffer(
     _In_  PVOID             DestinationBuffer,
     _In_  size_t            NumBytesToCopyTo
     );
-

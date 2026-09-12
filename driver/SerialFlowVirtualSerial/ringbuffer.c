@@ -167,17 +167,15 @@ RingBufferWrite(
     RingBufferGetAvailableSpace(Self, &availableSpace);
 
     //
-    // If there is not enough space to fit in all the data passed in by the
-    // caller then copy as much as possible and throw away the rest
+    // A successful write must preserve every byte. Reject the whole write
+    // before modifying the buffer if it cannot fit; a partial silent write
+    // permanently shifts fixed-length frames in the receiving application.
     //
     if (availableSpace < DataSize)
     {
-        bytesToCopy = availableSpace;
+        return STATUS_BUFFER_TOO_SMALL;
     }
-    else
-    {
-        bytesToCopy = DataSize;
-    }
+    bytesToCopy = DataSize;
 
     if (bytesToCopy)
     {
@@ -335,4 +333,3 @@ RingBufferRead(
 
     return STATUS_SUCCESS;
 }
-

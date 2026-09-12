@@ -19,6 +19,7 @@ Environment:
 
 
 #include "internal.h"
+#include "read-queue.h"
 
 #define SERIALFLOW_MAX_ENDPOINTS 64
 
@@ -66,17 +67,18 @@ QueueUnregister(_In_ PDEVICE_CONTEXT DeviceContext)
     ReleaseSRWLockExclusive(&gPairLock);
 }
 
+static VOID CompleteSerialEvent(PQUEUE_CONTEXT Context, ULONG Events);
+
 static NTSTATUS
 PairWrite(
     _In_ PQUEUE_CONTEXT Source,
     _In_reads_bytes_(Length) PUCHAR Characters,
-    _In_ size_t Length,
-    _Out_ PQUEUE_CONTEXT *Target
+    _In_ size_t Length
     )
 {
     ULONG index;
     NTSTATUS status = STATUS_DEVICE_NOT_CONNECTED;
-    *Target = NULL;
+    PQUEUE_CONTEXT target = NULL;
     AcquireSRWLockExclusive(&gPairLock);
     for (index = 0; index < SERIALFLOW_MAX_ENDPOINTS; index++) {
         if (gEndpoints[index] == Source) {
@@ -86,7 +88,7 @@ PairWrite(
                 if (peerIndex < SERIALFLOW_MAX_ENDPOINTS && gEndpoints[peerIndex] != NULL &&
                     gEndpoints[peerIndex]->DeviceContext->PairId[0] == L'\0') {
                     status = RingBufferWrite(&gEndpoints[peerIndex]->RingBuffer, Characters, Length);
-                    if (NT_SUCCESS(status)) *Target = gEndpoints[peerIndex];
+                    if (NT_SUCCESS(status)) target = gEndpoints[peerIndex];
                 }
                 break;
             }
@@ -94,12 +96,18 @@ PairWrite(
                 PQUEUE_CONTEXT peer = gEndpoints[peerIndex];
                 if (peer != NULL && ArePeers(Source, peer)) {
                     status = RingBufferWrite(&peer->RingBuffer, Characters, Length);
-                    if (NT_SUCCESS(status)) *Target = peer;
+                    if (NT_SUCCESS(status)) target = peer;
                     break;
                 }
             }
             break;
         }
+    }
+    if (target != NULL) {
+        // Keep endpoint lifetime, data delivery and notification under one lock.
+        CompleteSerialEvent(target, EV_RXCHAR);
+        DrainPendingReadsLocked(target);
+        CompleteSerialEvent(Source, EV_TXEMPTY);
     }
     ReleaseSRWLockExclusive(&gPairLock);
     return status;
@@ -631,9 +639,6 @@ EvtIoWrite(
     NTSTATUS                status;
     PQUEUE_CONTEXT          queueContext = GetQueueContext(Queue);
     WDFMEMORY               memory;
-    WDFREQUEST              savedRequest;
-    size_t                  availableData = 0;
-    PQUEUE_CONTEXT          targetQueue = NULL;
 
     Trace(TRACE_LEVEL_INFO,
             "EvtIoWrite 0x%p", Request);
@@ -651,51 +656,14 @@ EvtIoWrite(
     //
     status = PairWrite(queueContext,
                        (PUCHAR)WdfMemoryGetBuffer(memory, NULL),
-                       Length,
-                       &targetQueue);
+                       Length);
     if( !NT_SUCCESS(status) ) {
         WdfRequestComplete(Request, status);
         return;
     }
 
     WdfRequestCompleteWithInformation(Request, status, Length);
-    CompleteSerialEvent(targetQueue, EV_RXCHAR);
-    CompleteSerialEvent(queueContext, EV_TXEMPTY);
 
-    //
-    // Get the amount of data available in the ring buffer
-    //
-    RingBufferGetAvailableData(
-                            &targetQueue->RingBuffer,
-                            &availableData);
-
-    if (availableData == 0) {
-        return;
-    }
-
-    //
-    // Continue with the next request, if there is one pending
-    //
-    for ( ; ; ) {
-
-        status = WdfIoQueueRetrieveNextRequest(
-                            targetQueue->ReadQueue,
-                            &savedRequest);
-
-        if (!NT_SUCCESS(status)) {
-            break;
-        }
-
-        status = WdfRequestForwardToIoQueue(
-                            savedRequest,
-                            targetQueue->Queue);
-
-        if( !NT_SUCCESS(status) ) {
-            Trace(TRACE_LEVEL_ERROR,
-                "Error: WdfRequestForwardToIoQueue failed 0x%x", status);
-            WdfRequestComplete(savedRequest, status);
-        }
-    }
 }
 
 
@@ -710,6 +678,7 @@ EvtIoRead(
     PQUEUE_CONTEXT          queueContext = GetQueueContext(Queue);
     WDFMEMORY               memory;
     size_t                  bytesCopied = 0;
+    SERIAL_TIMEOUTS         timeouts;
 
     Trace(TRACE_LEVEL_INFO,
             "EvtIoRead 0x%p", Request);
@@ -733,7 +702,8 @@ EvtIoRead(
         return;
     }
 
-    if (bytesCopied > 0) {
+    GetTimeouts(queueContext->DeviceContext, &timeouts);
+    if (bytesCopied > 0 || ReadReturnsImmediately(&timeouts)) {
         ReleaseSRWLockExclusive(&gPairLock);
         //
         // Data was read from buffer succesfully
