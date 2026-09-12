@@ -4,6 +4,22 @@
 `serial/VirtualSerial2` 示例（Microsoft Public License）建立，目标为 Windows 10 1803+
 和 Windows 11、UMDF 2、x64/ARM64。
 
+## 串口兼容性验证
+
+修复了 GET_CHARS / GET_HANDFLOW 空响应、常用状态查询和 PURGE 请求缺失，
+并增加 RXCHAR / TXEMPTY 通知。SerialFlow 对自有 UMDF 虚拟端口使用写入完成回调，
+不调用该驱动不支持的 FlushFileBuffers；实体串口仍等待 drain。
+这不表示对端应用已经读取或处理数据，也不表示实现了完整硬件流控或所有读超时语义。
+
+关闭占用端口的软件，更新驱动并重新打开端口后，可运行：
+
+```powershell
+./scripts/test-virtual-serial.ps1 -First COM180 -Second COM181
+```
+
+端口必须是已经创建且空闲的一对。脚本验证 115200/8N1、接收事件、双向二进制收发、
+缓冲区清空和 DTR/RTS 设置，不创建或删除设备。VOFA+ 本体仍需单独复测。
+
 ## 当前状态与安全边界
 
 工程已包含串口 IOCTL、读取/写入队列、环形缓冲区和跨端点投递。设备实例按安装顺序

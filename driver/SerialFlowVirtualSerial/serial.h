@@ -92,6 +92,19 @@ Abstract:
 #define IOCTL_SERIAL_SET_FIFO_CONTROL   CTL_CODE(FILE_DEVICE_SERIAL_PORT,39,METHOD_BUFFERED,FILE_ANY_ACCESS)
 
 
+// ABI-compatible structures from ntddser.h (which conflicts with winioctl.h).
+typedef struct _SERIAL_CHARS {
+    UCHAR EofChar, ErrorChar, BreakChar, EventChar, XonChar, XoffChar;
+} SERIAL_CHARS;
+typedef struct _SERIAL_HANDFLOW {
+    ULONG ControlHandShake, FlowReplace;
+    LONG XonLimit, XoffLimit;
+} SERIAL_HANDFLOW;
+typedef struct _SERIAL_STATUS {
+    ULONG Errors, HoldReasons, AmountInInQueue, AmountInOutQueue;
+    BOOLEAN EofReceived, WaitForImmediate;
+} SERIAL_STATUS;
+
 typedef struct _SERIAL_BAUD_RATE {
     ULONG BaudRate;
     } SERIAL_BAUD_RATE,*PSERIAL_BAUD_RATE;

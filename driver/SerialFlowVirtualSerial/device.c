@@ -72,6 +72,12 @@ DeviceCreate(
 
     deviceContext = GetDeviceContext(device);
     deviceContext->Device = device;
+    deviceContext->BaudRate = 115200;
+    deviceContext->LineControlRegister = SERIAL_8_DATA;
+    deviceContext->ValidDataMask = 0xff;
+    deviceContext->Chars.XonChar = 0x11;
+    deviceContext->Chars.XoffChar = 0x13;
+
 
     *DeviceContext = deviceContext;
 

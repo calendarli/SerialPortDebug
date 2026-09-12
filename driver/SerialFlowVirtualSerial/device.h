@@ -42,6 +42,9 @@ typedef struct _DEVICE_CONTEXT
     UCHAR           ValidDataMask;
 
     SERIAL_TIMEOUTS Timeouts;
+    SERIAL_CHARS Chars;
+    SERIAL_HANDFLOW Handflow;
+    ULONG WaitMask;
 
     BOOLEAN         CreatedLegacyHardwareKey;
 

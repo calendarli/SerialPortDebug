@@ -1,3 +1,4 @@
+import { writeSerialData } from './serial-write'
 import { app, shell, BrowserWindow, dialog, ipcMain } from 'electron'
 import { execFile } from 'child_process'
 import { existsSync, mkdirSync } from 'fs'
@@ -93,6 +94,7 @@ function explainRuntimeError(
 }
 
 const openPorts = new Map<string, SerialPort>()
+const virtualSerialPorts = new WeakSet<SerialPort>()
 let mainWindow: BrowserWindow | null = null
 const dataWindows = new Map<string, BrowserWindow>()
 const writeQueues = new Map<string, Promise<void>>()
@@ -283,6 +285,9 @@ async function openManagedPort(options: PortOptions): Promise<boolean> {
   validatePortOptions(options)
   assertPortAvailable(options.path)
   await closePort(options.path)
+  const listedPort = (await SerialPort.list().catch(() => [])).find(
+    (port) => port.path === options.path
+  )
   let next: SerialPort
   try {
     next = new SerialPort({ ...options, autoOpen: false })
@@ -292,6 +297,7 @@ async function openManagedPort(options: PortOptions): Promise<boolean> {
   } catch (error) {
     throw explainOpenError(error, options)
   }
+  if (listedPort?.manufacturer === 'SerialFlow') virtualSerialPorts.add(next)
   openPorts.set(options.path, next)
   next.on('data', (chunk: Buffer) => {
     queueReceivedData(options.path, chunk)
@@ -717,12 +723,7 @@ function registerSerialHandlers(): void {
         if (active !== originalPort) throw new Error('串口连接已变化，已取消旧的发送任务')
         if (!active?.isOpen) throw new Error('串口未打开')
         try {
-          await new Promise<void>((resolve, reject) => {
-            active.write(data, (error) => {
-              if (error) return reject(error)
-              active.drain((drainError) => (drainError ? reject(drainError) : resolve()))
-            })
-          })
+          await writeSerialData(active, data, virtualSerialPorts.has(active))
         } catch (error) {
           throw explainRuntimeError(error, '发送数据', active.path)
         }

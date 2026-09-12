@@ -105,6 +105,17 @@ PairWrite(
     return status;
 }
 
+static VOID
+CompleteSerialEvent(PQUEUE_CONTEXT Context, ULONG Events)
+{
+    WDFREQUEST pending;
+    ULONG events = Events & Context->DeviceContext->WaitMask;
+    if (events && NT_SUCCESS(WdfIoQueueRetrieveNextRequest(Context->WaitMaskQueue, &pending))) {
+        NTSTATUS status = RequestCopyFromBuffer(pending, &events, sizeof(events));
+        WdfRequestComplete(pending, status);
+    }
+}
+
 NTSTATUS
 QueueCreate(
     _In_  PDEVICE_CONTEXT   DeviceContext
@@ -380,6 +391,7 @@ EvtIoDeviceControl(
     case IOCTL_SERIAL_GET_TIMEOUTS:
     {
         SERIAL_TIMEOUTS timeoutValues = {0};
+        GetTimeouts(deviceContext, &timeoutValues);
 
         status = RequestCopyFromBuffer(Request,
                             (void*) &timeoutValues,
@@ -414,48 +426,44 @@ EvtIoDeviceControl(
 
     case IOCTL_SERIAL_WAIT_ON_MASK:
     {
-        //
-        // NOTE: A wait-on-mask request should not be completed until either:
-        //  1) A wait event occurs; or
-        //  2) A set-wait-mask request is received
-        //
-        // This is a driver for a virtual serial port. Since there is no
-        // actual hardware, we complete the request with some failure code.
-        //
-        WDFREQUEST savedRequest;
-
-        status = WdfIoQueueRetrieveNextRequest(
-                            queueContext->WaitMaskQueue,
-                            &savedRequest);
-
-        if (NT_SUCCESS(status)) {
-            WdfRequestComplete(savedRequest,
-                            STATUS_UNSUCCESSFUL);
+        size_t available;
+        ULONG events = 0;
+        WDFREQUEST pending;
+        if (OutputBufferLength < sizeof(ULONG)) {
+            status = STATUS_BUFFER_TOO_SMALL;
+            break;
         }
-
-        //
-        // Keep the request in a manual queue and the framework will take
-        // care of cancelling them when the app exits
-        //
-        status = WdfRequestForwardToIoQueue(
-                            Request,
-                            queueContext->WaitMaskQueue);
-
-        if( !NT_SUCCESS(status) ) {
-            Trace(TRACE_LEVEL_ERROR,
-                "Error: WdfRequestForwardToIoQueue failed 0x%x", status);
-            WdfRequestComplete(Request, status);
+        if (!deviceContext->WaitMask) {
+            status = STATUS_INVALID_PARAMETER;
+            break;
         }
-
-        //
-        // Instead of "break", use "return" to prevent the current request
-        // from being completed.
-        //
+        if (NT_SUCCESS(WdfIoQueueRetrieveNextRequest(queueContext->WaitMaskQueue, &pending))) {
+            // Only one wait may be outstanding for a port.
+            status = WdfRequestForwardToIoQueue(pending, queueContext->WaitMaskQueue);
+            if (!NT_SUCCESS(status)) WdfRequestComplete(pending, status);
+            status = STATUS_INVALID_PARAMETER;
+            break;
+        }
+        AcquireSRWLockExclusive(&gPairLock);
+        RingBufferGetAvailableData(&queueContext->RingBuffer, &available);
+        if (available) events = EV_RXCHAR & deviceContext->WaitMask;
+        if (events) {
+            ReleaseSRWLockExclusive(&gPairLock);
+            status = RequestCopyFromBuffer(Request, &events, sizeof(events));
+            break;
+        }
+        status = WdfRequestForwardToIoQueue(Request, queueContext->WaitMaskQueue);
+        ReleaseSRWLockExclusive(&gPairLock);
+        if (!NT_SUCCESS(status)) WdfRequestComplete(Request, status);
         return;
     }
 
     case IOCTL_SERIAL_SET_WAIT_MASK:
     {
+        ULONG mask;
+        status = RequestCopyToBuffer(Request, &mask, sizeof(mask));
+        if (!NT_SUCCESS(status)) break;
+        deviceContext->WaitMask = mask;
         //
         // NOTE: If a wait-on-mask request is already pending when set-wait-mask
         // request is processed, the pending wait-on-event request is completed
@@ -485,16 +493,115 @@ EvtIoDeviceControl(
         break;
     }
 
-    case IOCTL_SERIAL_SET_QUEUE_SIZE:
+    case IOCTL_SERIAL_GET_CHARS:
+        status = RequestCopyFromBuffer(Request, &deviceContext->Chars, sizeof(deviceContext->Chars));
+        break;
+    case IOCTL_SERIAL_SET_CHARS:
+    {
+        SERIAL_CHARS chars;
+        status = RequestCopyToBuffer(Request, &chars, sizeof(chars));
+        if (NT_SUCCESS(status)) deviceContext->Chars = chars;
+        break;
+    }
+    case IOCTL_SERIAL_GET_HANDFLOW:
+        status = RequestCopyFromBuffer(Request, &deviceContext->Handflow, sizeof(deviceContext->Handflow));
+        break;
+    case IOCTL_SERIAL_SET_HANDFLOW:
+    {
+        SERIAL_HANDFLOW handflow;
+        status = RequestCopyToBuffer(Request, &handflow, sizeof(handflow));
+        if (NT_SUCCESS(status)) deviceContext->Handflow = handflow;
+        break;
+    }
+    case IOCTL_SERIAL_GET_WAIT_MASK:
+        status = RequestCopyFromBuffer(Request, &deviceContext->WaitMask, sizeof(ULONG));
+        break;
+    case IOCTL_SERIAL_GET_COMMSTATUS:
+    {
+        SERIAL_STATUS commStatus = {0};
+        size_t available;
+        AcquireSRWLockExclusive(&gPairLock);
+        RingBufferGetAvailableData(&queueContext->RingBuffer, &available);
+        ReleaseSRWLockExclusive(&gPairLock);
+        commStatus.AmountInInQueue = (ULONG)available;
+        status = RequestCopyFromBuffer(Request, &commStatus, sizeof(commStatus));
+        break;
+    }
+    case IOCTL_SERIAL_GET_PROPERTIES:
+    {
+        COMMPROP properties = {0};
+        properties.wPacketLength = sizeof(properties);
+        properties.wPacketVersion = 2;
+        properties.dwServiceMask = SP_SERIALCOMM;
+        properties.dwMaxRxQueue = DATA_BUFFER_SIZE - 1;
+        properties.dwCurrentRxQueue = DATA_BUFFER_SIZE - 1;
+        properties.dwMaxBaud = BAUD_USER;
+        properties.dwProvSubType = PST_RS232;
+        properties.dwProvCapabilities = PCF_PARITY_CHECK;
+        properties.dwSettableParams = SP_BAUD | SP_DATABITS | SP_STOPBITS | SP_PARITY;
+        properties.dwSettableBaud = BAUD_USER | BAUD_115200 | BAUD_9600;
+        properties.wSettableData = DATABITS_5 | DATABITS_6 | DATABITS_7 | DATABITS_8;
+        properties.wSettableStopParity = STOPBITS_10 | STOPBITS_15 | STOPBITS_20 |
+            PARITY_NONE | PARITY_ODD | PARITY_EVEN | PARITY_MARK | PARITY_SPACE;
+        status = RequestCopyFromBuffer(Request, &properties, sizeof(properties));
+        break;
+    }
+    case IOCTL_SERIAL_GET_MODEMSTATUS:
+    {
+        // Virtual link has no physical modem lines.
+        ULONG modemStatus = MS_CTS_ON | MS_DSR_ON | MS_RLSD_ON;
+        status = RequestCopyFromBuffer(Request, &modemStatus, sizeof(modemStatus));
+        break;
+    }
+    case IOCTL_SERIAL_GET_DTRRTS:
+        status = RequestCopyFromBuffer(Request, &deviceContext->ModemControlRegister, sizeof(ULONG));
+        break;
+    case IOCTL_SERIAL_PURGE:
+    {
+        ULONG flags;
+        status = RequestCopyToBuffer(Request, &flags, sizeof(flags));
+        if (!NT_SUCCESS(status)) break;
+        if (flags & ~(PURGE_TXABORT | PURGE_RXABORT | PURGE_TXCLEAR | PURGE_RXCLEAR)) {
+            status = STATUS_INVALID_PARAMETER;
+            break;
+        }
+        if (flags & PURGE_RXCLEAR) {
+            AcquireSRWLockExclusive(&gPairLock);
+            RingBufferInitialize(&queueContext->RingBuffer, queueContext->Buffer, sizeof(queueContext->Buffer));
+            ReleaseSRWLockExclusive(&gPairLock);
+        }
+        if (flags & PURGE_RXABORT) {
+            WDFREQUEST pending;
+            while (NT_SUCCESS(WdfIoQueueRetrieveNextRequest(queueContext->ReadQueue, &pending)))
+                WdfRequestComplete(pending, STATUS_CANCELLED);
+        }
+        // Writes complete synchronously; there is no outstanding TX queue.
+        break;
+    }
     case IOCTL_SERIAL_SET_DTR:
+        deviceContext->ModemControlRegister |= 1u;
+        status = STATUS_SUCCESS;
+        break;
     case IOCTL_SERIAL_SET_RTS:
+        deviceContext->ModemControlRegister |= 2u;
+        status = STATUS_SUCCESS;
+        break;
     case IOCTL_SERIAL_CLR_RTS:
+        deviceContext->ModemControlRegister &= ~2u;
+        status = STATUS_SUCCESS;
+        break;
+    case IOCTL_SERIAL_CLR_DTR:
+        deviceContext->ModemControlRegister &= ~1u;
+        status = STATUS_SUCCESS;
+        break;
+    case IOCTL_SERIAL_SET_BREAK_ON:
+    case IOCTL_SERIAL_SET_BREAK_OFF:
+        status = STATUS_SUCCESS;
+        break;
+
+    case IOCTL_SERIAL_SET_QUEUE_SIZE:
     case IOCTL_SERIAL_SET_XON:
     case IOCTL_SERIAL_SET_XOFF:
-    case IOCTL_SERIAL_SET_CHARS:
-    case IOCTL_SERIAL_GET_CHARS:
-    case IOCTL_SERIAL_GET_HANDFLOW:
-    case IOCTL_SERIAL_SET_HANDFLOW:
     case IOCTL_SERIAL_RESET_DEVICE:
         //
         // NOTE: The application expects STATUS_SUCCESS for these IOCTLs.
@@ -535,6 +642,7 @@ EvtIoWrite(
     if( !NT_SUCCESS(status) ) {
         Trace(TRACE_LEVEL_ERROR,
             "Error: WdfRequestRetrieveInputMemory failed 0x%x", status);
+        WdfRequestComplete(Request, status);
         return;
     }
 
@@ -551,6 +659,8 @@ EvtIoWrite(
     }
 
     WdfRequestCompleteWithInformation(Request, status, Length);
+    CompleteSerialEvent(targetQueue, EV_RXCHAR);
+    CompleteSerialEvent(queueContext, EV_TXEMPTY);
 
     //
     // Get the amount of data available in the ring buffer
@@ -617,13 +727,14 @@ EvtIoRead(
                             (BYTE*)WdfMemoryGetBuffer(memory, NULL),
                             Length,
                             &bytesCopied);
-    ReleaseSRWLockExclusive(&gPairLock);
     if( !NT_SUCCESS(status) ) {
+        ReleaseSRWLockExclusive(&gPairLock);
         WdfRequestComplete(Request, status);
         return;
     }
 
     if (bytesCopied > 0) {
+        ReleaseSRWLockExclusive(&gPairLock);
         //
         // Data was read from buffer succesfully
         //
@@ -636,6 +747,7 @@ EvtIoRead(
         //
         status = WdfRequestForwardToIoQueue(Request,
                             queueContext->ReadQueue);
+        ReleaseSRWLockExclusive(&gPairLock);
         if( !NT_SUCCESS(status) ) {
             Trace(TRACE_LEVEL_ERROR,
                 "Error: WdfRequestForwardToIoQueue failed 0x%x", status);
@@ -1013,6 +1125,8 @@ QueueProcessSetLineControl(
             break;
         }
     }
+
+    if (!NT_SUCCESS(status)) return status;
 
     //
     // Update our line control register variable atomically
