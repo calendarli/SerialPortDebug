@@ -1,5 +1,9 @@
 appId: io.github.calendarli.serialflow.desktop
 productName: SerialFlow
+compression: maximum
+electronLanguages:
+  - zh-CN
+  - en-US
 directories:
   buildResources: build
 files:
@@ -13,6 +17,9 @@ extraResources:
     to: firmware/NOTICE.md
   - from: resources/firmware/esp32/${os}-${arch}
     to: firmware/esp32/${os}-${arch}
+    filter:
+      - '**/*'
+      - '!{espefuse,espsecure,esp_rfc2217_server}{,.exe}'
 win:
   extraResources:
     - from: resources/virtual-serial/win-${arch}

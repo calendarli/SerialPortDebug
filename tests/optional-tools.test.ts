@@ -1,5 +1,13 @@
 import { afterAll, afterEach, expect, spyOn, test } from 'bun:test'
-import { esptoolAssets, fetchEsptool, resourceTarget } from '../scripts/fetch-esptool'
+import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import {
+  esptoolAssets,
+  fetchEsptool,
+  pruneEsptoolBundle,
+  resourceTarget
+} from '../scripts/fetch-esptool'
 import { optional } from '../scripts/optional'
 
 const warnings = spyOn(console, 'warn').mockImplementation(() => {
@@ -36,4 +44,27 @@ test('optional failures do not abort installation', async () => {
     })
   ).resolves.toBeUndefined()
   expect(warnings).toHaveBeenCalledWith('[optional] fixture unavailable: toolchain missing')
+})
+
+test('cached esptool pruning removes companion tools but preserves runtime and license files', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'serialflow-esptool-'))
+  try {
+    const retained = ['esptool', 'esptool.exe', 'LICENSE', 'README.md', 'install.json']
+    const removed = ['espefuse', 'espsecure', 'esp_rfc2217_server'].flatMap((name) => [
+      name,
+      `${name}.exe`
+    ])
+    for (const name of [...retained, ...removed]) await writeFile(join(directory, name), name)
+    await mkdir(join(directory, '_internal'))
+    await writeFile(join(directory, '_internal', 'runtime'), 'runtime dependency')
+    await pruneEsptoolBundle(directory)
+    await pruneEsptoolBundle(directory)
+    expect((await readdir(directory)).sort()).toEqual([...retained, '_internal'].sort())
+    expect(await readFile(join(directory, '_internal', 'runtime'), 'utf8')).toBe(
+      'runtime dependency'
+    )
+    expect(await readFile(join(directory, 'esptool.exe'), 'utf8')).toBe('esptool.exe')
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
 })

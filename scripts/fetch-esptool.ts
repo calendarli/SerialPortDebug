@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { chmod, cp, mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 import extract from 'extract-zip'
 import { optional, run } from './optional'
 
@@ -38,6 +38,16 @@ export function resourceTarget(platform: string, arch: string): string {
   return `${os}-${arch === 'arm' ? 'armv7l' : arch}`
 }
 
+const unusedExecutables = ['espefuse', 'espsecure', 'esp_rfc2217_server'].flatMap((name) => [
+  name,
+  `${name}.exe`
+])
+
+export async function pruneEsptoolBundle(directory: string): Promise<void> {
+  // Also migrate valid cached installations without downloading the release again.
+  for (const name of unusedExecutables) await rm(join(directory, name), { force: true })
+}
+
 export async function fetchEsptool(
   platform = process.env.SERIALFLOW_PLATFORM || process.platform,
   arch = process.env.SERIALFLOW_ARCH || process.arch
@@ -58,8 +68,10 @@ export async function fetchEsptool(
       if (
         marker.version === esptoolVersion &&
         marker.sha256 === createHash('sha256').update(binary).digest('hex')
-      )
+      ) {
+        await pruneEsptoolBundle(destination)
         return
+      }
     } catch {
       /* Missing or incomplete installation: fetch again. */
     }
@@ -86,7 +98,10 @@ export async function fetchEsptool(
       const bundle = join(unpacked, `esptool-${asset.platform}`)
       const binary = await readFile(join(bundle, executable))
       const ready = join(stage, 'ready')
-      await cp(bundle, ready, { recursive: true })
+      await cp(bundle, ready, {
+        recursive: true,
+        filter: (source) => !unusedExecutables.includes(basename(source))
+      })
       if (!target.startsWith('win-')) await chmod(join(ready, executable), 0o755)
       await writeFile(
         join(ready, 'install.json'),

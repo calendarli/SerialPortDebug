@@ -1,7 +1,11 @@
 /// <reference lib="webworker" />
 
 import quickJsWasmUrl from '@jitl/quickjs-wasmfile-release-sync/wasm?url'
-import { newQuickJSWASMModule, newVariant, RELEASE_SYNC } from 'quickjs-emscripten'
+import RELEASE_SYNC from '@jitl/quickjs-wasmfile-release-sync'
+import {
+  newQuickJSWASMModuleFromVariant as newQuickJSWASMModule,
+  newVariant
+} from 'quickjs-emscripten-core'
 
 type RunMessage = {
   type: 'run'
