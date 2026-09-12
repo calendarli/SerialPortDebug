@@ -8,9 +8,9 @@ import {
 import { DataWindowManager } from './components/DataWindowManager'
 import appIcon from './assets/app-icon.png'
 import { WindowPinButton } from './components/WindowPinButton'
-import { findReplyMatch, replyByteOffset } from './reply-matcher'
+import { appendHexHistory, findReplyMatch, replyByteOffset } from './reply-matcher'
 import { removeReplyGroup } from './auto-reply-groups'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ReceivePanel } from './components/ReceivePanel'
 import { PlotPanel } from './components/PlotPanel'
 import { ModbusPanel } from './components/ModbusPanel'
@@ -554,26 +554,35 @@ function App(): React.JSX.Element {
       rxEvents: 0,
       txEvents: 0
     }
-    if (pending.rxEvents) setRxCommunicationCount((count) => count + pending.rxEvents)
-    if (pending.txEvents) setTxCommunicationCount((count) => count + pending.txEvents)
-    if (!pending.entries.length) return
-    const addedBytes = pending.entries.reduce((total, entry) => total + entry.bytes, 0)
-    setInteractionCache((current) => {
-      const entries = [...current.entries, ...pending.entries]
-      const settings = interactionSettingsRef.current
-      let totalBytes = current.bytes + addedBytes
-      let start = 0
-      while (
-        start < entries.length &&
-        ((settings.maxEntries > 0 && entries.length - start > settings.maxEntries) ||
-          totalBytes > settings.maxBytes)
-      ) {
-        totalBytes -= entries[start].bytes
-        start += 1
-      }
-      return { entries: start ? entries.slice(start) : entries, bytes: totalBytes }
+    startTransition(() => {
+      if (pending.rxEvents) setRxCommunicationCount((count) => count + pending.rxEvents)
+      if (pending.txEvents) setTxCommunicationCount((count) => count + pending.txEvents)
+      if (!pending.entries.length) return
+      const addedBytes = pending.entries.reduce((total, entry) => total + entry.bytes, 0)
+      setInteractionCache((current) => {
+        const entries = [...current.entries, ...pending.entries]
+        const settings = interactionSettingsRef.current
+        let totalBytes = current.bytes + addedBytes
+        let start = 0
+        while (
+          start < entries.length &&
+          ((settings.maxEntries > 0 && entries.length - start > settings.maxEntries) ||
+            totalBytes > settings.maxBytes)
+        ) {
+          totalBytes -= entries[start].bytes
+          start += 1
+        }
+        return { entries: start ? entries.slice(start) : entries, bytes: totalBytes }
+      })
     })
   }, [])
+
+  useEffect(
+    () => () => {
+      if (pendingFrameRef.current !== null) window.clearTimeout(pendingFrameRef.current)
+    },
+    []
+  )
 
   const queueInteraction = useCallback(
     (
@@ -607,7 +616,8 @@ function App(): React.JSX.Element {
         })
       }
       if (pendingFrameRef.current === null)
-        pendingFrameRef.current = window.requestAnimationFrame(flushInteractions)
+        // Batch presentation only; framing, matching and counters still see every frame.
+        pendingFrameRef.current = window.setTimeout(flushInteractions, 32)
     },
     [flushInteractions]
   )
@@ -788,39 +798,52 @@ function App(): React.JSX.Element {
       }
       const text = decoder.decode(bytes, { stream: true })
       const chunkHex = bytesToHex(bytes)
-      const previousReply = replyBuffers.current.get(sourcePort) || new Uint8Array()
-      let replyBytes = new Uint8Array(previousReply.length + bytes.length)
-      replyBytes.set(previousReply)
-      replyBytes.set(bytes, previousReply.length)
-      // Process the full incoming chunk before bounding the unmatched suffix.
-      let lineBuffer = new TextDecoder().decode(replyBytes, { stream: true })
-      let hexBuffer = bytesToHex(replyBytes)
-      const pauseLineBuffer = ((pauseLineBuffers.current.get(sourcePort) || '') + text).slice(-8192)
-      pauseLineBuffers.current.set(sourcePort, pauseLineBuffer)
-      const previousPauseHex = pauseHexBuffers.current.get(sourcePort) || ''
-      const pauseHexBuffer = `${previousPauseHex}${previousPauseHex ? ' ' : ''}${chunkHex}`
-        .split(/\s+/)
-        .slice(-8192)
-        .join(' ')
-      pauseHexBuffers.current.set(sourcePort, pauseHexBuffer)
+      const activeRules = compiledRules.filter(
+        ({ rule }) => !rule.targetPort || rule.targetPort === sourcePort
+      )
+      const needsReplyText = activeRules.some(({ rule }) => !rule.receiveHex)
+      const needsReplyHex = activeRules.some(({ rule }) => rule.receiveHex)
+      let replyBytes: Uint8Array = bytes
+      if (activeRules.length) {
+        const previousReply = replyBuffers.current.get(sourcePort)
+        if (previousReply?.length) {
+          replyBytes = new Uint8Array(previousReply.length + bytes.length)
+          replyBytes.set(previousReply)
+          replyBytes.set(bytes, previousReply.length)
+        }
+      }
+      // Only prepare history representations that an enabled rule actually uses.
+      let lineBuffer = needsReplyText ? new TextDecoder().decode(replyBytes, { stream: true }) : ''
+      let hexBuffer = needsReplyHex ? bytesToHex(replyBytes) : ''
       let shouldAutoPause = false
       if (!paused && autoPauseExpression) {
-        const pauseCandidates = autoPauseHex
-          ? [pauseHexBuffer, chunkHex]
-          : [
-              pauseLineBuffer,
-              ...pauseLineBuffer.split(/\r?\n/).map((line) => line.replace(/\r$/, ''))
-            ]
+        let pauseCandidates: string[]
+        if (autoPauseHex) {
+          const previous = pauseHexBuffers.current.get(sourcePort) || ''
+          const history = appendHexHistory(previous, chunkHex)
+          pauseHexBuffers.current.set(sourcePort, history)
+          pauseCandidates = [history, chunkHex]
+        } else {
+          const history = ((pauseLineBuffers.current.get(sourcePort) || '') + text).slice(-8192)
+          pauseLineBuffers.current.set(sourcePort, history)
+          pauseCandidates = [
+            history,
+            ...history.split(/\r?\n/).map((line) => line.replace(/\r$/, ''))
+          ]
+        }
         shouldAutoPause = pauseCandidates.some((candidate) => {
           autoPauseExpression.lastIndex = 0
           return autoPauseExpression.test(candidate)
         })
+      } else {
+        pauseLineBuffers.current.delete(sourcePort)
+        pauseHexBuffers.current.delete(sourcePort)
       }
       // Consume one match at a time, preserving the unprocessed suffix for later chunks.
-      let matching = true
+      let matching = activeRules.length > 0
       while (matching) {
         matching = false
-        const matches = compiledRules
+        const matches = activeRules
           .flatMap(({ rule, expression }, priority) => {
             if (rule.targetPort && rule.targetPort !== sourcePort) return []
             const selected = findReplyMatch(
@@ -844,8 +867,8 @@ function App(): React.JSX.Element {
           const { input: matchedCandidate, match: matchedResult, end } = selected
           const consumedBytes = replyByteOffset(replyBytes, end, !!rule.receiveHex)
           replyBytes = replyBytes.subarray(consumedBytes)
-          lineBuffer = new TextDecoder().decode(replyBytes, { stream: true })
-          hexBuffer = bytesToHex(replyBytes)
+          lineBuffer = needsReplyText ? new TextDecoder().decode(replyBytes, { stream: true }) : ''
+          hexBuffer = needsReplyHex ? bytesToHex(replyBytes) : ''
           matching = true
           if (rule.parameterMode === 'program') {
             const sessionVersion = serialSessionVersions.current.get(sourcePort) || 0
@@ -910,7 +933,8 @@ function App(): React.JSX.Element {
           break
         }
       }
-      replyBuffers.current.set(sourcePort, replyBytes.slice(-8192))
+      if (activeRules.length) replyBuffers.current.set(sourcePort, replyBytes.slice(-8192))
+      else replyBuffers.current.delete(sourcePort)
       const displayText = displayDecoders.current.decode(
         sourcePort,
         bytes,
@@ -1186,6 +1210,8 @@ function App(): React.JSX.Element {
   }
 
   const clearReceive = (): void => {
+    if (pendingFrameRef.current !== null) window.clearTimeout(pendingFrameRef.current)
+    pendingFrameRef.current = null
     pendingInteractionsRef.current = {
       entries: [],
       rxEvents: 0,

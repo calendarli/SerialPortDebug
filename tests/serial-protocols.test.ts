@@ -4,7 +4,11 @@ import { test, beforeEach, afterEach, jest } from 'bun:test'
 import { SerialFramer, defaultSerialFraming } from '../src/renderer/src/serial-framer'
 import { appendCrc } from '../src/renderer/src/serial-utils'
 import { ModbusClient } from '../src/renderer/src/modbus-client'
-import { findReplyMatch, replyByteOffset } from '../src/renderer/src/reply-matcher'
+import {
+  appendHexHistory,
+  findReplyMatch,
+  replyByteOffset
+} from '../src/renderer/src/reply-matcher'
 import { settlingTime } from '../src/renderer/src/settling-time'
 import { saveReplyGroup, removeReplyGroup } from '../src/renderer/src/auto-reply-groups'
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window')
@@ -19,6 +23,21 @@ afterEach(() => {
 const packet = (values) => appendCrc(Uint8Array.from(values), 'modbus')
 const read = packet([1, 3, 0, 0, 0, 2])
 const response = packet([1, 3, 4, 0, 12, 0, 34])
+
+test('hex pause history preserves byte boundaries and cross-chunk matches without tokenizing', () => {
+  let history = ''
+  const expected: string[] = []
+  for (let index = 0; index < 12000; index++) {
+    const hex = (index % 256).toString(16).padStart(2, '0').toUpperCase()
+    history = appendHexHistory(history, hex)
+    expected.push(hex)
+  }
+  assert.equal(history, expected.slice(-8192).join(' '))
+  assert.equal(appendHexHistory(history, ''), history)
+  assert.equal(appendHexHistory('AA BB', 'CC DD'), 'AA BB CC DD')
+  const large = Array.from({ length: 20000 }, (_, i) => (i % 2 ? 'AB' : 'CD')).join(' ')
+  assert.equal(appendHexHistory(history, large), large.split(' ').slice(-8192).join(' '))
+})
 
 test('single-byte missing header discards noise; multi-byte markers span chunks', () => {
   const framer = new SerialFramer(),

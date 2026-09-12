@@ -1,3 +1,10 @@
+// Both inputs use canonical "AA BB" formatting. Keep 8192 complete bytes
+// without allocating an array of thousands of tokens for every received frame.
+export function appendHexHistory(previous: string, chunk: string): string {
+  if (!chunk) return previous
+  return (previous ? `${previous} ${chunk}` : chunk).slice(-(8192 * 3 - 1))
+}
+
 // Keep original candidate input/capture semantics while reporting a buffer consumption offset.
 export function findReplyMatch(
   expression: RegExp,

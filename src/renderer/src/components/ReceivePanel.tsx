@@ -79,15 +79,23 @@ export function ReceivePanel(props: Props): React.JSX.Element {
   const [matchedEntryId, setMatchedEntryId] = useState<number | null>(null)
   const [searchMessage, setSearchMessage] = useState('')
   const followTailRef = useRef(true)
-  const virtualizer = useVirtualizer({
-    count: props.entries.length,
-    getScrollElement: () => scrollElement,
-    getItemKey: (index) => props.entries[index].id,
-    estimateSize: (index) =>
+  // Keep callbacks stable during scroll/menu updates: a new getItemKey causes
+  // the virtualizer to rebuild measurements for the entire retained history.
+  const getItemKey = useCallback((index: number) => props.entries[index].id, [props.entries])
+  const getScrollElement = useCallback(() => scrollElement, [scrollElement])
+  const estimateSize = useCallback(
+    (index: number) =>
       Math.max(
         20,
         Math.ceil((props.display[props.entries[index].direction].size ?? props.fontSize) * 1.55)
       ),
+    [props.entries, props.display, props.fontSize]
+  )
+  const virtualizer = useVirtualizer({
+    count: props.entries.length,
+    getScrollElement,
+    getItemKey,
+    estimateSize,
     overscan: 14
   })
   const lastEntryId = props.entries[props.entries.length - 1]?.id

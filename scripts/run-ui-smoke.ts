@@ -4,7 +4,12 @@ import electron from 'electron'
 import { run } from './optional'
 
 const root = resolve(import.meta.dirname, '..')
-const suite = process.argv[2] === 'updates' ? 'update-ui-smoke' : 'firmware-ui-smoke'
+const suite =
+  process.argv[2] === 'updates'
+    ? 'update-ui-smoke'
+    : process.argv[2] === 'serial'
+      ? 'serial-ui-performance'
+      : 'firmware-ui-smoke'
 await mkdir(resolve(root, 'build'), { recursive: true })
 const result = await Bun.build({
   entrypoints: [resolve(root, `scripts/${suite}.ts`)],

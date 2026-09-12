@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import {
   espChips,
   type FirmwareFamily,
@@ -61,7 +61,7 @@ const errorText = (error: unknown): string =>
     ''
   )
 
-export function FirmwareFlashPanel(): React.JSX.Element {
+export const FirmwareFlashPanel = memo(function FirmwareFlashPanel(): React.JSX.Element {
   const [initial] = useState(loadSettings)
   const [request, setRequest] = useState(initial.request)
   const [toolPaths, setToolPaths] = useState(initial.tools)
@@ -530,4 +530,4 @@ export function FirmwareFlashPanel(): React.JSX.Element {
       </div>
     </section>
   )
-}
+})
