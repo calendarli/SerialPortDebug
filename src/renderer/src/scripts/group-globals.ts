@@ -15,8 +15,10 @@ export function printableGlobal(value: unknown, hex: boolean): string {
   if (typeof value === 'boolean') return hex ? (value ? '01' : '00') : String(value)
   if (typeof value === 'number' || typeof value === 'bigint') {
     if (!hex) return String(value)
-    if ((typeof value === 'number' && (!Number.isSafeInteger(value) || value < 0)) ||
-        (typeof value === 'bigint' && value < 0n))
+    if (
+      (typeof value === 'number' && (!Number.isSafeInteger(value) || value < 0)) ||
+      (typeof value === 'bigint' && value < 0n)
+    )
       throw new Error('HEX 全局变量必须是非负整数')
     const result = value.toString(16).toUpperCase()
     return result.length % 2 ? `0${result}` : result
@@ -39,7 +41,8 @@ export function evaluateGlobalPlaceholders(
   globals: GroupGlobals,
   hex: boolean
 ): string {
-  return template.replace(/\{\{\s*(\+\+)?global\.([\p{L}_$][\p{L}\p{N}_$]*)(\+\+)?\s*\}\}/gu,
+  return template.replace(
+    /\{\{\s*(\+\+)?global\.([\p{L}_$][\p{L}\p{N}_$]*)(\+\+)?\s*\}\}/gu,
     (_match, prefix, key, suffix) => {
       let value = globals[key]
       if (prefix || suffix) {
@@ -50,5 +53,6 @@ export function evaluateGlobalPlaceholders(
         else value = numeric
       }
       return printableGlobal(value, hex)
-    })
+    }
+  )
 }

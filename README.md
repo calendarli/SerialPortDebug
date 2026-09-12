@@ -179,42 +179,42 @@ Windows 安装程序采用引导式安装，用户可自行选择安装目录，
 ```bash
 git clone https://github.com/calendarli/SerialFlow.git
 cd SerialFlow
-npm ci
-npm run dev
+bun install --frozen-lockfile
+bun run dev
 ```
 
 ## 开发与构建
 
 ```bash
 # 代码格式化
-npm run format
+bun run format
 
 # ESLint 检查
-npm run lint
+bun run lint
 
 # 主进程和渲染进程类型检查
-npm run typecheck
+bun run typecheck
 
 # 生产构建
-npm run build
+bun run build
 
 # 生成 Windows 安装程序
-npm run build:win
+bun run build:win
 
 # 生成未打包应用目录
-npm run build:unpack
+bun run build:unpack
 ```
 
-构建配置还提供 `npm run build:mac` 和 `npm run build:linux`。当前 `extraResources` 包含 Windows 虚拟串口驱动路径，跨平台打包前需调整这些资源配置；虚拟串口驱动仅适用于 Windows。
+构建配置还提供 `bun run build:mac` 和 `bun run build:linux`。资源按目标系统和架构复制，Windows 虚拟串口驱动仅打入 Windows 包。
 
-Windows 打包前需准备 `electron-builder.yml` 中列出的驱动管理器、驱动包和证书，构建要求参见 [驱动说明](driver/SerialFlowVirtualSerial/README.md)。仅运行 `npm run build` 不会编译驱动。
+`bun install` 的 postinstall 会安装 Electron、重建原生依赖，并尝试编译虚拟串口驱动和下载 esptool。两项可选功能失败只打印警告。驱动需要 Visual Studio C++ 和 WDK；可用 `bun run build:driver` 重试。详见 [驱动说明](driver/SerialFlowVirtualSerial/README.md)。
 
-已有自动化测试可通过 `node --test tests/*.test.cjs` 运行。
+已有自动化测试可通过 `bun test` 运行。
 
 切换 Electron 版本或运行环境后，如果 `serialport` 原生模块不匹配，请执行：
 
 ```bash
-npm run postinstall
+bun run postinstall
 ```
 
 ## 常见问题
@@ -262,7 +262,7 @@ HEX 文本只能包含 `0-9`、`A-F`，并应组成完整字节，例如 `AA 01 
 
 ## 反馈与贡献
 
-提交问题时请附上应用版本、操作系统、串口设备与参数、复现步骤和相关日志。提交代码前运行 `npm run lint`、`npm run typecheck` 及与修改相关的测试。项目版本更新规则见 [AGENTS.md](AGENTS.md)。
+提交问题时请附上应用版本、操作系统、串口设备与参数、复现步骤和相关日志。提交代码前运行 `bun run lint`、`bun run typecheck` 及与修改相关的测试。
 
 ## 开源协议
 
@@ -279,3 +279,13 @@ HEX 文本只能包含 `0-9`、`A-F`，并应组成完整字节，例如 `AA 01 
 `driver/SerialFlowVirtualSerial/` 基于 Microsoft `serial/VirtualSerial2` 示例开发，该部分按其 [驱动说明](driver/SerialFlowVirtualSerial/README.md) 保留 **Microsoft Public License（Ms-PL）** 授权及 Microsoft 版权声明，不由本项目的 GPL-3.0 声明重新授权。Ms-PL 条款参见 [协议全文](https://opensource.org/license/ms-pl)。
 
 Electron、React、serialport、QuickJS 等第三方依赖继续遵循各自许可证。分发源码或安装包时，也须保留并遵守相关第三方许可及版权声明。
+
+### 多平台资源与工具链
+
+使用 Bun 1.4.2+ 和 Node.js 22.18+。`bun run test:ui` 在完成构建后运行 Electron 界面回归测试。`bun run format:check` 检查格式。
+
+共享代码位于 `src/common`，主进程、预加载和渲染进程统一使用 `@common/*`。辅助脚本和 Bun 测试由 `tsconfig.tools.json` 检查。帮助与编程手册分别由 `src/renderer/help/index.html`、`src/renderer/programming-manual/index.html` 进入 React/Vite 构建。
+
+esptool 保存到 `resources/firmware/esp32/<os>-<arch>`。跨架构打包前设置 `SERIALFLOW_PLATFORM`（win32/darwin/linux）和 `SERIALFLOW_ARCH`（x64/arm64/arm）再运行 `bun run fetch:esptool`。Windows ARM64 暂无官方 esptool 5.3.1 预编译资产，安装会警告，可在界面中指定兼容工具。驱动使用 `SERIALFLOW_ARCH` 选择 x64/arm64，产物位于 `resources/virtual-serial/win-<arch>`。缺少目标资源时打包会警告并省略该功能，不会复制宿主架构资源。
+
+更新源为 calendarli/SerialFlow 的 GitHub Releases；发布需包含 electron-builder 生成的安装包、blockmap 和更新元数据。macOS 自动更新需发布 ZIP 包。

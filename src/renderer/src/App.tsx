@@ -908,7 +908,11 @@ function App(): React.JSX.Element {
         }
       }
       replyBuffers.current.set(sourcePort, replyBytes.slice(-8192))
-      const displayText = displayDecoders.current.decode(sourcePort, bytes, interactionDisplay.encoding)
+      const displayText = displayDecoders.current.decode(
+        sourcePort,
+        bytes,
+        interactionDisplay.encoding
+      )
       const rendered = rxHex ? `${chunkHex} ` : displayText
       queueInteraction('rx', sourcePort, rendered, bytes.length, !paused, text, chunkHex)
       if (shouldAutoPause) {
@@ -932,7 +936,10 @@ function App(): React.JSX.Element {
       }
     })
     const offStatus = window.api.onStatus((status) => {
-      serialSessionVersions.current.set(status.path, (serialSessionVersions.current.get(status.path) || 0) + 1)
+      serialSessionVersions.current.set(
+        status.path,
+        (serialSessionVersions.current.get(status.path) || 0) + 1
+      )
       displayDecoders.current.clear(status.path)
       serialFramerRef.current.clear(status.path)
       textDecoders.current.delete(status.path)
@@ -1232,7 +1239,8 @@ function App(): React.JSX.Element {
   const changeInteractionDisplay = (value: InteractionDisplay): void => {
     const next = normalizeInteractionDisplay(value)
     localStorage.setItem(interactionDisplayKey, JSON.stringify(next))
-    if (next.encoding !== interactionDisplay.encoding) displayDecoders.current = new InteractionTextDecoder()
+    if (next.encoding !== interactionDisplay.encoding)
+      displayDecoders.current = new InteractionTextDecoder()
     setInteractionDisplay(next)
   }
   const changeInteractionFontSize = (value: number): void => {

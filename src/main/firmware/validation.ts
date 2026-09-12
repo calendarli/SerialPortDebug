@@ -1,6 +1,6 @@
 import { readFile, stat } from 'fs/promises'
 import { extname, isAbsolute } from 'path'
-import { espChips, type FirmwareRequest } from '../../shared/firmware'
+import { espChips, type FirmwareRequest } from '@common/firmware'
 
 export type AddressRange = { start: number; end: number }
 export const hexAddress = (value: number): string => `0x${value.toString(16).toUpperCase()}`

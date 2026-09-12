@@ -196,7 +196,10 @@ export function Sidebar(props: Props): React.JSX.Element {
           data-tooltip-side="right"
           className="help-tab"
           onClick={() =>
-            window.open(new URL('help.html', window.location.href).toString(), 'serialflow-help')
+            window.open(
+              new URL('help/index.html', window.location.href).toString(),
+              'serialflow-help'
+            )
           }
         >
           <CircleHelp

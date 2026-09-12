@@ -8,14 +8,16 @@ import { SerialPort } from 'serialport'
 import icon from '../../resources/icon-v3.png?asset'
 import { FileTransferManager } from './file-transfer'
 import { FirmwareManager } from './firmware/manager'
-import type { FirmwareFamily, FirmwareRequest } from '../shared/firmware'
+import type { FirmwareFamily, FirmwareRequest } from '@common/firmware'
 
 // Retain existing settings when upgrading installations created under the old package name.
 app.setName('SerialFlow')
 const serialFlowUserData = join(app.getPath('appData'), 'SerialFlow')
 const legacyUserData = join(app.getPath('appData'), 'serialportdebug')
 const userDataPath =
-  !existsSync(serialFlowUserData) && existsSync(legacyUserData) ? legacyUserData : serialFlowUserData
+  !existsSync(serialFlowUserData) && existsSync(legacyUserData)
+    ? legacyUserData
+    : serialFlowUserData
 mkdirSync(userDataPath, { recursive: true })
 app.setPath('userData', userDataPath)
 
@@ -104,35 +106,26 @@ let quitting = false
 let quitReady = false
 
 function assertPortAvailable(path: string): void {
-  if (firmwarePorts.has(path.toUpperCase())) throw new Error(`串口 ${path} 正被固件烧录独占，请等待任务结束`)
+  if (firmwarePorts.has(path.toUpperCase()))
+    throw new Error(`串口 ${path} 正被固件烧录独占，请等待任务结束`)
+}
+
+function virtualSerialRoot(): string {
+  return app.isPackaged
+    ? join(process.resourcesPath, 'virtual-serial')
+    : join(app.getAppPath(), 'resources', 'virtual-serial', `win-${process.arch}`)
 }
 
 function virtualSerialPaths(): { manager: string; inf: string } {
-  const root = app.isPackaged
-    ? join(process.resourcesPath, 'virtual-serial')
-    : join(app.getAppPath(), 'driver', 'SerialFlowVirtualSerial')
+  const root = virtualSerialRoot()
   return {
-    manager: app.isPackaged
-      ? join(root, 'SerialFlowVirtualSerialManager.exe')
-      : join(root, 'Manager', 'x64', 'Release', 'SerialFlowVirtualSerialManager.exe'),
-    inf: app.isPackaged
-      ? join(root, 'virtualserial2um.inf')
-      : join(root, 'ComPort', 'x64', 'Debug', 'VirtualSerial2um', 'virtualserial2um.inf')
+    manager: join(root, 'SerialFlowVirtualSerialManager.exe'),
+    inf: join(root, 'virtualserial2um.inf')
   }
 }
 
 function virtualSerialCertificatePath(): string {
-  return app.isPackaged
-    ? join(process.resourcesPath, 'virtual-serial', 'SerialFlowVirtualSerial.cer')
-    : join(
-        app.getAppPath(),
-        'driver',
-        'SerialFlowVirtualSerial',
-        'ComPort',
-        'x64',
-        'Debug',
-        'SerialFlowVirtualSerial.cer'
-      )
+  return join(virtualSerialRoot(), 'SerialFlowVirtualSerial.cer')
 }
 
 function runPowerShell(script: string): Promise<string> {
@@ -326,53 +319,101 @@ function registerSerialHandlers(): void {
   firmwareManager = new FirmwareManager({
     resources: app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'),
     temp: app.getPath('temp'),
-    emit: state => emit('firmware:progress', state),
-    acquire: request => enqueuePortOperation(async () => {
-      if (request.transport !== 'uart') return async () => {}
-      const path = request.port
-      assertPortAvailable(path)
-      if (fileTransferManager?.isPortBusy(path)) throw new Error('目标串口正在传输或接收文件，请先停止文件传输')
-      firmwarePorts.add(path.toUpperCase())
-      const port = openPorts.get(path)
-      const saved: PortOptions | undefined = port ? {
-        path, baudRate: port.baudRate, dataBits: port.settings.dataBits ?? 8,
-        stopBits: port.settings.stopBits ?? 1, parity: port.settings.parity ?? 'none'
-      } : undefined
-      try { await closePort(path) } catch (error) { firmwarePorts.delete(path.toUpperCase()); throw error }
-      return () => enqueuePortOperation(async () => {
-        firmwarePorts.delete(path.toUpperCase())
-        if (saved && request.restorePort && !quitting) await openManagedPort(saved)
+    emit: (state) => emit('firmware:progress', state),
+    acquire: (request) =>
+      enqueuePortOperation(async () => {
+        if (request.transport !== 'uart') return async () => {}
+        const path = request.port
+        assertPortAvailable(path)
+        if (fileTransferManager?.isPortBusy(path))
+          throw new Error('目标串口正在传输或接收文件，请先停止文件传输')
+        firmwarePorts.add(path.toUpperCase())
+        const port = openPorts.get(path)
+        const saved: PortOptions | undefined = port
+          ? {
+              path,
+              baudRate: port.baudRate,
+              dataBits: port.settings.dataBits ?? 8,
+              stopBits: port.settings.stopBits ?? 1,
+              parity: port.settings.parity ?? 'none'
+            }
+          : undefined
+        try {
+          await closePort(path)
+        } catch (error) {
+          firmwarePorts.delete(path.toUpperCase())
+          throw error
+        }
+        return () =>
+          enqueuePortOperation(async () => {
+            firmwarePorts.delete(path.toUpperCase())
+            if (saved && request.restorePort && !quitting) await openManagedPort(saved)
+          })
       })
-    })
   })
   ipcMain.handle('firmware:state', () => firmwareManager!.snapshot())
-  ipcMain.handle('firmware:tool', (_event, family: FirmwareFamily, path: string) => firmwareManager!.toolInfo(family, path))
+  ipcMain.handle('firmware:tool', (_event, family: FirmwareFamily, path: string) =>
+    firmwareManager!.toolInfo(family, path)
+  )
   ipcMain.handle('firmware:probes', (_event, path: string) => firmwareManager!.probes(path))
   ipcMain.handle('firmware:chooseTool', async (_event, family: FirmwareFamily) => {
     if (!['stm32', 'esp32'].includes(family)) throw new Error('无效芯片系列')
-    const result = await dialog.showOpenDialog({ title: family === 'stm32' ? '选择 STM32_Programmer_CLI' : '选择 esptool 5.x', properties: ['openFile'], filters: process.platform === 'win32' ? [{ name: '烧录工具', extensions: ['exe'] }] : [] })
+    const result = await dialog.showOpenDialog({
+      title: family === 'stm32' ? '选择 STM32_Programmer_CLI' : '选择 esptool 5.x',
+      properties: ['openFile'],
+      filters: process.platform === 'win32' ? [{ name: '烧录工具', extensions: ['exe'] }] : []
+    })
     return result.canceled ? null : firmwareManager!.resolveTool(family, result.filePaths[0])
   })
   ipcMain.handle('firmware:chooseFiles', async (_event, family: FirmwareFamily) => {
     if (!['stm32', 'esp32'].includes(family)) throw new Error('无效芯片系列')
-    const result = await dialog.showOpenDialog({ title: '选择烧录固件', properties: family === 'esp32' ? ['openFile', 'multiSelections'] : ['openFile'], filters: [{ name: '固件', extensions: family === 'stm32' ? ['hex', 'bin'] : ['bin'] }] })
+    const result = await dialog.showOpenDialog({
+      title: '选择烧录固件',
+      properties: family === 'esp32' ? ['openFile', 'multiSelections'] : ['openFile'],
+      filters: [{ name: '固件', extensions: family === 'stm32' ? ['hex', 'bin'] : ['bin'] }]
+    })
     if (result.canceled) return []
-    return Promise.all(result.filePaths.map(async path => ({ path, name: basename(path), size: (await stat(path)).size, address: family === 'stm32' ? '0x08000000' : '' })))
+    return Promise.all(
+      result.filePaths.map(async (path) => ({
+        path,
+        name: basename(path),
+        size: (await stat(path)).size,
+        address: family === 'stm32' ? '0x08000000' : ''
+      }))
+    )
   })
-  ipcMain.handle('firmware:start', async (_event, request: FirmwareRequest, operation: 'detect' | 'flash') => {
-    if (operation === 'flash' && request?.eraseAll) {
-      const result = await dialog.showMessageBox({ type: 'warning', title: '确认整片擦除', message: '整片擦除将删除目标芯片上的固件和保存的数据。', detail: `目标：${request.family} / ${request.transport === 'swd' ? request.probe : request.port}。此操作无法撤销。`, buttons: ['取消', '整片擦除并烧录'], defaultId: 0, cancelId: 0 })
-      if (result.response !== 1) return null
+  ipcMain.handle(
+    'firmware:start',
+    async (_event, request: FirmwareRequest, operation: 'detect' | 'flash') => {
+      if (operation === 'flash' && request?.eraseAll) {
+        const result = await dialog.showMessageBox({
+          type: 'warning',
+          title: '确认整片擦除',
+          message: '整片擦除将删除目标芯片上的固件和保存的数据。',
+          detail: `目标：${request.family} / ${request.transport === 'swd' ? request.probe : request.port}。此操作无法撤销。`,
+          buttons: ['取消', '整片擦除并烧录'],
+          defaultId: 0,
+          cancelId: 0
+        })
+        if (result.response !== 1) return null
+      }
+      return firmwareManager!.start(request, operation)
     }
-    return firmwareManager!.start(request, operation)
-  })
+  )
   ipcMain.handle('firmware:cancel', (_event, id: string) => firmwareManager!.cancel(id))
   ipcMain.handle('firmware:saveLog', async () => {
     const state = firmwareManager!.snapshot()
     if (!state) throw new Error('暂无烧录日志')
-    const result = await dialog.showSaveDialog({ defaultPath: `firmware-${state.id}.txt`, filters: [{ name: '日志', extensions: ['txt'] }] })
+    const result = await dialog.showSaveDialog({
+      defaultPath: `firmware-${state.id}.txt`,
+      filters: [{ name: '日志', extensions: ['txt'] }]
+    })
     if (result.canceled || !result.filePath) return null
-    await writeFile(result.filePath, `${state.phase}\n${new Date(state.startedAt).toISOString()}\n${state.logs.join('\n')}\n`, 'utf8')
+    await writeFile(
+      result.filePath,
+      `${state.phase}\n${new Date(state.startedAt).toISOString()}\n${state.logs.join('\n')}\n`,
+      'utf8'
+    )
     return result.filePath
   })
   fileTransferManager = new FileTransferManager(writeRawPort, (progress) =>
@@ -415,7 +456,10 @@ function registerSerialHandlers(): void {
         const url = new URL(process.env['ELECTRON_RENDERER_URL'])
         url.searchParams.set('dataWindow', id)
         await window.loadURL(url.toString())
-      } else await window.loadFile(join(__dirname, '../renderer/index.html'), { query: { dataWindow: id } })
+      } else
+        await window.loadFile(join(__dirname, '../renderer/index.html'), {
+          query: { dataWindow: id }
+        })
     } catch (error) {
       if (!window.isDestroyed()) window.destroy()
       throw error
@@ -549,10 +593,11 @@ function registerSerialHandlers(): void {
       chunkSize: number,
       protocol: 'serialflow' | 'raw',
       chunkDelay?: number
-    ) => enqueuePortOperation(async () => {
-      assertPortAvailable(port)
-      return fileTransferManager!.sendFile(port, filePath, chunkSize, protocol, chunkDelay)
-    })
+    ) =>
+      enqueuePortOperation(async () => {
+        assertPortAvailable(port)
+        return fileTransferManager!.sendFile(port, filePath, chunkSize, protocol, chunkDelay)
+      })
   )
   ipcMain.handle('fileTransfer:cancel', (_event, taskId: string) =>
     fileTransferManager!.cancel(taskId)
@@ -648,7 +693,10 @@ function registerSerialHandlers(): void {
     enqueuePortOperation(() => openManagedPort(options))
   )
   ipcMain.handle('serial:close', async (_event, path: string) =>
-    enqueuePortOperation(() => { assertPortAvailable(path); return closePort(path) })
+    enqueuePortOperation(() => {
+      assertPortAvailable(path)
+      return closePort(path)
+    })
   )
   ipcMain.handle('serial:write', async (_event, path: string, base64: string) => {
     if (!path) throw new Error('请选择发送串口')
@@ -705,8 +753,8 @@ function createWindow(): void {
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     try {
       const target = new URL(url)
-      const isProgrammingManual = target.pathname.endsWith('/programming-manual.html')
-      const isHelpManual = target.pathname.endsWith('/help.html')
+      const isProgrammingManual = target.pathname.endsWith('/programming-manual/index.html')
+      const isHelpManual = target.pathname.endsWith('/help/index.html')
       const isLocalManual =
         (isProgrammingManual || isHelpManual) &&
         (target.protocol === 'file:' ||
@@ -738,7 +786,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.serialflow.desktop')
+  electronApp.setAppUserModelId('io.github.calendarli.serialflow.desktop')
   app.on('browser-window-created', (_, window) => optimizer.watchWindowShortcuts(window))
   registerSerialHandlers()
   createWindow()
@@ -747,7 +795,7 @@ app.whenReady().then(() => {
   })
 })
 
-app.on('before-quit', event => {
+app.on('before-quit', (event) => {
   if (quitReady) return
   event.preventDefault()
   if (quitting) return

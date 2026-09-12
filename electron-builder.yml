@@ -1,36 +1,29 @@
-appId: com.serialflow.desktop
+appId: io.github.calendarli.serialflow.desktop
 productName: SerialFlow
 directories:
   buildResources: build
 files:
-  - '!resources/firmware/**'
-  - '!scripts/**'
-  - '!tests/**'
-  - '!docs/**'
-  - '!**/.vscode/*'
-  - '!src/*'
-  - '!electron.vite.config.{js,ts,mjs,cjs}'
-  - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
-  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
-  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - out/**
+  - package.json
+  - resources/icon-v3.png
 asarUnpack:
-  - resources/**
+  - '**/*.node'
 extraResources:
-  - from: resources/firmware
-    to: firmware
-  - from: driver/SerialFlowVirtualSerial/Manager/x64/Release/SerialFlowVirtualSerialManager.exe
-    to: virtual-serial/SerialFlowVirtualSerialManager.exe
-  - from: driver/SerialFlowVirtualSerial/ComPort/x64/Debug/VirtualSerial2um
-    to: virtual-serial
-  - from: driver/SerialFlowVirtualSerial/ComPort/x64/Debug/SerialFlowVirtualSerial.cer
-    to: virtual-serial/SerialFlowVirtualSerial.cer
+  - from: resources/firmware/NOTICE.md
+    to: firmware/NOTICE.md
+  - from: resources/firmware/esp32/${os}-${arch}
+    to: firmware/esp32/${os}-${arch}
 win:
+  extraResources:
+    - from: resources/virtual-serial/win-${arch}
+      to: virtual-serial
+
   executableName: SerialFlow
   icon: build/icon-v3.ico
   target:
     - nsis
 nsis:
-  artifactName: SerialFlow-${version}-Setup.${ext}
+  artifactName: SerialFlow-${version}-${arch}-Setup.${ext}
   oneClick: false
   perMachine: false
   allowElevation: true
@@ -49,6 +42,9 @@ nsis:
   runAfterFinish: true
   deleteAppDataOnUninstall: false
 mac:
+  target:
+    - dmg
+    - zip
   icon: build/icon-v3.icns
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
@@ -58,19 +54,19 @@ mac:
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
   notarize: false
 dmg:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: ${name}-${version}-${arch}.${ext}
 linux:
   target:
     - AppImage
     - snap
     - deb
-  maintainer: electronjs.org
+  maintainer: calendarli and kairlec
   category: Utility
 appImage:
-  artifactName: ${name}-${version}.${ext}
-npmRebuild: false
+  artifactName: ${name}-${version}-${arch}.${ext}
+npmRebuild: true
 publish:
-  provider: generic
-  url: https://example.com/auto-updates
-electronDownload:
-  mirror: https://npmmirror.com/mirrors/electron/
+  provider: github
+  owner: calendarli
+  repo: SerialFlow
+  releaseType: release

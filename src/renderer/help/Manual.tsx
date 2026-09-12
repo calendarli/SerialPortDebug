@@ -1,0 +1,412 @@
+import { useHelpSearch } from '../src/manuals/useHelpSearch'
+import './style.css'
+
+export default function Manual(): React.JSX.Element {
+  useHelpSearch()
+  return (
+    <>
+      <div className="shell">
+        <aside>
+          <div className="brand">
+            <strong>SerialFlow</strong>
+            <span>使用帮助与快速定位</span>
+          </div>
+          <div className="search">
+            <input id="search" type="search" placeholder="搜索功能或问题…" aria-label="搜索帮助" />
+            <button id="clear" title="清空搜索" aria-label="清空搜索">
+              ×
+            </button>
+          </div>
+          <nav id="nav">
+            <a href="#layout">界面布局</a>
+            <a href="#start">快速开始</a>
+            <a href="#serial">串口配置</a>
+            <a href="#interaction">数据交互</a>
+            <a href="#plot">实时曲线</a>
+            <a href="#send">数据发送</a>
+            <a href="#commands">快捷指令</a>
+            <a href="#data-windows">数据窗口</a>
+            <a href="#reply">自动回复</a>
+            <a href="#pairs">虚拟串口对</a>
+            <a href="#transfer">文件传输</a>
+            <a href="#programming">编程参数</a>
+            <a href="#modbus">Modbus RTU</a>
+            <a href="#project">工程导入导出</a>
+            <a href="#troubleshoot">故障排查</a>
+            <a href="#shortcuts">快捷操作</a>
+          </nav>
+        </aside>
+        <main>
+          <section className="hero">
+            <h1>SerialFlow 使用帮助</h1>
+            <p>
+              从左侧目录选择功能，或在搜索框输入“打不开串口”“HEX”“曲线”等关键词。每个章节都说明入口位置、操作步骤和常见问题。
+            </p>
+          </section>
+          <div className="quick-grid">
+            <a href="#start">
+              <strong>第一次使用</strong>
+              <span>完成端口选择、参数配置、打开和收发测试</span>
+            </a>
+            <a href="#layout">
+              <strong>功能在哪里</strong>
+              <span>按左侧导航、中央工作区和底部状态栏快速定位</span>
+            </a>
+            <a href="#troubleshoot">
+              <strong>遇到连接问题</strong>
+              <span>排查端口占用、驱动、参数和设备断开</span>
+            </a>
+          </div>
+          <div id="empty" className="empty-search">
+            没有找到相关帮助，请尝试更短的关键词。
+          </div>
+
+          <article id="layout" data-title="界面布局 导航 功能在哪里">
+            <h2>界面布局</h2>
+            <dl className="map">
+              <dt>顶部状态栏</dt>
+              <dd>显示当前已打开的串口数量和端口号。</dd>
+              <dt>左侧图标栏</dt>
+              <dd>切换串口、串口对、指令、回复、Modbus、帮助和关于，也可收起或展开配置区。</dd>
+              <dt>左侧配置区</dt>
+              <dd>显示当前导航项的配置内容。拖动配置区右边缘可调整宽度，双击恢复默认宽度。</dd>
+              <dt>实时曲线</dt>
+              <dd>位于中央上方。可拖动底部把手改变高度；收起后为数据交互释放空间。</dd>
+              <dt>数据交互</dt>
+              <dd>集中显示每个端口的 RX/TX 数据，支持 HEX、时间戳、暂停、搜索和条件暂停。</dd>
+              <dt>发送区</dt>
+              <dd>位于中央下方，用于选择目标串口、编辑内容、切换 ASCII/HEX、CRC 和自动发送。</dd>
+              <dt>底部状态栏</dt>
+              <dd>显示操作结果、RX/TX 次数、缓存占用和数据频率。</dd>
+            </dl>
+          </article>
+
+          <article id="start" data-title="快速开始 第一次使用 连接 收发">
+            <h2>快速开始</h2>
+            <ol className="steps">
+              <li>连接串口设备，打开左侧“串口”，点击刷新按钮。</li>
+              <li>从端口列表选择设备。绿色背景表示该端口已经打开，列表同时显示系统串口名称。</li>
+              <li>确认波特率、数据位、停止位和校验位与设备一致，然后点击“打开此串口”。</li>
+              <li>在底部发送区选择目标端口，输入内容，按设备协议选择 ASCII 或 HEX 后发送。</li>
+              <li>在“数据交互”查看 TX 和 RX；需要观察数值变化时勾选“接收数据绘制曲线”。</li>
+            </ol>
+            <div className="tip">
+              建议首次连接使用设备文档给出的默认参数。常见配置是 115200、8 数据位、1
+              停止位、无校验。
+            </div>
+          </article>
+
+          <article id="serial" data-title="串口配置 多串口 波特率 分帧 打开 关闭">
+            <h2>多串口配置</h2>
+            <h3>端口列表与状态</h3>
+            <p>
+              点击刷新重新枚举设备。选项文字包含 COM
+              端口和系统串口名称；已打开端口用绿色背景表示。一个物理端口不能同时分配给多个配置。
+            </p>
+            <h3>通信参数</h3>
+            <p>
+              波特率、数据位、停止位和校验位必须与设备一致。端口打开后参数会锁定；如需修改，请先关闭该串口。
+            </p>
+            <h3>接收分帧</h3>
+            <ul>
+              <li>
+                <strong>原始数据块：</strong>按系统收到的数据块直接处理，适合简单观察。
+              </li>
+              <li>
+                <strong>分隔符：</strong>按换行符或自定义分隔符形成完整帧。
+              </li>
+              <li>
+                <strong>固定长度：</strong>累计到指定字节数后形成一帧。
+              </li>
+              <li>
+                <strong>帧头 + 帧尾：</strong>从指定 HEX 帧头截取到帧尾。
+              </li>
+              <li>
+                <strong>空闲超时：</strong>线路静默指定时间后结束当前帧。
+              </li>
+            </ul>
+            <div className="warn">
+              分帧会影响显示、条件暂停、自动回复和曲线解析。协议有明确帧边界时，建议选择对应方式。
+            </div>
+          </article>
+
+          <article
+            id="interaction"
+            data-title="数据交互 接收 HEX 时间戳 暂停 搜索 清空 缓存 条件暂停 设置 字体 编码 GBK RX TX"
+          >
+            <h2>数据交互</h2>
+            <ul>
+              <li>
+                <strong>接收 HEX：</strong>以十六进制字节显示接收数据；关闭时按文本显示。
+              </li>
+              <li>
+                <strong>时间戳：</strong>显示每条交互记录的接收或发送时间。
+              </li>
+              <li>
+                <strong>暂停接收显示：</strong>停止向界面追加记录，不会关闭串口。
+              </li>
+              <li>
+                <strong>设置：</strong>可配置默认字号、缓存和条数，并分别设置 RX/TX
+                文字颜色、字体和字号。字号选择“跟随默认”时受默认字号和 Ctrl +
+                鼠标滚轮控制。颜色、字体和字号作用于已有记录；文本显示编码只作用于后续记录，不改变实际发送字节或协议匹配。支持
+                UTF-8、GBK、GB18030、Big5、UTF-16LE/BE、Windows-1252。配置会保存，并随工程导入导出。
+              </li>
+              <li>
+                <strong>缓存 / 条数：</strong>
+                限制内存中的交互记录，达到限制后优先移除最旧记录；条数为 0 表示不限制条数。
+              </li>
+              <li>
+                <strong>搜索：</strong>在数据视窗按 <code>Ctrl + F</code>
+                ，可按普通文本或正则表达式定位。
+              </li>
+              <li>
+                <strong>清空：</strong>清除当前界面的交互记录，不影响串口连接。
+              </li>
+            </ul>
+            <h3>条件暂停</h3>
+            <p>
+              启用后选择 ASCII 或
+              HEX，输入完整匹配条件。当收到的数据帧满足条件时，软件自动暂停后续接收显示。正则模式适合匹配变化字段。
+            </p>
+          </article>
+
+          <article id="plot" data-title="实时曲线 绘图 数值 配色 PID 暂停 Y轴 缩放">
+            <h2>实时曲线</h2>
+            <p>
+              先在对应串口配置中勾选“接收数据绘制曲线”。支持 <code>PWM=10, PID=-2.5</code>、
+              <code>PWM:10</code> 或 <code>10,20,30</code> 等文本数值格式。
+            </p>
+            <ul>
+              <li>
+                右侧工具区可回到实时、恢复 Y 自动范围、暂停绘图、清空曲线、调整配色和打开 PID
+                调参建议。
+              </li>
+              <li>滚动或拖动 X 轴可查看历史时间区间；滚动或拖动 Y 轴可缩放和平移数值范围。</li>
+              <li>移动鼠标查看同一时刻各通道的插值数据；图例中的复选框可单独隐藏通道。</li>
+              <li>“收起/展开”会同步隐藏或显示右侧工具区。</li>
+            </ul>
+            <div className="warn">
+              二进制 HEX 帧不能直接绘制。请先由设备输出文本数值，或使用脚本转换后再观察。
+            </div>
+          </article>
+
+          <article id="send" data-title="发送 ASCII HEX 自动发送 CRC 目标端口">
+            <h2>数据发送</h2>
+            <p>
+              多串口同时打开时，先选择目标端口。ASCII 模式发送文本；HEX
+              模式要求输入成对的十六进制字节，例如 <code>AA 01 0D 0A</code>。
+            </p>
+            <ul>
+              <li>“追加 CRLF”会在文本末尾添加回车换行。</li>
+              <li>CRC 可按所选算法计算并追加到发送数据。</li>
+              <li>自动发送可设置间隔和次数；次数为 0 时表示持续发送，直到手动停止。</li>
+            </ul>
+          </article>
+
+          <article id="data-windows" data-title="数据窗口 置顶 自定义 匹配 模板 HEX 字节">
+            <h2>独立数据窗口</h2>
+            <p>
+              点击顶部“数据窗口”，可创建多个独立 Windows
+              窗口。每个窗口默认置顶，也可点击图钉取消置顶。串口在主窗口打开；各数据窗口独立选择接收串口、配置匹配模板并显示最新匹配结果。
+            </p>
+            <ul>
+              <li>固定内容使用 HEX 字节，例如 AA 02；?? 表示任意一个字节，不显示。</li>
+              <li>
+                &#123;名称:字节数&#125; 表示提取并显示该字段，例如 AA 02 &#123;数据:4&#125; BB 收到
+                AA 02 01 02 03 04 BB 后显示 01 02 03 04。
+              </li>
+              <li>
+                可在模板任意位置组合多个字段，例如 55 ?? &#123;温度:2&#125; &#123;压力:2&#125; 0D
+                0A；字段名称须唯一，一条模板最多 4096 字节。
+              </li>
+              <li>
+                按完整模板从左到右匹配，自动处理分包和连续多帧；已匹配的字节不会重复使用。所有字段同时显示
+                HEX 和 DEC，按大端解析（左侧字节为高位）。每个字段可独立配置有符号/无符号和 0～20 位
+                DEC 小数位；有符号采用字段位宽的补码，负数 HEX
+                显示负号及绝对值，原始字节保留在完整匹配帧中。DEC 小数位为 1 时除以 10，为 2 时除以
+                100，并保留指定小数位。
+              </li>
+              <li>
+                点击“保存并应用”后保留配置，下次从窗口列表重新打开。关闭主窗口会关闭所有数据窗口。
+              </li>
+            </ul>
+          </article>
+
+          <article id="commands" data-title="快捷指令 指令组 参数 模板 CRC">
+            <h2>快捷指令</h2>
+            <p>
+              将常用报文保存为指令并按组管理。指令可绑定目标串口、ASCII/HEX
+              模式、CRC，以及人工输入或程序计算的参数。发送前会根据当前参数生成最终报文。
+            </p>
+            <div className="tip">
+              对频繁使用的初始化、查询和控制命令分别建组，可以减少误发并提升现场调试速度。
+            </div>
+          </article>
+
+          <article id="reply" data-title="自动回复 规则 条件 正则 参数 状态">
+            <h2>自动回复</h2>
+            <p>
+              规则匹配接收帧后向指定串口回复。可选择
+              ASCII/HEX、普通匹配或正则表达式，并通过参数和程序生成回复内容。
+            </p>
+            <ul>
+              <li>规则按启用状态运行；侧栏角标显示当前启用数量。</li>
+              <li>多串口环境下应明确设置目标端口，避免回复到错误设备。</li>
+              <li>修改分帧方式后应重新验证规则，因为匹配对象是分帧后的完整数据。</li>
+              <li>程序参数的语法和可用 API 可从规则编辑区打开“编程参数手册”查看。</li>
+            </ul>
+          </article>
+
+          <article id="pairs" data-title="虚拟串口对 创建 删除 驱动 UAC">
+            <h2>虚拟串口对</h2>
+            <p>
+              用于创建两个互相连通的虚拟 COM
+              端口，适合联调两个串口程序。选择两个未占用端口号后创建；删除时选择现有端口对。
+            </p>
+            <div className="warn">
+              安装证书、创建和删除虚拟串口需要 Windows
+              管理员授权。操作后若系统尚未刷新设备列表，请刷新或重启应用。
+            </div>
+          </article>
+
+          <article
+            id="transfer"
+            data-title="文件传输 发送文件 接收文件 协议 原始模式 固件烧录 STM32 ESP32 HEX BIN ST-LINK"
+          >
+            <h2>串口文件传输</h2>
+            <p>
+              在底部发送区切换到“发送文件”，选择文件、分块大小、区块延时和已打开的目标串口。文件以原始二进制发送，需由对端协议保证完整性。
+            </p>
+            <h3>固件烧录</h3>
+            <p>
+              切换到底部“固件烧录”页签，选择 STM32 或 ESP32。STM32 支持 UART、ST-LINK / SWD 和 HEX /
+              BIN；ESP32 支持一个或多个 BIN。HEX 使用文件内地址，BIN 请按工程输出填写写入地址，ESP32
+              不自动猜测分区偏移。
+            </p>
+            <p>
+              Windows x64 已内置 esptool 5.3.1。STM32 需先安装
+              STM32CubeProgrammer；未自动找到时，在高级设置中选择安装目录中的
+              STM32_Programmer_CLI.exe。
+            </p>
+            <p>
+              先刷新并选择串口或探针，可使用“检测芯片”查看日志，再“开始烧录”。STM32 UART
+              需要按芯片手册设置 BOOT 并复位，烧录后恢复 BOOT 配置并手动复位。ESP32
+              无自动下载电路时，选择手动模式并操作 BOOT/RESET。
+            </p>
+            <p>
+              烧录时独占目标串口；若正在传输/接收文件，请先停止。可选择结束后恢复原串口连接，自动发送任务需要重新启动。切换页签不停止烧录；停止或退出应用可能留下不完整固件，需重新烧录。整片擦除会删除设备上的全部数据，默认关闭。
+            </p>
+            <p>
+              日志可查看和导出。固件检查不能证明文件适用于当前硬件，请确认目标芯片与地址。本版不提供解除保护、eFuse、安全启动配置或外部
+              Flash loader。
+            </p>
+          </article>
+
+          <article id="programming" data-title="编程参数手册 参数程序 JavaScript API 示例">
+            <h2>编程参数手册</h2>
+            <p>
+              快捷指令和自动回复中的程序参数支持使用 JavaScript
+              生成动态内容。独立的编程参数手册包含可用变量、API、返回值要求、安全限制及完整示例。
+            </p>
+            <a
+              className="manual-link"
+              href="../programming-manual/index.html"
+              target="_blank"
+              rel="noopener"
+            >
+              打开编程参数手册
+            </a>
+          </article>
+
+          <article id="modbus" data-title="Modbus RTU 主站 从站 功能码 寄存器 CRC">
+            <h2>Modbus RTU</h2>
+            <p>
+              选择已打开串口后，按站号、功能码、起始地址和数量构造请求。软件负责 RTU 报文和
+              CRC，收到响应后解析寄存器或线圈数据。
+            </p>
+            <div className="tip">
+              Modbus 地址通常同时存在十进制、十六进制和 4xxxx
+              文档表示法。遇到偏移一位时，请确认设备文档使用的是协议地址还是寄存器编号。
+            </div>
+          </article>
+
+          <article id="project" data-title="工程 导入 导出 配置 备份">
+            <h2>工程导入与导出</h2>
+            <p>
+              串口配置页顶部的“导出”可保存当前串口配置、规则、指令和相关设置；“导入”用于恢复。导入后请检查实际
+              COM 端口号，因为设备在另一台电脑上可能被系统分配不同端口。
+            </p>
+          </article>
+
+          <article
+            id="troubleshoot"
+            data-title="故障排查 打不开 没数据 乱码 曲线没有 端口占用 驱动"
+          >
+            <h2>故障排查</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>现象</th>
+                  <th>优先检查</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>找不到串口</td>
+                  <td>重新插拔设备并刷新；检查 Windows 设备管理器、USB 线、驱动和设备供电。</td>
+                </tr>
+                <tr>
+                  <td>串口无法打开</td>
+                  <td>
+                    关闭其他串口工具或烧录软件；确认端口未被占用；尝试设备默认的 115200/8/N/1。
+                  </td>
+                </tr>
+                <tr>
+                  <td>能发送但收不到</td>
+                  <td>
+                    检查 TX/RX 是否交叉、GND
+                    是否共地、目标端口是否正确、设备是否需要先发送唤醒命令。
+                  </td>
+                </tr>
+                <tr>
+                  <td>文本乱码</td>
+                  <td>确认波特率和字符编码；若数据本身是二进制，请启用“接收 HEX”。</td>
+                </tr>
+                <tr>
+                  <td>自动回复不触发</td>
+                  <td>检查规则是否启用、ASCII/HEX 模式、分帧结果、正则表达式及目标串口。</td>
+                </tr>
+                <tr>
+                  <td>曲线没有数据</td>
+                  <td>
+                    确认串口已勾选绘图、接收的是文本数值、字段格式受支持，并检查通道是否在图例中停用。
+                  </td>
+                </tr>
+                <tr>
+                  <td>界面数据越来越多</td>
+                  <td>降低缓存 MB 或最大条数；暂停显示只停止追加显示，不会关闭串口。</td>
+                </tr>
+              </tbody>
+            </table>
+          </article>
+
+          <article id="shortcuts" data-title="快捷操作 快捷键 搜索 缩放 调整">
+            <h2>快捷操作</h2>
+            <ul>
+              <li>
+                <code>Ctrl + F</code>：在数据交互区域打开搜索。
+              </li>
+              <li>
+                <code>Ctrl + 鼠标滚轮</code>：在数据视窗中调整字号。
+              </li>
+              <li>拖动实时曲线底部把手：调整曲线区域高度；双击恢复默认高度。</li>
+              <li>拖动发送区顶部边缘：调整发送区域高度；双击恢复默认高度。</li>
+              <li>拖动左侧配置区右边缘：调整侧栏宽度；双击恢复默认宽度。</li>
+            </ul>
+          </article>
+          <div className="footer">SerialFlow 离线使用帮助</div>
+        </main>
+      </div>
+    </>
+  )
+}

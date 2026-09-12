@@ -14,3 +14,14 @@ AGENTS.md
 build/firmware-qa-*/
 build/firmware-ui*.png
 build/test-results.txt
+
+.idea/
+*.tsbuildinfo
+resources/firmware/esp32/
+resources/virtual-serial/
+
+# Local verification output
+build/*-results.txt
+build/lint.json
+build/firmware-ui-smoke.cjs
+build/virtual-serial/

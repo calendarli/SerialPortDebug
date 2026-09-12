@@ -1175,7 +1175,6 @@ export function PlotPanel({ entries, enabledPorts, embedded = false }: Props): R
                 </label>
                 <small>最多保留 100,000 个采样点</small>
                 <button onClick={() => setOpenPanel('colors')}>曲线配色</button>
-
               </div>
             </FloatingPanel>
             <FloatingPanel

@@ -1,0 +1,103 @@
+:root {
+  color-scheme: light;
+  font-family: Inter, 'Microsoft YaHei', sans-serif;
+  color: #243047;
+  background: #f4f7fb;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  line-height: 1.7;
+}
+header {
+  padding: 28px max(28px, calc((100vw - 900px) / 2));
+  color: #fff;
+  background: linear-gradient(135deg, #1d4ed8, #2563eb 55%, #0891b2);
+}
+header h1 {
+  margin: 0;
+  font-size: 28px;
+}
+header p {
+  margin: 6px 0 0;
+  color: #dbeafe;
+}
+main {
+  width: min(900px, calc(100% - 36px));
+  margin: 22px auto 48px;
+}
+nav,
+section {
+  margin-bottom: 16px;
+  padding: 20px 22px;
+  border: 1px solid #d8e1ec;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 4px 16px #3341550a;
+}
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+}
+nav a {
+  color: #2563eb;
+  text-decoration: none;
+}
+h2 {
+  margin: 0 0 10px;
+  color: #172033;
+  font-size: 20px;
+}
+h3 {
+  margin: 18px 0 6px;
+  font-size: 15px;
+}
+p,
+ul {
+  margin: 7px 0;
+}
+code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-family: Consolas, monospace;
+}
+pre {
+  overflow: auto;
+  padding: 14px 16px;
+  border-radius: 9px;
+  background: #0f172a;
+  color: #dbeafe;
+  font:
+    13px/1.65 Consolas,
+    monospace;
+}
+pre code {
+  padding: 0;
+  background: none;
+  color: inherit;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+th,
+td {
+  padding: 9px 10px;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  color: #475569;
+  background: #f8fafc;
+}
+.note {
+  padding: 10px 12px;
+  border-left: 4px solid #0ea5e9;
+  background: #f0f9ff;
+}

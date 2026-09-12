@@ -18,12 +18,21 @@ COM A WriteFile -> endpoint A -> pair broker -> endpoint B buffer -> COM B ReadF
 COM B WriteFile -> endpoint B -> pair broker -> endpoint A buffer -> COM A ReadFile
 ```
 
-构建需要 Visual Studio 2022 C++、Windows 11 SDK/WDK。开发安装需要管理员权限和测试签名；
+构建需要 Visual Studio 2022/2026 C++、匹配版本的 Windows SDK/WDK 与 Visual Studio WDK 扩展。开发安装需要管理员权限和测试签名；
 正式发布必须完成 Microsoft 驱动签名。本应用不得自动关闭 Secure Boot 或启用测试模式。
 
 ```powershell
-msbuild .\VirtualSerial.sln /t:Build /p:Configuration=Debug /p:Platform=x64
+# 在仓库根目录运行；默认目标为当前机器架构
+bun run build:driver
+# 可选：构建 ARM64
+$env:SERIALFLOW_ARCH = "arm64"
+bun run build:driver
 ```
+
+`bun install` 自动尝试 Release 构建；失败只警告，虚拟串口成为未包含的可选功能。
+`MSBUILD_PATH` 可指定 MSBuild。构建产物保存在 `build/virtual-serial/<arch>`，完整驱动包
+才会复制到 `resources/virtual-serial/win-<arch>`。不会安装驱动或导入证书。
+目录内 `.gitignore` 只允许源码、工程与文档；已追踪的旧二进制需另行手动取消追踪。
 
 原始文件中的 Microsoft 版权头必须保留。官方来源：
 <https://github.com/microsoft/Windows-driver-samples/tree/main/serial/VirtualSerial2>

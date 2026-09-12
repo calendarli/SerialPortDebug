@@ -264,10 +264,12 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
   useEffect(() => runner.sync(props.commands), [props.commands, runner])
   useEffect(() => {
     let lastTask = ''
-    return window.api.onFirmwareProgress(state => {
+    return window.api.onFirmwareProgress((state) => {
       if (!state.busy || !state.port || state.id === lastTask) return
       lastTask = state.id
-      const affected = propsRef.current.commands.filter(command => !command.targetPort || command.targetPort === state.port)
+      const affected = propsRef.current.commands.filter(
+        (command) => !command.targetPort || command.targetPort === state.port
+      )
       for (const command of affected) void runner.stop(command.id, false)
       // Invalidate group loops containing an affected command, including ancestors.
       const groups = new Set<number>()
@@ -275,11 +277,12 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
         let id = command.parentId
         while (id !== null && !groups.has(id)) {
           groups.add(id)
-          id = propsRef.current.groups.find(group => group.id === id)?.parentId ?? null
+          id = propsRef.current.groups.find((group) => group.id === id)?.parentId ?? null
         }
       }
-      for (const id of groups) groupLoopTokensRef.current.set(id, (groupLoopTokensRef.current.get(id) || 0) + 1)
-      setActiveGroupLoopIds(current => new Set([...current].filter(id => !groups.has(id))))
+      for (const id of groups)
+        groupLoopTokensRef.current.set(id, (groupLoopTokensRef.current.get(id) || 0) + 1)
+      setActiveGroupLoopIds((current) => new Set([...current].filter((id) => !groups.has(id))))
     })
   }, [runner])
   useEffect(() => {
@@ -307,6 +310,7 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
       runner.stopAll()
       void runner.drain().then(() => {
         // StrictMode replays effects; only dispose a runtime that remains unmounted.
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- Read the latest generation after drain to distinguish StrictMode remounts.
         if (lifecycleRef.current === generation) programRuntime.dispose()
       })
     }
@@ -1453,8 +1457,8 @@ export const CommandsPanel = memo(function CommandsPanel(props: Props): React.JS
                           }}
                         />
                         <small>
-                          直接编写 JS 或 TS，无需切换语言。
-                          process(data, context) 返回完整字节数组或 Uint8Array；data
+                          直接编写 JS 或 TS，无需切换语言。 process(data, context)
+                          返回完整字节数组或 Uint8Array；data
                           是替换参数并编码后的字节。context.phase 区分
                           press（主指令）、release（抬起）、companion（被附带执行）。
                         </small>

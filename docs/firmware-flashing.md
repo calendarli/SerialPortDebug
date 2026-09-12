@@ -2,18 +2,18 @@
 
 底部「发送消息 / 发送文件」旁新增「固件烧录」。首版主要面向 Windows x64。
 
-| 目标 | 连接方式 | 固件 |
-| --- | --- | --- |
-| STM32 | UART 系统 Bootloader | Intel HEX、BIN |
-| STM32 | ST-LINK / SWD | Intel HEX、BIN |
-| ESP32 系列 | UART 下载模式 | 一个或多个 BIN |
+| 目标       | 连接方式             | 固件           |
+| ---------- | -------------------- | -------------- |
+| STM32      | UART 系统 Bootloader | Intel HEX、BIN |
+| STM32      | ST-LINK / SWD        | Intel HEX、BIN |
+| ESP32 系列 | UART 下载模式        | 一个或多个 BIN |
 
 ## 工具准备
 
-- ESP32：应用包含官方 esptool 5.3.1 Windows x64 独立工具，无需安装 Python。
+- ESP32：安装时尝试获取官方 esptool 5.3.1 独立工具，按系统和架构打包，无需安装 Python；下载失败时可手动指定工具。
 - STM32：先安装 [STM32CubeProgrammer](https://www.st.com/en/development-tools/stm32cubeprog.html)。自动检测标准安装目录；未找到时，在高级设置中选择安装目录里的 `bin/STM32_Programmer_CLI.exe`。不要只复制一个 EXE，其运行依赖完整安装目录。
 - 高级设置可指定工具位置、查看版本、重新检测。esptool 自定义路径要求 5.x 原生可执行文件。
-- macOS/Linux 可指定对应系统的原生工具，本项目未内置这两个系统的工具，也未完成其硬件验证。
+- 支持准备 macOS x64/arm64、Linux x64/arm64/armv7 以及 Windows x64 的 esptool。其他架构可指定兼容的原生工具；macOS/Linux 尚未完成硬件验证。
 
 ## 烧录步骤
 
@@ -49,11 +49,11 @@ HEX 验证记录长度、校验和、结束记录、扩展地址及地址重叠�
 ## 开发验证
 
 ```text
-npm run build
-node --test tests/firmware.test.cjs
-node_modules/.bin/electron scripts/firmware-ui-smoke.cjs
+bun run build
+bun test tests/firmware.test.ts
+bun run test:ui
 ```
 
 自动测试覆盖固件预检、参数生成、模拟任务成功/失败/取消、资源释放，以及真实 Electron 界面和 preload 接口。它们不会擦写硬件。需要使用实际 STM32 和 ESP32 开发板补充烧录、启动、断线重烧与串口恢复验收。
 
-内置工具来源、版本和校验和见 `resources/firmware/NOTICE.md`。可运行 `python scripts/fetch-esptool.py` 重新获取固定版本。
+内置工具来源、版本和校验和见 `resources/firmware/NOTICE.md`。可运行 `bun run fetch:esptool` 重新获取固定版本。

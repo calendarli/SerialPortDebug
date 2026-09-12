@@ -3,15 +3,28 @@ import { existsSync } from 'fs'
 import { mkdtemp, rm, writeFile } from 'fs/promises'
 import { basename, delimiter, dirname, join } from 'path'
 import { randomUUID } from 'crypto'
-import type {
-  FirmwareFamily,
-  FirmwareRequest,
-  FirmwareState,
-  FirmwareTool
-} from '../../shared/firmware'
+import type { FirmwareFamily, FirmwareRequest, FirmwareState, FirmwareTool } from '@common/firmware'
 import { hexAddress, inspectFirmware, validateRequest } from './validation'
 
+type FirmwareProcess = import('node:events').EventEmitter &
+  Pick<ChildProcess, 'pid' | 'stdout' | 'stderr' | 'kill'>
+
+type ProcessRunner = {
+  spawn: (
+    path: string,
+    args: string[],
+    options: import('node:child_process').SpawnOptions
+  ) => FirmwareProcess
+  execFile: (
+    path: string,
+    args: string[],
+    options: import('node:child_process').ExecFileOptions,
+    callback: () => void
+  ) => void
+}
+
 type Hooks = {
+  process?: ProcessRunner
   resources: string
   temp: string
   emit: (state: FirmwareState) => void
@@ -57,7 +70,7 @@ export function flashCommands(request: FirmwareRequest, paths: string[]): Comman
 
 export class FirmwareManager {
   private state: FirmwareState | null = null
-  private child: ChildProcess | null = null
+  private child: FirmwareProcess | null = null
   private cancelled = false
   private timer?: NodeJS.Timeout
   private execution: Promise<void> | null = null
@@ -76,7 +89,7 @@ export class FirmwareManager {
     // PyInstaller one-file builds can have a child process holding the serial port.
     if (process.platform === 'win32') {
       this.termination = new Promise<void>((resolve) => {
-        execFile(
+        ;(this.hooks.process?.execFile ?? execFile)(
           join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'taskkill.exe'),
           ['/PID', String(child.pid), '/T', '/F'],
           { windowsHide: true, timeout: 10000 },
@@ -133,7 +146,14 @@ export class FirmwareManager {
         throw new Error(`请选择 ${exe}`)
       return custom
     }
-    const candidates = [join(this.hooks.resources, 'firmware', family, exe)]
+    const os =
+      process.platform === 'win32'
+        ? 'win'
+        : process.platform === 'darwin'
+          ? 'mac'
+          : process.platform
+    const arch = process.arch === 'arm' ? 'armv7l' : process.arch
+    const candidates = [join(this.hooks.resources, 'firmware', family, `${os}-${arch}`, exe)]
     if (family === 'stm32') {
       for (const root of [
         process.env.ProgramW6432,
@@ -164,7 +184,7 @@ export class FirmwareManager {
   ): Promise<string> {
     return new Promise((resolve, reject) => {
       if (tracked && this.cancelled) return reject(new Error('任务已停止'))
-      const child = spawn(path, args, {
+      const child = (this.hooks.process?.spawn ?? spawn)(path, args, {
         windowsHide: true,
         shell: false,
         cwd: dirname(path),

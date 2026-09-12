@@ -112,7 +112,9 @@ export function SendPanel(props: Props): React.JSX.Element {
       onChange={(event) => props.onTargetPortChange(event.target.value)}
     >
       <option value="">选择目标串口</option>
-      {props.openedPorts.map((path) => <option key={path}>{path}</option>)}
+      {props.openedPorts.map((path) => (
+        <option key={path}>{path}</option>
+      ))}
     </select>
   )
 
@@ -126,16 +128,30 @@ export function SendPanel(props: Props): React.JSX.Element {
         onPointerUp={finishResize}
         onPointerCancel={finishResize}
         onDoubleClick={() => props.onHeightCommit(230)}
-      ><i /></div>
+      >
+        <i />
+      </div>
 
       <div className="send-mode-tabs">
-        <button className={mode === 'message' ? 'active' : ''} onClick={() => setMode('message')}>发送消息</button>
-        <button className={mode === 'file' ? 'active' : ''} onClick={() => setMode('file')}>发送文件</button>
-        <button className={mode === 'firmware' ? 'active' : ''} onClick={() => setMode('firmware')}>固件烧录</button>
+        <button className={mode === 'message' ? 'active' : ''} onClick={() => setMode('message')}>
+          发送消息
+        </button>
+        <button className={mode === 'file' ? 'active' : ''} onClick={() => setMode('file')}>
+          发送文件
+        </button>
+        <button className={mode === 'firmware' ? 'active' : ''} onClick={() => setMode('firmware')}>
+          固件烧录
+        </button>
         <button
           hidden={mode === 'firmware'}
           className="send-editor-clear clear-action-button"
-          title={mode === 'message' ? '清空输入框' : canCancel ? '文件发送中，暂时不能清空' : '清空所选文件'}
+          title={
+            mode === 'message'
+              ? '清空输入框'
+              : canCancel
+                ? '文件发送中，暂时不能清空'
+                : '清空所选文件'
+          }
           aria-label={mode === 'message' ? '清空输入框' : '清空所选文件'}
           disabled={mode === 'file' && Boolean(canCancel)}
           onClick={() => {
@@ -165,16 +181,32 @@ export function SendPanel(props: Props): React.JSX.Element {
             </button>
             {portSelect}
             <label className="send-crc-toggle">
-              <input type="checkbox" checked={props.crcEnabled} onChange={(event) => props.onCrcEnabledChange(event.target.checked)} /> CRC
+              <input
+                type="checkbox"
+                checked={props.crcEnabled}
+                onChange={(event) => props.onCrcEnabledChange(event.target.checked)}
+              />{' '}
+              CRC
             </label>
-            <select className="crc-select" aria-label="CRC 格式" disabled={!props.crcEnabled} value={props.crcMode} onChange={(event) => props.onCrcModeChange(event.target.value as CrcMode)}>
+            <select
+              className="crc-select"
+              aria-label="CRC 格式"
+              disabled={!props.crcEnabled}
+              value={props.crcMode}
+              onChange={(event) => props.onCrcModeChange(event.target.value as CrcMode)}
+            >
               <option value="crc8">CRC-8</option>
               <option value="modbus">CRC-16/MODBUS</option>
               <option value="ccitt-false">CRC-16/CCITT-FALSE</option>
               <option value="xmodem">CRC-16/XMODEM</option>
               <option value="crc32">CRC-32</option>
             </select>
-            <select className="line-ending-select" aria-label="发送后追加" value={props.lineEnding} onChange={(event) => props.onLineEndingChange(event.target.value as LineEnding)}>
+            <select
+              className="line-ending-select"
+              aria-label="发送后追加"
+              value={props.lineEnding}
+              onChange={(event) => props.onLineEndingChange(event.target.value as LineEnding)}
+            >
               <option value="">无追加</option>
               <option value={'\n'}>\\n</option>
               <option value={'\r'}>\\r</option>
@@ -182,7 +214,10 @@ export function SendPanel(props: Props): React.JSX.Element {
               <option value={'\r\n'}>\\r\\n</option>
             </select>
             <div className="send-button-group">
-              <button className={`send-button ${props.autoSendRunning ? 'stop' : ''}`} onClick={props.onSend}>
+              <button
+                className={`send-button ${props.autoSendRunning ? 'stop' : ''}`}
+                onClick={props.onSend}
+              >
                 {props.autoSend ? (props.autoSendRunning ? '停止发送' : '连续发送') : '发送(S)'}
               </button>
               <button
@@ -199,20 +234,52 @@ export function SendPanel(props: Props): React.JSX.Element {
                 className="send-options-floating"
               >
                 <div className="send-options-popover">
-                  <button className={`continuous-send ${props.autoSend ? 'active' : ''}`} onClick={() => props.onAutoSendChange(!props.autoSend)}>
+                  <button
+                    className={`continuous-send ${props.autoSend ? 'active' : ''}`}
+                    onClick={() => props.onAutoSendChange(!props.autoSend)}
+                  >
                     <i /> 连续发送
                   </button>
                   <label className="send-stepper">
                     <span>发送后延时 (ms)</span>
-                    <button onClick={() => props.onIntervalChange(Math.max(1, props.interval - 1))}>−</button>
-                    <input type="number" min="1" value={props.interval} onChange={(event) => props.onIntervalChange(Number(event.target.value))} />
+                    <button onClick={() => props.onIntervalChange(Math.max(1, props.interval - 1))}>
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      min="1"
+                      value={props.interval}
+                      onChange={(event) => props.onIntervalChange(Number(event.target.value))}
+                    />
                     <button onClick={() => props.onIntervalChange(props.interval + 1)}>+</button>
                   </label>
                   <label className="send-stepper">
                     <span>重复次数（0 为无限）</span>
-                    <button disabled={props.autoSendRunning} onClick={() => props.onAutoSendCountChange(Math.max(0, props.autoSendCount - 1))}>−</button>
-                    <input type="number" min="0" disabled={props.autoSendRunning} value={props.autoSendCount} onChange={(event) => props.onAutoSendCountChange(Math.max(0, Math.floor(Number(event.target.value) || 0)))} />
-                    <button disabled={props.autoSendRunning} onClick={() => props.onAutoSendCountChange(props.autoSendCount + 1)}>+</button>
+                    <button
+                      disabled={props.autoSendRunning}
+                      onClick={() =>
+                        props.onAutoSendCountChange(Math.max(0, props.autoSendCount - 1))
+                      }
+                    >
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      min="0"
+                      disabled={props.autoSendRunning}
+                      value={props.autoSendCount}
+                      onChange={(event) =>
+                        props.onAutoSendCountChange(
+                          Math.max(0, Math.floor(Number(event.target.value) || 0))
+                        )
+                      }
+                    />
+                    <button
+                      disabled={props.autoSendRunning}
+                      onClick={() => props.onAutoSendCountChange(props.autoSendCount + 1)}
+                    >
+                      +
+                    </button>
                   </label>
                   <small>● 按 Ctrl + Enter 发送</small>
                 </div>
@@ -224,32 +291,69 @@ export function SendPanel(props: Props): React.JSX.Element {
         <div className="send-file-view">
           <div className="send-file-status send-file-main">
             <span>{fileStatus}</span>
-            {progress && <span>{percent.toFixed(1)}% · {formatBytes(progress.transferredBytes)} / {formatBytes(progress.totalBytes)}</span>}
-            <i><b style={{ width: `${percent}%` }} /></i>
+            {progress && (
+              <span>
+                {percent.toFixed(1)}% · {formatBytes(progress.transferredBytes)} /{' '}
+                {formatBytes(progress.totalBytes)}
+              </span>
+            )}
+            <i>
+              <b style={{ width: `${percent}%` }} />
+            </i>
           </div>
           <div className="send-bottom-bar file-send-bar">
-            <button className="choose-file-button" onClick={() => void chooseFile()}>选择文件</button>
-            <select value={chunkSize} onChange={(event) => setChunkSize(Number(event.target.value))}>
-              <option value={256}>256 B</option><option value={512}>512 B</option><option value={1024}>1 KB 分块</option><option value={4096}>4 KB 分块</option>
+            <button className="choose-file-button" onClick={() => void chooseFile()}>
+              选择文件
+            </button>
+            <select
+              value={chunkSize}
+              onChange={(event) => setChunkSize(Number(event.target.value))}
+            >
+              <option value={256}>256 B</option>
+              <option value={512}>512 B</option>
+              <option value={1024}>1 KB 分块</option>
+              <option value={4096}>4 KB 分块</option>
             </select>
-            <label className="file-chunk-delay" data-tooltip="每发送完一个文件区块后等待指定时间，再发送下一个区块。0 表示不延时。">
+            <label
+              className="file-chunk-delay"
+              data-tooltip="每发送完一个文件区块后等待指定时间，再发送下一个区块。0 表示不延时。"
+            >
               区块延时
               <input
                 type="number"
                 min="0"
                 max="60000"
                 value={chunkDelay}
-                onChange={(event) => setChunkDelay(Math.min(60000, Math.max(0, Math.floor(Number(event.target.value) || 0))))}
+                onChange={(event) =>
+                  setChunkDelay(
+                    Math.min(60000, Math.max(0, Math.floor(Number(event.target.value) || 0)))
+                  )
+                }
               />
               ms
             </label>
             {portSelect}
-            {canCancel && <button className="send-cancel-button" onClick={() => void window.api.cancelFileTransfer(progress.taskId)}>取消</button>}
-            <button className="send-button" disabled={!file || !props.targetPort} onClick={() => void sendFile()}>发送文件</button>
+            {canCancel && (
+              <button
+                className="send-cancel-button"
+                onClick={() => void window.api.cancelFileTransfer(progress.taskId)}
+              >
+                取消
+              </button>
+            )}
+            <button
+              className="send-button"
+              disabled={!file || !props.targetPort}
+              onClick={() => void sendFile()}
+            >
+              发送文件
+            </button>
           </div>
         </div>
       ) : null}
-      <div className="firmware-host" hidden={mode !== 'firmware'}><FirmwareFlashPanel /></div>
+      <div className="firmware-host" hidden={mode !== 'firmware'}>
+        <FirmwareFlashPanel />
+      </div>
     </div>
   )
 }

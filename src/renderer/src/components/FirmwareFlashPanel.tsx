@@ -5,7 +5,7 @@ import {
   type FirmwareRequest,
   type FirmwareState,
   type FirmwareTool
-} from '../../../shared/firmware'
+} from '@common/firmware'
 
 const storageKey = 'serialflow.firmware.settings.v1'
 const defaults: FirmwareRequest = {
@@ -134,6 +134,7 @@ export function FirmwareFlashPanel(): React.JSX.Element {
         if (sequence === toolSequence.current) setError(errorText(cause))
       })
     return () => {
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- This is a request generation counter, not a DOM ref; invalidate pending requests.
       toolSequence.current++
     }
   }, [request.family, request.toolPath])

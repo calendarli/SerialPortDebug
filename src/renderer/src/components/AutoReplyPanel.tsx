@@ -1036,7 +1036,10 @@ export function AutoReplyPanel({
                         onClick={(event) => {
                           event.preventDefault()
                           window.open(
-                            new URL('programming-manual.html', window.location.href).toString(),
+                            new URL(
+                              'programming-manual/index.html',
+                              window.location.href
+                            ).toString(),
                             'serialflow-programming-manual'
                           )
                         }}

@@ -1,4 +1,10 @@
-import type { FirmwareFamily, FirmwareFile, FirmwareRequest, FirmwareState, FirmwareTool } from '../shared/firmware'
+import type {
+  FirmwareFamily,
+  FirmwareFile,
+  FirmwareRequest,
+  FirmwareState,
+  FirmwareTool
+} from '@common/firmware'
 
 type SerialPortInfo = {
   path: string
@@ -100,9 +106,7 @@ declare global {
       openPort(options: SerialOptions): Promise<boolean>
       closePort(path: string): Promise<void>
       write(path: string, base64: string): Promise<number>
-      onData(
-        callback: (data: { path: string; chunks: Uint8Array[] }) => void
-      ): () => void
+      onData(callback: (data: { path: string; chunks: Uint8Array[] }) => void): () => void
       onStatus(callback: (status: { open: boolean; path: string }) => void): () => void
       onError(callback: (error: { path: string; message: string }) => void): () => void
       onFileTransferProgress(callback: (progress: FileTransferProgress) => void): () => void
