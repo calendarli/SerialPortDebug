@@ -20,6 +20,9 @@ export async function buildDriver(
       'Installer',
       'vswhere.exe'
     )
+    // WDK verification DLLs run inside MSBuild, so select a 64-bit host even
+    // when cross-compiling. Recent WDKs do not ship the x86 InfVerif DLL.
+    const msbuildHost = process.arch === 'arm64' ? 'arm64' : 'amd64'
     const msbuild =
       process.env.MSBUILD_PATH ||
       execFileSync(
@@ -31,18 +34,21 @@ export async function buildDriver(
           '-requires',
           'Microsoft.Component.MSBuild',
           '-find',
-          'MSBuild\\**\\Bin\\MSBuild.exe'
+          `MSBuild\\**\\Bin\\${msbuildHost}\\MSBuild.exe`
         ],
         { encoding: 'utf8', windowsHide: true }
       )
         .trim()
         .split(/\r?\n/)[0]
     if (!msbuild || !existsSync(msbuild))
-      throw new Error('MSBuild not found; set MSBUILD_PATH or install Visual Studio')
+      throw new Error('64-bit MSBuild not found; set MSBUILD_PATH or install Visual Studio')
+    console.log(`Driver build MSBuild: ${msbuild}`)
     const source = join(root, 'driver', 'SerialFlowVirtualSerial')
     const platform = arch === 'arm64' ? 'ARM64' : 'x64'
     const configuration = 'Release'
     const output = join(root, 'build', 'virtual-serial', arch)
+    // Let MSBuild resolve the installed SDK version. A global "10.0" override also
+    // becomes WDKBuildFolder, preventing versioned WDK props from loading.
     for (const project of [
       'Manager/SerialFlowVirtualSerialManager.vcxproj',
       'ComPort/VirtualSerial2um.vcxproj'
@@ -56,11 +62,9 @@ export async function buildDriver(
           `/p:Platform=${platform}`,
           `/p:OutDir=${join(output, project.split('/')[0])}\\`,
           `/p:IntDir=${join(output, project.split('/')[0], 'obj')}\\`,
-          '/p:WindowsTargetPlatformVersion=10.0',
           '/m'
         ],
-        source,
-        true
+        source
       )
     }
     await mkdir(join(root, 'resources', 'virtual-serial'), { recursive: true })

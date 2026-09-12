@@ -8,7 +8,7 @@ import {
   pruneEsptoolBundle,
   resourceTarget
 } from '../scripts/fetch-esptool'
-import { optional } from '../scripts/optional'
+import { optional, run } from '../scripts/optional'
 
 const warnings = spyOn(console, 'warn').mockImplementation(() => {
   /* Assert warnings without printing fixtures. */
@@ -44,6 +44,26 @@ test('optional failures do not abort installation', async () => {
     })
   ).resolves.toBeUndefined()
   expect(warnings).toHaveBeenCalledWith('[optional] fixture unavailable: toolchain missing')
+})
+
+test('quiet command failures preserve stdout and stderr in optional warnings', async () => {
+  await optional('driver fixture', () => {
+    run(
+      process.execPath,
+      [
+        '-e',
+        'console.log("error MSB8020: toolset missing"); console.error("compiler details"); process.exit(1)'
+      ],
+      process.cwd(),
+      true
+    )
+  })
+  expect(warnings).toHaveBeenCalledTimes(1)
+  const message = String(warnings.mock.calls[0][0])
+  expect(message).toContain('exited with 1')
+  expect(message).toContain('\nerror MSB8020: toolset missing\ncompiler details')
+  expect(message).toContain('Command:')
+  expect(message).toContain(`Working directory: ${process.cwd()}`)
 })
 
 test('cached esptool pruning removes companion tools but preserves runtime and license files', async () => {
