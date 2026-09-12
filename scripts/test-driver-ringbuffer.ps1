@@ -1,7 +1,7 @@
 # Compile the actual ring buffer implementation without loading/installing a driver.
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
-$output = Join-Path $root 'build/virtual-serial/ringbuffer-test'
+$output = Join-Path $root '.tmp/virtual-serial/ringbuffer-test'
 New-Item -ItemType Directory -Force -Path $output | Out-Null
 $source = Join-Path $root 'driver/SerialFlowVirtualSerial'
 $code = [IO.File]::ReadAllText((Join-Path $source 'ringbuffer.c'))

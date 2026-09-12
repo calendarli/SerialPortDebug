@@ -22,7 +22,7 @@ Module._load = function (name, ...args) {
 }
 app.disableHardwareAcceleration()
 app.commandLine.appendSwitch('in-process-gpu')
-const profile = fs.mkdtempSync(path.join(root, 'build', 'firmware-qa-serial-'))
+const profile = fs.mkdtempSync(path.join(root, '.tmp', 'ui-smoke', 'firmware-qa-serial-'))
 app.setPath('appData', profile)
 app.setPath('userData', profile)
 app.getAppPath = () => root

@@ -21,8 +21,4 @@ resources/firmware/esp32/
 resources/virtual-serial/
 
 # Local verification output
-build/*-results.txt
-build/lint.json
-build/firmware-ui-smoke.cjs
-build/update-ui-smoke.cjs
-build/virtual-serial/
+.tmp/

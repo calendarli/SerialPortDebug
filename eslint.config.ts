@@ -15,6 +15,7 @@ export default defineConfig(
       'driver/**',
       'resources/**',
       'build/**',
+      '.tmp/**',
       '**/.idea/**'
     ]
   },

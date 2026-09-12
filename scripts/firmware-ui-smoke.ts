@@ -77,7 +77,7 @@ Module._load = function (name, ...args) {
 const root = process.cwd()
 app.disableHardwareAcceleration()
 app.commandLine.appendSwitch('in-process-gpu')
-const profile = fs.mkdtempSync(path.join(root, 'build', 'firmware-qa-'))
+const profile = fs.mkdtempSync(path.join(root, '.tmp', 'ui-smoke', 'firmware-qa-'))
 app.setPath('appData', profile)
 app.setPath('userData', profile)
 app.getAppPath = () => root
@@ -152,13 +152,13 @@ app.whenReady().then(async () => {
     assert(layout.footer.bottom <= layout.panel.bottom + 1, 'actions must remain in the panel')
     assert(layout.footer.height > 25)
     fs.writeFileSync(
-      path.join(root, 'build', 'firmware-ui.png'),
+      path.join(root, '.tmp', 'ui-smoke', 'firmware-ui.png'),
       (await window.webContents.capturePage(undefined, { stayHidden: true })).toPNG()
     )
     window.setContentSize(980, 650)
     await new Promise((resolve) => setTimeout(resolve, 1200))
     fs.writeFileSync(
-      path.join(root, 'build', 'firmware-ui-compact.png'),
+      path.join(root, '.tmp', 'ui-smoke', 'firmware-ui-compact.png'),
       (await window.webContents.capturePage(undefined, { stayHidden: true })).toPNG()
     )
     assert(await run(`document.documentElement.scrollWidth <= innerWidth`))

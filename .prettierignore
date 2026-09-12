@@ -2,6 +2,7 @@ node_modules/
 out/
 dist/
 build/
+.tmp/
 resources/firmware/esp32/
 bun.lock
 .idea/

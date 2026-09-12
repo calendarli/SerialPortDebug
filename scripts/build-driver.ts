@@ -46,7 +46,7 @@ export async function buildDriver(
     const source = join(root, 'driver', 'SerialFlowVirtualSerial')
     const platform = arch === 'arm64' ? 'ARM64' : 'x64'
     const configuration = 'Release'
-    const output = join(root, 'build', 'virtual-serial', arch)
+    const output = join(root, '.tmp', 'virtual-serial', arch)
     // Let MSBuild resolve the installed SDK version. A global "10.0" override also
     // becomes WDKBuildFolder, preventing versioned WDK props from loading.
     for (const project of [

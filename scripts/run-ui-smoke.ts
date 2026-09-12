@@ -10,14 +10,15 @@ const suite =
     : process.argv[2] === 'serial'
       ? 'serial-ui-performance'
       : 'firmware-ui-smoke'
-await mkdir(resolve(root, 'build'), { recursive: true })
+const output = resolve(root, '.tmp', 'ui-smoke')
+await mkdir(output, { recursive: true })
 const result = await Bun.build({
   entrypoints: [resolve(root, `scripts/${suite}.ts`)],
   target: 'node',
   format: 'cjs',
   packages: 'external',
-  outdir: resolve(root, 'build'),
+  outdir: output,
   naming: `${suite}.cjs`
 })
 if (!result.success) throw new AggregateError(result.logs, 'UI smoke compilation failed')
-run(electron as unknown as string, [resolve(root, `build/${suite}.cjs`)], root, false, 90000)
+run(electron as unknown as string, [resolve(output, `${suite}.cjs`)], root, false, 90000)
