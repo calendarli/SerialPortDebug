@@ -7,6 +7,11 @@
   "author": "calendarli",
   "license": "GPL-3.0-only",
   "scripts": {
+    "release:version": "bun scripts/release-version.ts",
+    "release:notes": "bun scripts/release-notes.ts",
+    "package:win-x64": "bun run build && electron-builder --win nsis --x64 --publish never",
+    "package:linux-x64": "bun run build && electron-builder --linux AppImage deb --x64 --publish never",
+    "package:linux-arm64": "bun run build && electron-builder --linux AppImage deb --arm64 --publish never",
     "format": "prettier --write .",
     "lint": "eslint --cache .",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",

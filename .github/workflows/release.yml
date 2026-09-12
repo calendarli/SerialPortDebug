@@ -1,0 +1,135 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]*.[0-9]*.[0-9]*'
+      - 'V[0-9]*.[0-9]*.[0-9]*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.18.0'
+          package-manager-cache: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - name: Validate tag and generate commit-based release notes
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: bun run release:notes "$RELEASE_TAG" release-notes.md
+      - run: bun install --frozen-lockfile
+      - run: bun run lint
+      - run: bun run typecheck
+      - run: bun test
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: release-notes.md
+          if-no-files-found: error
+
+  build:
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: win-x64
+            runner: windows-2022
+          - target: linux-x64
+            runner: ubuntu-22.04
+          - target: linux-arm64
+            runner: ubuntu-22.04-arm
+    runs-on: ${{ matrix.runner }}
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.18.0'
+          package-manager-cache: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - name: Install Linux packaging dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libarchive-tools libfuse2 rpm
+      - run: bun install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+          path: build
+      - name: Build installer and updater metadata
+        run: bun run package:${{ matrix.target }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ matrix.target }}
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            dist/*.exe
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.blockmap
+            dist/latest*.yml
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: packages-*
+          merge-multiple: true
+          path: release-assets
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+      - name: Publish complete release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Require all three updater feeds and all installer formats before publishing.
+          test -s release-assets/latest.yml
+          test -s release-assets/latest-linux.yml
+          test -s release-assets/latest-linux-arm64.yml
+          shopt -s nullglob
+          windows=(release-assets/*.exe)
+          appimages=(release-assets/*.AppImage)
+          debs=(release-assets/*.deb)
+          blockmaps=(release-assets/*.exe.blockmap)
+          [[ ${#windows[@]} == 1 && ${#appimages[@]} == 2 && ${#debs[@]} == 2 && ${#blockmaps[@]} == 1 ]]
+          (cd release-assets && sha256sum * > ../SHA256SUMS.txt)
+          mv SHA256SUMS.txt release-assets/
+          # Never replace assets of an already published release. A failed draft can be retried.
+          if state=$(gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft'); then
+            if [[ "$state" != true ]]; then
+              echo "Release already published: $RELEASE_TAG"
+              exit 1
+            fi
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --draft \
+              --title "SerialFlow $RELEASE_TAG" --notes-file release-notes.md
+          fi
+          gh release upload "$RELEASE_TAG" release-assets/* --clobber
+          gh release edit "$RELEASE_TAG" --notes-file release-notes.md --draft=false
