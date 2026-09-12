@@ -17,7 +17,7 @@ jobs:
   validate:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: oven-sh/setup-bun@v2
@@ -31,7 +31,7 @@ jobs:
       - run: bun run lint
       - run: bun run typecheck
       - run: bun test
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-notes
           path: release-notes.md
@@ -44,7 +44,7 @@ jobs:
       matrix:
         include:
           - target: win-x64
-            runner: windows-2022
+            runner: windows-2025-vs2026
           - target: linux-x64
             runner: ubuntu-22.04
           - target: linux-arm64
@@ -53,7 +53,7 @@ jobs:
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: package.json
@@ -62,7 +62,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libarchive-tools libfuse2 rpm
       - name: Set up NuGet for Windows driver tools
         if: runner.os == 'Windows'
-        uses: NuGet/setup-nuget@v2
+        uses: NuGet/setup-nuget@v4.0
       - name: Restore pinned Windows SDK and WDK
         if: runner.os == 'Windows'
         shell: pwsh
@@ -75,7 +75,7 @@ jobs:
           "SERIALFLOW_ARCH=x64" >> $env:GITHUB_ENV
       # postinstall builds the driver; Windows releases must fail if it cannot be built.
       - run: bun install --frozen-lockfile
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: release-notes
           path: build
@@ -92,7 +92,7 @@ jobs:
               throw "Packaged virtual serial driver is missing or empty: $path"
             }
           }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: packages-${{ matrix.target }}
           if-no-files-found: error
@@ -110,12 +110,12 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: packages-*
           merge-multiple: true
           path: release-assets
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: release-notes
       - name: Publish complete release

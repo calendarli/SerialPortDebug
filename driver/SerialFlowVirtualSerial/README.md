@@ -78,8 +78,8 @@ bun run build:driver
 
 ### GitHub Actions Windows 打包
 
-Release workflow 在 `windows-2022`（VS2022，含 WDK 扩展）上从 NuGet 恢复
-`driver/packages.config` 固定的 SDK/WDK 10.0.26100.6584。通过
+Release workflow 在 `windows-2025-vs2026`（VS2026，含 WDK 扩展）上从 NuGet 恢复
+`driver/packages.config` 固定的 SDK/WDK 10.0.28000.2526。通过
 `SERIALFLOW_WDK_PACKAGES` 指向包目录，`driver/Directory.Build.props` 只在该变量
 设置时导入 NuGet 工具链；普通本地构建继续使用已安装的 SDK/WDK。
 升级版本时需同步修改上述两个文件，并确认与 CI 的 Visual Studio 版本兼容。
