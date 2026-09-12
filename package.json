@@ -30,7 +30,8 @@
     "format:check": "prettier --check .",
     "build:driver": "bun scripts/build-driver.ts",
     "fetch:esptool": "bun scripts/fetch-esptool.ts",
-    "test:ui": "bun scripts/run-ui-smoke.ts"
+    "test:ui": "bun scripts/run-ui-smoke.ts",
+    "test:ui:updates": "bun scripts/run-ui-smoke.ts updates"
   },
   "dependencies": {
     "@electron-toolkit/utils": "^4.0.0",

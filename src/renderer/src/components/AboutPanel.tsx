@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import appIcon from '../assets/app-icon.png'
+import type { UpdateState } from '@common/update'
+import { UpdateControls } from './UpdateControls'
 
 const repositoryUrl = 'https://github.com/calendarli/SerialFlow'
 
@@ -15,7 +17,13 @@ const platformNames: Record<string, string> = {
   linux: 'Linux'
 }
 
-export function AboutPanel(): React.JSX.Element {
+export function AboutPanel({
+  updateState,
+  onUpdateAction
+}: {
+  updateState: UpdateState
+  onUpdateAction: () => Promise<void>
+}): React.JSX.Element {
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null)
   const versions = window.electron.process.versions
 
@@ -72,6 +80,11 @@ export function AboutPanel(): React.JSX.Element {
           <dd>v{versions.node}</dd>
         </div>
       </dl>
+
+      <section className="about-update" aria-label="软件更新">
+        <h3>软件更新</h3>
+        <UpdateControls state={updateState} onAction={onUpdateAction} />
+      </section>
 
       <div className="about-repository">
         <span className="about-repository-icon" aria-hidden="true">

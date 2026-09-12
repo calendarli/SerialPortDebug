@@ -24,4 +24,5 @@ resources/virtual-serial/
 build/*-results.txt
 build/lint.json
 build/firmware-ui-smoke.cjs
+build/update-ui-smoke.cjs
 build/virtual-serial/

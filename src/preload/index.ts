@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { FirmwareFamily, FirmwareRequest, FirmwareState } from '@common/firmware'
+import type { UpdateState } from '@common/update'
 
 // Sandboxed preload scripts can only load Electron's built-in modules.
 // Keep the renderer-facing compatibility surface deliberately small.
@@ -14,6 +15,16 @@ const electron = {
 }
 
 const api = {
+  getUpdateState: (): Promise<UpdateState> => ipcRenderer.invoke('update:getState'),
+  checkForUpdates: (): Promise<void> => ipcRenderer.invoke('update:check'),
+  downloadUpdate: (): Promise<void> => ipcRenderer.invoke('update:download'),
+  installUpdate: (): Promise<void> => ipcRenderer.invoke('update:install'),
+  onUpdateState: (callback: (state: UpdateState) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, state: UpdateState): void =>
+      callback(state)
+    ipcRenderer.on('update:state', listener)
+    return () => ipcRenderer.removeListener('update:state', listener)
+  },
   getFirmwareState: () => ipcRenderer.invoke('firmware:state'),
   getFirmwareTool: (family: FirmwareFamily, path: string) =>
     ipcRenderer.invoke('firmware:tool', family, path),

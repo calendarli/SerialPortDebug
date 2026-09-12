@@ -1,3 +1,4 @@
+import type { UpdateState } from '@common/update'
 import type {
   FirmwareFamily,
   FirmwareFile,
@@ -50,6 +51,11 @@ declare global {
       }
     }
     api: {
+      getUpdateState(): Promise<UpdateState>
+      checkForUpdates(): Promise<void>
+      downloadUpdate(): Promise<void>
+      installUpdate(): Promise<void>
+      onUpdateState(callback: (state: UpdateState) => void): () => void
       getFirmwareState(): Promise<FirmwareState | null>
       getFirmwareTool(family: FirmwareFamily, path: string): Promise<FirmwareTool>
       listFirmwareProbes(path: string): Promise<string[]>

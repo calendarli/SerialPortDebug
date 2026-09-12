@@ -16,6 +16,8 @@ import { PlotPanel } from './components/PlotPanel'
 import { ModbusPanel } from './components/ModbusPanel'
 import { AutoReplyPanel } from './components/AutoReplyPanel'
 import { AboutPanel } from './components/AboutPanel'
+import { useAppUpdates } from './use-app-updates'
+import { UpdateNotice } from './components/UpdateControls'
 import { CommandsPanel } from './components/CommandsPanel'
 import { normalizeCommandExtensions } from './command-settings'
 import { SendPanel } from './components/SendPanel'
@@ -418,6 +420,7 @@ function trimInteractionEntries(
 }
 
 function App(): React.JSX.Element {
+  const updates = useAppUpdates()
   const [ports, setPorts] = useState<Port[]>([])
   const [serialConfigs, setSerialConfigs] = useState<SerialConfig[]>(loadSerialConfigs)
   const [openedPorts, setOpenedPorts] = useState<Set<string>>(new Set())
@@ -1477,7 +1480,9 @@ function App(): React.JSX.Element {
               onExport={() => void exportAutoReplies()}
             />
           }
-          aboutContent={<AboutPanel />}
+          aboutContent={
+            <AboutPanel updateState={updates.state} onUpdateAction={updates.runAction} />
+          }
         />
         {sideTab === 'pairs' ? (
           <SerialPairPanel />
@@ -1553,6 +1558,7 @@ function App(): React.JSX.Element {
           </section>
         )}
       </section>
+      <UpdateNotice state={updates.state} onAction={updates.runAction} />
       {errorDialog && (
         <div
           className="modal-backdrop app-error-backdrop"

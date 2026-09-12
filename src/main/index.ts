@@ -9,6 +9,8 @@ import icon from '../../resources/icon-v3.png?asset'
 import { FileTransferManager } from './file-transfer'
 import { FirmwareManager } from './firmware/manager'
 import type { FirmwareFamily, FirmwareRequest } from '@common/firmware'
+import { autoUpdater } from 'electron-updater'
+import { UpdateManager } from './update-manager'
 
 // Retain existing settings when upgrading installations created under the old package name.
 app.setName('SerialFlow')
@@ -106,6 +108,7 @@ let quitting = false
 let quitReady = false
 
 function assertPortAvailable(path: string): void {
+  if (quitting) throw new Error('程序正在关闭，请等待当前操作完成')
   if (firmwarePorts.has(path.toUpperCase()))
     throw new Error(`串口 ${path} 正被固件烧录独占，请等待任务结束`)
 }
@@ -790,6 +793,50 @@ app.whenReady().then(() => {
   app.on('browser-window-created', (_, window) => optimizer.watchWindowShortcuts(window))
   registerSerialHandlers()
   createWindow()
+  const updates = new UpdateManager(
+    autoUpdater,
+    (state) => {
+      if (mainWindow && !mainWindow.isDestroyed())
+        mainWindow.webContents.send('update:state', state)
+    },
+    async () => {
+      if (!mainWindow || mainWindow.isDestroyed() || quitting) return false
+      const { response } = await dialog.showMessageBox(mainWindow, {
+        type: 'warning',
+        title: '安装更新',
+        message: '程序将关闭并安装更新，是否继续？',
+        detail: '串口连接、数据传输和固件烧录任务将停止。请先保存需要的数据。',
+        buttons: ['取消', '关闭并安装'],
+        defaultId: 0,
+        cancelId: 0,
+        noLink: true
+      })
+      return response === 1 && !quitting
+    },
+    async () => {
+      quitting = true
+      try {
+        await firmwareManager?.shutdown()
+        await closeAllPorts()
+      } finally {
+        // The ordinary quit handler remains responsible for final shutdown.
+        quitting = false
+      }
+    },
+    !app.isPackaged
+      ? '开发模式不检查更新，请在安装后的正式版本中使用。'
+      : !(
+            (process.platform === 'win32' && process.arch === 'x64') ||
+            (process.platform === 'linux' && ['x64', 'arm64'].includes(process.arch))
+          )
+        ? '当前平台暂未提供自动更新安装包。'
+        : undefined
+  )
+  ipcMain.handle('update:getState', () => updates.getState())
+  ipcMain.handle('update:check', () => updates.check())
+  ipcMain.handle('update:download', () => updates.download())
+  ipcMain.handle('update:install', () => updates.install())
+  void updates.checkOnStartup()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
